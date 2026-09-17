@@ -1,47 +1,15 @@
 {
  "schema": 2,
  "phase": "live",
- "generated_at": "2026-09-17T19:23:27.933339Z",
+ "generated_at": "2026-09-17T19:30:30.885424Z",
  "event": {
   "name": "Longtable",
-  "start": "2026-09-17T13:00:00-04:00",
+  "start": "2026-09-17T15:00:00-04:00",
   "tz": "America/New_York",
   "slot_minutes": 30,
-  "slots": 42
+  "slots": 38
  },
- "people": [
-  {
-   "id": "p1",
-   "name": "Nah Fhey",
-   "dm": true,
-   "hidden": false,
-   "variant": 4082956081,
-   "presence": {
-    "planned": [
-     0,
-     42
-    ],
-    "actual": {
-     "here": null,
-     "leaving": 0
-    }
-   }
-  }
- ],
- "tables": [
-  {
-   "id": "t1",
-   "name": "TEST",
-   "system": "D&D 5e",
-   "pitch": "this is a test",
-   "seats": 5,
-   "walk_ins": true,
-   "start": 0,
-   "end": 5,
-   "dm": "p1",
-   "created_at": "2026-09-17T07:57:33.398533-05:00",
-   "signups": []
-  }
- ],
+ "people": [],
+ "tables": [],
  "events": []
 }
