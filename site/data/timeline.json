@@ -1,7 +1,7 @@
 {
  "schema": 2,
  "phase": "live",
- "generated_at": "2026-09-17T19:34:30.251698Z",
+ "generated_at": "2026-09-17T19:36:21.181877Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -9,7 +9,25 @@
   "slot_minutes": 30,
   "slots": 38
  },
- "people": [],
+ "people": [
+  {
+   "id": "p1",
+   "name": "Nah Fhey",
+   "dm": true,
+   "hidden": false,
+   "variant": 4082956081,
+   "presence": {
+    "planned": [
+     2,
+     38
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  }
+ ],
  "tables": [],
  "events": []
 }
