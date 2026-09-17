@@ -1,0 +1,1527 @@
+{
+ "schema": 2,
+ "phase": "live",
+ "generated_at": "2026-11-07T20:09:41Z",
+ "event": {
+  "name": "Longtable",
+  "start": "2026-11-07T10:00:00-05:00",
+  "tz": "America/New_York",
+  "slot_minutes": 30,
+  "slots": 48
+ },
+ "people": [
+  {
+   "id": "u_mara",
+   "name": "Mara Okonkwo",
+   "dm": true,
+   "hidden": false,
+   "variant": 2674673926,
+   "presence": {
+    "planned": [
+     0,
+     22
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_theo",
+   "name": "Theo Lindqvist",
+   "dm": true,
+   "hidden": false,
+   "variant": 3734847873,
+   "presence": {
+    "planned": [
+     1,
+     32
+    ],
+    "actual": {
+     "here": 1.1,
+     "leaving": 31.6
+    }
+   }
+  },
+  {
+   "id": "u_priya",
+   "name": "Priya Raman",
+   "dm": true,
+   "hidden": false,
+   "variant": 2807749152,
+   "presence": {
+    "planned": [
+     3,
+     31
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_jonah",
+   "name": "Jonah Beck",
+   "dm": true,
+   "hidden": false,
+   "variant": 757673057,
+   "presence": {
+    "planned": [
+     8,
+     48
+    ],
+    "actual": {
+     "here": 8.3,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_wen",
+   "name": "Wen Zhao",
+   "dm": true,
+   "hidden": false,
+   "variant": 1982626525,
+   "presence": {
+    "planned": [
+     12,
+     24
+    ],
+    "actual": {
+     "here": 12.9,
+     "leaving": 23.2
+    }
+   }
+  },
+  {
+   "id": "u_sol",
+   "name": "Sol Ferreira",
+   "dm": true,
+   "hidden": false,
+   "variant": 1239807689,
+   "presence": {
+    "planned": [
+     16,
+     26
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_ilse",
+   "name": "Ilse Vandermeer",
+   "dm": true,
+   "hidden": false,
+   "variant": 3198513396,
+   "presence": {
+    "planned": [
+     28,
+     38
+    ],
+    "actual": {
+     "here": 28.6,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_rafa",
+   "name": "Rafa Domínguez",
+   "dm": true,
+   "hidden": false,
+   "variant": 2283794869,
+   "presence": {
+    "planned": [
+     40,
+     48
+    ],
+    "actual": {
+     "here": 40.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_ada",
+   "name": "Ada Whitlock",
+   "dm": false,
+   "hidden": false,
+   "variant": 763803779,
+   "presence": {
+    "planned": [
+     0,
+     10
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": 9.6
+    }
+   }
+  },
+  {
+   "id": "u_bram",
+   "name": "Bram Castellano",
+   "dm": false,
+   "hidden": false,
+   "variant": 2472576459,
+   "presence": {
+    "planned": [
+     0,
+     12
+    ],
+    "actual": {
+     "here": 1.3,
+     "leaving": 11.4
+    }
+   }
+  },
+  {
+   "id": "u_cleo",
+   "name": "Cleo Marsh",
+   "dm": false,
+   "hidden": false,
+   "variant": 3084790974,
+   "presence": {
+    "planned": [
+     1,
+     14
+    ],
+    "actual": {
+     "here": null,
+     "leaving": 13.5
+    }
+   }
+  },
+  {
+   "id": "u_dev",
+   "name": "Dev Anand",
+   "dm": false,
+   "hidden": false,
+   "variant": 3978316516,
+   "presence": {
+    "planned": [
+     1,
+     20
+    ],
+    "actual": {
+     "here": 2.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_esme",
+   "name": "Esme Larkin",
+   "dm": false,
+   "hidden": false,
+   "variant": 3757126131,
+   "presence": {
+    "planned": [
+     2,
+     24
+    ],
+    "actual": {
+     "here": 2.9,
+     "leaving": 22.7
+    }
+   }
+  },
+  {
+   "id": "u_finn",
+   "name": "Finn O'Dwyer",
+   "dm": false,
+   "hidden": false,
+   "variant": 2322133956,
+   "presence": {
+    "planned": [
+     2,
+     10
+    ],
+    "actual": {
+     "here": 1.6,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_greta",
+   "name": "Greta Holm",
+   "dm": false,
+   "hidden": false,
+   "variant": 201467292,
+   "presence": {
+    "planned": [
+     2,
+     16
+    ],
+    "actual": {
+     "here": 3.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_hugo",
+   "name": "Hugo Batista",
+   "dm": false,
+   "hidden": false,
+   "variant": 3759624844,
+   "presence": {
+    "planned": [
+     3,
+     22
+    ],
+    "actual": {
+     "here": 4.7,
+     "leaving": 12.1
+    }
+   }
+  },
+  {
+   "id": "u_ines",
+   "name": "Ines Ferrer",
+   "dm": false,
+   "hidden": false,
+   "variant": 2246934574,
+   "presence": {
+    "planned": [
+     4,
+     12
+    ],
+    "actual": {
+     "here": 5.1,
+     "leaving": 11.9
+    }
+   }
+  },
+  {
+   "id": "u_jules",
+   "name": "Jules Moreau",
+   "dm": false,
+   "hidden": false,
+   "variant": 4284617568,
+   "presence": {
+    "planned": [
+     4,
+     26
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_kit",
+   "name": null,
+   "dm": false,
+   "hidden": true,
+   "variant": null,
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_lena",
+   "name": "Lena Sørensen",
+   "dm": false,
+   "hidden": false,
+   "variant": 518810095,
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_milo",
+   "name": "Milo Petrov",
+   "dm": false,
+   "hidden": false,
+   "variant": 813020718,
+   "presence": {
+    "planned": [
+     1,
+     48
+    ],
+    "actual": {
+     "here": 3.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_nadia",
+   "name": "Nadia Haddad",
+   "dm": false,
+   "hidden": false,
+   "variant": 38243538,
+   "presence": {
+    "planned": [
+     2,
+     48
+    ],
+    "actual": {
+     "here": 6.4,
+     "leaving": 29.2
+    }
+   }
+  },
+  {
+   "id": "u_oisin",
+   "name": "Oisín Byrne",
+   "dm": false,
+   "hidden": false,
+   "variant": 3837998693,
+   "presence": {
+    "planned": [
+     6,
+     30
+    ],
+    "actual": {
+     "here": 8.2,
+     "leaving": 19.5
+    }
+   }
+  },
+  {
+   "id": "u_pip",
+   "name": "Pip Talbot",
+   "dm": false,
+   "hidden": false,
+   "variant": 3485228510,
+   "presence": {
+    "planned": [
+     8,
+     20
+    ],
+    "actual": {
+     "here": 10.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_quinn",
+   "name": "Quinn Delacroix",
+   "dm": false,
+   "hidden": false,
+   "variant": 152663802,
+   "presence": {
+    "planned": [
+     10,
+     24
+    ],
+    "actual": {
+     "here": 12.4,
+     "leaving": 25.8
+    }
+   }
+  },
+  {
+   "id": "u_rosa",
+   "name": "Rosa Ibáñez",
+   "dm": false,
+   "hidden": false,
+   "variant": 1438340730,
+   "presence": {
+    "planned": [
+     12,
+     26
+    ],
+    "actual": {
+     "here": 12.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_sam",
+   "name": "Sam Kowalski",
+   "dm": false,
+   "hidden": false,
+   "variant": 1156905332,
+   "presence": {
+    "planned": [
+     12,
+     32
+    ],
+    "actual": {
+     "here": 14.6,
+     "leaving": 29.1
+    }
+   }
+  },
+  {
+   "id": "u_tess",
+   "name": "Tess Nakamura",
+   "dm": false,
+   "hidden": false,
+   "variant": 2168738360,
+   "presence": {
+    "planned": [
+     14,
+     30
+    ],
+    "actual": {
+     "here": 16.3,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_umar",
+   "name": "Umar Siddiqui",
+   "dm": false,
+   "hidden": false,
+   "variant": 2350918152,
+   "presence": {
+    "planned": [
+     16,
+     24
+    ],
+    "actual": {
+     "here": 16.9,
+     "leaving": 35.2
+    }
+   }
+  },
+  {
+   "id": "u_vera",
+   "name": "Vera Lindgren",
+   "dm": false,
+   "hidden": false,
+   "variant": 2913433009,
+   "presence": {
+    "planned": [
+     16,
+     36
+    ],
+    "actual": {
+     "here": 18.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_wyatt",
+   "name": "Wyatt Boone",
+   "dm": false,
+   "hidden": false,
+   "variant": 949449876,
+   "presence": {
+    "planned": [
+     18,
+     34
+    ],
+    "actual": {
+     "here": 20.7,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_xiu",
+   "name": "Xiu Lan",
+   "dm": false,
+   "hidden": false,
+   "variant": 1576846133,
+   "presence": {
+    "planned": [
+     20,
+     48
+    ],
+    "actual": {
+     "here": 22.5,
+     "leaving": 39.4
+    }
+   }
+  },
+  {
+   "id": "u_yara",
+   "name": "Yara Mansour",
+   "dm": false,
+   "hidden": false,
+   "variant": 3835376218,
+   "presence": {
+    "planned": [
+     22,
+     40
+    ],
+    "actual": {
+     "here": 24.3,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_zeke",
+   "name": "Zeke Halloran",
+   "dm": false,
+   "hidden": false,
+   "variant": 4215498364,
+   "presence": {
+    "planned": [
+     24,
+     44
+    ],
+    "actual": {
+     "here": 27.1,
+     "leaving": 35.8
+    }
+   }
+  },
+  {
+   "id": "u_abel",
+   "name": "Abel Nkemelu",
+   "dm": false,
+   "hidden": false,
+   "variant": 596010891,
+   "presence": {
+    "planned": [
+     26,
+     36
+    ],
+    "actual": {
+     "here": 28.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_bea",
+   "name": "Bea Fontaine",
+   "dm": false,
+   "hidden": false,
+   "variant": 2239047611,
+   "presence": {
+    "planned": [
+     28,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_cass",
+   "name": null,
+   "dm": false,
+   "hidden": true,
+   "variant": null,
+   "presence": {
+    "planned": [
+     30,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dara",
+   "name": "Dara Quigley",
+   "dm": false,
+   "hidden": false,
+   "variant": 1019051759,
+   "presence": {
+    "planned": [
+     34,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_eli",
+   "name": "Eli Strand",
+   "dm": false,
+   "hidden": false,
+   "variant": 1797879807,
+   "presence": {
+    "planned": [
+     36,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_freya",
+   "name": "Freya Voss",
+   "dm": false,
+   "hidden": false,
+   "variant": 4280303154,
+   "presence": {
+    "planned": [
+     38,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_gus",
+   "name": "Gus Mercer",
+   "dm": false,
+   "hidden": false,
+   "variant": 1182883030,
+   "presence": {
+    "planned": [
+     40,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_hana",
+   "name": "Hana Kobayashi",
+   "dm": false,
+   "hidden": false,
+   "variant": 3508503159,
+   "presence": {
+    "planned": [
+     42,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_ivo",
+   "name": "Ivo Tremblay",
+   "dm": false,
+   "hidden": false,
+   "variant": 3570226531,
+   "presence": {
+    "planned": [
+     4,
+     8
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_admin",
+   "name": "Devin",
+   "dm": false,
+   "hidden": false,
+   "variant": 3643441772,
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  }
+ ],
+ "tables": [
+  {
+   "id": "t01",
+   "name": "The Sunken Keep",
+   "system": "D&D 5e",
+   "pitch": "Level-3 dungeon crawl beneath a drowned chapel. Pregens provided.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 2,
+   "end": 10,
+   "dm": "u_mara",
+   "created_at": "2026-10-10T18:00:00-05:00",
+   "signups": [
+    {
+     "person": "u_lena",
+     "planned": [
+      2,
+      10
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_bram",
+     "planned": [
+      2,
+      10
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_kit",
+     "planned": [
+      2,
+      10
+     ],
+     "actual": [
+      2,
+      null
+     ]
+    },
+    {
+     "person": "u_oisin",
+     "planned": [
+      6,
+      10
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_ada",
+     "planned": [
+      2,
+      10
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t02",
+   "name": "Duskvol Heist",
+   "system": "Blades in the Dark",
+   "pitch": "One score, one crew, one very angry Spirit Warden.",
+   "seats": 4,
+   "walk_ins": false,
+   "start": 2,
+   "end": 8,
+   "dm": "u_theo",
+   "created_at": "2026-10-11T18:04:00-05:00",
+   "signups": [
+    {
+     "person": "u_jules",
+     "planned": [
+      4,
+      8
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_milo",
+     "planned": [
+      2,
+      8
+     ],
+     "actual": [
+      3.1,
+      null
+     ]
+    },
+    {
+     "person": "u_finn",
+     "planned": [
+      2,
+      8
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_hugo",
+     "planned": [
+      3,
+      8
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t03",
+   "name": "Goblin Market",
+   "system": "D&D 5e",
+   "pitch": "Low-level, high-chaos. Bring a goblin voice.",
+   "seats": 6,
+   "walk_ins": true,
+   "start": 4,
+   "end": 12,
+   "dm": "u_priya",
+   "created_at": "2026-10-12T18:08:00-05:00",
+   "signups": [
+    {
+     "person": "u_pip",
+     "planned": [
+      8,
+      12
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_esme",
+     "planned": [
+      4,
+      12
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_greta",
+     "planned": [
+      4,
+      12
+     ],
+     "actual": [
+      4,
+      null
+     ]
+    },
+    {
+     "person": "u_quinn",
+     "planned": [
+      10,
+      12
+     ],
+     "actual": [
+      12.4,
+      12
+     ]
+    }
+   ]
+  },
+  {
+   "id": "t04",
+   "name": "Dead Planet",
+   "system": "Mothership",
+   "pitch": "Sci-fi horror on a derelict. You will not all make it.",
+   "seats": 4,
+   "walk_ins": false,
+   "start": 10,
+   "end": 16,
+   "dm": "u_jonah",
+   "created_at": "2026-10-13T18:12:00-05:00",
+   "signups": [
+    {
+     "person": "u_nadia",
+     "planned": [
+      10,
+      16
+     ],
+     "actual": [
+      10,
+      16
+     ]
+    },
+    {
+     "person": "u_ines",
+     "planned": [
+      10,
+      12
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_lena",
+     "planned": [
+      10,
+      16
+     ],
+     "actual": [
+      10,
+      null
+     ]
+    },
+    {
+     "person": "u_kit",
+     "planned": [
+      10,
+      16
+     ],
+     "actual": [
+      10,
+      null
+     ]
+    }
+   ]
+  },
+  {
+   "id": "t05",
+   "name": "Dragon Heist, Ch. 1",
+   "system": "D&D 5e",
+   "pitch": "Waterdeep intro chapter, level 1, new players welcome.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 12,
+   "end": 20,
+   "dm": "u_mara",
+   "created_at": "2026-10-14T18:16:00-05:00",
+   "signups": [
+    {
+     "person": "u_oisin",
+     "planned": [
+      12,
+      20
+     ],
+     "actual": [
+      12,
+      19.5
+     ]
+    },
+    {
+     "person": "u_wyatt",
+     "planned": [
+      18,
+      20
+     ],
+     "actual": [
+      20.7,
+      null
+     ]
+    },
+    {
+     "person": "u_greta",
+     "planned": [
+      12,
+      16
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_cleo",
+     "planned": [
+      12,
+      14
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t06",
+   "name": "Strahd Must Die Tonight",
+   "system": "D&D 5e",
+   "pitch": "Level-10 one-shot: storm Ravenloft in four hours.",
+   "seats": 6,
+   "walk_ins": false,
+   "start": 14,
+   "end": 22,
+   "dm": "u_wen",
+   "created_at": "2026-10-15T18:20:00-05:00",
+   "signups": [
+    {
+     "person": "u_esme",
+     "planned": [
+      14,
+      22
+     ],
+     "actual": [
+      14,
+      22
+     ]
+    },
+    {
+     "person": "u_quinn",
+     "planned": [
+      14,
+      22
+     ],
+     "actual": [
+      14,
+      22
+     ]
+    },
+    {
+     "person": "u_sam",
+     "planned": [
+      14,
+      22
+     ],
+     "actual": [
+      14.6,
+      22
+     ]
+    },
+    {
+     "person": "u_rosa",
+     "planned": [
+      14,
+      22
+     ],
+     "actual": [
+      14,
+      null
+     ]
+    },
+    {
+     "person": "u_dev",
+     "planned": [
+      14,
+      20
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_xiu",
+     "planned": [
+      20,
+      22
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t07",
+   "name": "Summer of '87",
+   "system": "Kids on Bikes",
+   "pitch": "Small-town weirdness, no prep needed, rules taught at the table.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 18,
+   "end": 24,
+   "dm": "u_sol",
+   "created_at": "2026-10-16T18:24:00-05:00",
+   "signups": [
+    {
+     "person": "u_nadia",
+     "planned": [
+      18,
+      24
+     ],
+     "actual": [
+      18,
+      24
+     ]
+    },
+    {
+     "person": "u_jules",
+     "planned": [
+      18,
+      24
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t08",
+   "name": "The Long Night",
+   "system": "D&D 5e",
+   "pitch": "Survival horror at level 5. Lights off, candles on.",
+   "seats": 5,
+   "walk_ins": false,
+   "start": 22,
+   "end": 30,
+   "dm": "u_theo",
+   "created_at": "2026-10-17T18:28:00-05:00",
+   "signups": [
+    {
+     "person": "u_esme",
+     "planned": [
+      22,
+      24
+     ],
+     "actual": [
+      22,
+      22.7
+     ]
+    },
+    {
+     "person": "u_oisin",
+     "planned": [
+      22,
+      30
+     ],
+     "actual": [
+      22,
+      19.5
+     ]
+    },
+    {
+     "person": "u_xiu",
+     "planned": [
+      22,
+      30
+     ],
+     "actual": [
+      22.5,
+      30
+     ]
+    },
+    {
+     "person": "u_kit",
+     "planned": [
+      22,
+      30
+     ],
+     "actual": [
+      22,
+      null
+     ]
+    },
+    {
+     "person": "u_quinn",
+     "planned": [
+      22,
+      24
+     ],
+     "actual": [
+      22,
+      24
+     ]
+    }
+   ]
+  },
+  {
+   "id": "t09",
+   "name": "Midnight Munchkin",
+   "system": "Munchkin (board)",
+   "pitch": "Backstabbing card game for the sleepless. Drop in, drop out.",
+   "seats": 6,
+   "walk_ins": true,
+   "start": 26,
+   "end": 30,
+   "dm": "u_priya",
+   "created_at": "2026-10-18T18:32:00-05:00",
+   "signups": [
+    {
+     "person": "u_vera",
+     "planned": [
+      26,
+      30
+     ],
+     "actual": [
+      26,
+      null
+     ]
+    },
+    {
+     "person": "u_yara",
+     "planned": [
+      26,
+      30
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_milo",
+     "planned": [
+      26,
+      30
+     ],
+     "actual": [
+      26,
+      null
+     ]
+    },
+    {
+     "person": "u_lena",
+     "planned": [
+      26,
+      30
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t10",
+   "name": "Graveyard Shift",
+   "system": "Call of Cthulhu 7e",
+   "pitch": "Investigators at 1 AM. Sanity not guaranteed.",
+   "seats": 4,
+   "walk_ins": false,
+   "start": 30,
+   "end": 36,
+   "dm": "u_ilse",
+   "created_at": "2026-10-19T18:36:00-05:00",
+   "signups": [
+    {
+     "person": "u_kit",
+     "planned": [
+      30,
+      36
+     ],
+     "actual": [
+      30,
+      null
+     ]
+    },
+    {
+     "person": "u_abel",
+     "planned": [
+      30,
+      36
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_dara",
+     "planned": [
+      34,
+      36
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_lena",
+     "planned": [
+      30,
+      36
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t11",
+   "name": "Dawn Patrol",
+   "system": "D&D 5e",
+   "pitch": "Level-2 skirmish for early risers and never-sleepers.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 38,
+   "end": 46,
+   "dm": "u_jonah",
+   "created_at": "2026-10-20T18:40:00-05:00",
+   "signups": [
+    {
+     "person": "u_gus",
+     "planned": [
+      40,
+      46
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_nadia",
+     "planned": [
+      38,
+      46
+     ],
+     "actual": [
+      38,
+      29.2
+     ]
+    },
+    {
+     "person": "u_xiu",
+     "planned": [
+      38,
+      46
+     ],
+     "actual": [
+      38,
+      39.4
+     ]
+    },
+    {
+     "person": "u_bea",
+     "planned": [
+      38,
+      46
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t12",
+   "name": "Breakfast Brawl",
+   "system": "Pathfinder 2e",
+   "pitch": "Arena one-shot with pancakes. Pregens provided.",
+   "seats": 6,
+   "walk_ins": true,
+   "start": 42,
+   "end": 48,
+   "dm": "u_rafa",
+   "created_at": "2026-10-21T18:44:00-05:00",
+   "signups": [
+    {
+     "person": "u_milo",
+     "planned": [
+      42,
+      48
+     ],
+     "actual": [
+      42,
+      null
+     ]
+    },
+    {
+     "person": "u_lena",
+     "planned": [
+      42,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_eli",
+     "planned": [
+      42,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  }
+ ],
+ "events": [
+  {
+   "id": "e01",
+   "kind": "announce",
+   "at": 0.9,
+   "duration": null,
+   "text": "Doors are open. Grab a lanyard at the desk and find your DM on the board.",
+   "person": null,
+   "by": "u_admin"
+  },
+  {
+   "id": "e07",
+   "kind": "shout",
+   "at": 2.4,
+   "duration": null,
+   "text": "Huzzah!",
+   "person": "u_ada",
+   "by": "u_ada"
+  },
+  {
+   "id": "e08",
+   "kind": "shout",
+   "at": 6.2,
+   "duration": null,
+   "text": "Natural 20!",
+   "person": "u_kit",
+   "by": "u_kit"
+  },
+  {
+   "id": "e02",
+   "kind": "break",
+   "at": 8.0,
+   "duration": 1.0,
+   "text": null,
+   "person": null,
+   "by": "u_admin"
+  },
+  {
+   "id": "e09",
+   "kind": "donation",
+   "at": 11.7,
+   "duration": null,
+   "text": "For every adventurer finding their first party!",
+   "person": "u_lena",
+   "by": "u_admin"
+  },
+  {
+   "id": "e10",
+   "kind": "shout",
+   "at": 15.1,
+   "duration": null,
+   "text": "Roll for initiative!",
+   "person": "u_mara",
+   "by": "u_mara"
+  },
+  {
+   "id": "e03",
+   "kind": "meal",
+   "at": 16.0,
+   "duration": 2.0,
+   "text": "Dinner",
+   "person": null,
+   "by": "u_admin"
+  },
+  {
+   "id": "e04",
+   "kind": "spotlight",
+   "at": 20.3,
+   "duration": null,
+   "text": "Esme rolled three nat 20s in a row and killed Strahd with a spoon.",
+   "person": "u_esme",
+   "by": "u_admin"
+  },
+  {
+   "id": "e11",
+   "kind": "shout",
+   "at": 23.4,
+   "duration": null,
+   "text": "More snacks!",
+   "person": "u_vera",
+   "by": "u_vera"
+  },
+  {
+   "id": "e05",
+   "kind": "announce",
+   "at": 27.8,
+   "duration": null,
+   "text": "Quiet hours from midnight. Sleepers are in the back room; keep the cheering to the hall.",
+   "person": null,
+   "by": "u_admin"
+  },
+  {
+   "id": "e06",
+   "kind": "break",
+   "at": 30.0,
+   "duration": 0.5,
+   "text": null,
+   "person": null,
+   "by": "u_admin"
+  },
+  {
+   "id": "e12",
+   "kind": "donation",
+   "at": 32.8,
+   "duration": null,
+   "text": "May your dice be kind and your table welcoming.",
+   "person": "u_bea",
+   "by": "u_admin"
+  },
+  {
+   "id": "e13",
+   "kind": "shout",
+   "at": 37.2,
+   "duration": null,
+   "text": "Huzzah!",
+   "person": "u_cass",
+   "by": "u_cass"
+  },
+  {
+   "id": "e14",
+   "kind": "shout",
+   "at": 44.6,
+   "duration": null,
+   "text": "Natural 20!",
+   "person": "u_rafa",
+   "by": "u_rafa"
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Longtable</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="identity">
+      <p class="eyebrow">The Great Hall</p>
+      <h1 id="event-name">Longtable</h1>
+      <p id="record-note" class="record-note" hidden>This is the final event record.</p>
+    </div>
+    <div class="readout">
+      <span id="mode-badge" class="badge">LOADING</span>
+      <time id="clock">—</time>
+      <span id="scene-event"></span>
+      <span id="current-event" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
+    </div>
+    <div class="controls" aria-label="Replay controls">
+      <button id="play" type="button" disabled>Play</button>
+      <label for="speed">Speed</label>
+      <select id="speed" disabled>
+        <option value="1">1×</option>
+        <option value="30">30×</option>
+        <option value="120">120×</option>
+        <option value="600" selected>600×</option>
+        <option value="1800">1800×</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div id="status" class="status" role="status" aria-live="polite">Loading the hall…</div>
+    <section class="hall-layout" aria-labelledby="hall-heading">
+      <div class="scene-wrap">
+        <h2 id="hall-heading" class="visually-hidden">Animated event hall</h2>
+        <canvas id="hall" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description table-list-heading"></canvas>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. The full table state is listed below.</p>
+        <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        <div class="timeline-controls">
+          <label for="scrubber">Event time</label>
+          <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
+          <div class="timeline-meta">
+            <span id="start-label">—</span>
+            <span id="now-marker" hidden>Now: —</span>
+            <span id="end-label">—</span>
+          </div>
+        </div>
+      </div>
+      <aside id="detail" class="detail" aria-live="polite">
+        <h2>Table details</h2>
+        <p class="muted">Select a table in the hall or in the accessible list below.</p>
+      </aside>
+    </section>
+
+    <section id="table-list" class="table-list" aria-labelledby="table-list-heading">
+      <h2 id="table-list-heading">Tables and rosters</h2>
+      <div id="tables"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Last updated <time id="updated">—</time>.</p>
+    <p>Art from Kenney’s Roguelike Characters and Roguelike/RPG packs, released under CC0.</p>
+  </footer>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
