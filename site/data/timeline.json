@@ -1,7 +1,7 @@
 {
  "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:20:43.983021Z",
+ "generated_at": "2026-09-18T12:22:24.367639Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -28,7 +28,7 @@
      38
     ],
     "actual": {
-     "here": 1.72,
+     "here": 34.74,
      "leaving": null
     }
    }
