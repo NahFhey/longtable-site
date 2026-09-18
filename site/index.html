@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -12,6 +13,8 @@
     <div class="identity">
       <p class="eyebrow">The Great Hall</p>
       <h1 id="event-name">Longtable</h1>
+      <p class="orientation">Longtable is a living map of our tabletop event. Browse games here, then use Discord to sign up or claim a seat.</p>
+      <div id="event-actions" class="event-actions" aria-label="Event actions"></div>
       <p id="record-note" class="record-note" hidden>This is the final event record.</p>
     </div>
     <div class="readout">
@@ -33,13 +36,26 @@
     </div>
   </header>
 
-  <main>
+  <main id="hall-content">
     <div id="status" class="status" role="status" aria-live="polite">Loading the hall…</div>
-    <section class="hall-layout" aria-labelledby="hall-heading">
+    <section id="table-list" class="table-list" aria-labelledby="table-list-heading">
+      <h2 id="table-list-heading">Tables and rosters</h2>
+      <div id="tables"></div>
+    </section>
+    <details id="hall-explorer" class="hall-explorer" open>
+      <summary>Explore the Great Hall</summary>
+    <section id="hall-layout" class="hall-layout" aria-labelledby="hall-heading">
       <div class="scene-wrap">
         <h2 id="hall-heading" class="visually-hidden">Animated event hall</h2>
-        <canvas id="hall" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. The full table state is listed below.</p>
+        <div class="camera-controls" aria-label="Hall camera controls">
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="recenter" type="button">Recenter</button>
+          <button id="fit-active" type="button">Fit active tables</button>
+        </div>
+        <p id="camera-help" class="camera-help">Drag to pan; scroll or pinch to zoom. With the hall focused, use arrow keys and +/−. Home shows the whole room.</p>
+        <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. The full table state is available in the table list.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
         <div class="timeline-controls">
           <label for="scrubber">Event time</label>
@@ -53,14 +69,11 @@
       </div>
       <aside id="detail" class="detail" aria-live="polite">
         <h2>Table details</h2>
-        <p class="muted">Select a table in the hall or in the accessible list below.</p>
+        <p class="muted">Select a table in the hall or in the table list.</p>
       </aside>
     </section>
+    </details>
 
-    <section id="table-list" class="table-list" aria-labelledby="table-list-heading">
-      <h2 id="table-list-heading">Tables and rosters</h2>
-      <div id="tables"></div>
-    </section>
   </main>
 
   <footer>

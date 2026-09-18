@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { characterAppearance } from "../characters.mjs";
 import {
   ANNOUNCE_MINUTES,
   SPOTLIGHT_MINUTES,
@@ -42,6 +43,7 @@ function person(id, overrides = {}) {
     dm: false,
     hidden: id === "hidden-key",
     variant: id === "hidden-key" ? null : 31,
+    appearance: null,
     presence: { planned: [0, 8], actual: { here: null, leaving: null } },
     ...overrides,
   };
@@ -79,8 +81,8 @@ function event(id, kind, at, overrides = {}) {
   return { id, kind, at, duration, text, person: target, by: "admin", ...overrides };
 }
 
-test("schema 1 and 2 are accepted, unknown fields are ignored, and 0/3 are rejected", () => {
-  for (const schema of [1, 2]) {
+test("schema 1, 2 and 3 are accepted, unknown fields are ignored, and 0/4 are rejected", () => {
+  for (const schema of [1, 2, 3]) {
     const input = timeline(schema);
     input.unknown_top = "ignored";
     input.event.future_field = 42;
@@ -91,7 +93,35 @@ test("schema 1 and 2 are accepted, unknown fields are ignored, and 0/3 are rejec
     assert.equal("future_field" in result.event, false);
     assert.equal("future_field" in result.people[0], false);
   }
-  for (const schema of [0, 3]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
+  for (const schema of [0, 4]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
+});
+
+test("custom appearances survive live reconciliation and defaults preserve old characters", () => {
+  const input = timeline(3);
+  const choices = { skin: 3, shirt: 14, hair: 15, hat: 2 };
+  const initial = validateTimeline(input);
+  assert.deepEqual(characterAppearance(initial.people[2]), { skin: 3, shirt: 7, hair: 0, hat: 0 });
+  input.people[2].appearance = choices;
+  input.generated_at = "2026-11-07T15:02:00Z";
+  const updated = validateTimeline(input);
+  assert.deepEqual(characterAppearance(updated.people[2]), choices);
+  const live = reconcileLiveSnapshot(createLiveState(initial), updated);
+  assert.deepEqual(characterAppearance(live.snapshot.people[2]), choices);
+  assert.equal(characterAppearance({ hidden: true, variant: 1, appearance: choices }), null);
+});
+
+test("schema 3 rejects missing, malformed, or identifying hidden appearances", () => {
+  const choices = { skin: 3, shirt: 14, hair: 15, hat: 2 };
+  const invalid = [undefined, {}, [], { ...choices, skin: true }, { ...choices, shirt: 15 },
+    { ...choices, hair: -1 }, { ...choices, hat: 4 }, { ...choices, extra: 0 }];
+  for (const appearance of invalid) {
+    const input = timeline(3);
+    input.people[2].appearance = appearance;
+    assert.throws(() => validateTimeline(input), TimelineError);
+  }
+  const hidden = timeline(3);
+  hidden.people[3].appearance = choices;
+  assert.throws(() => validateTimeline(hidden), TimelineError);
 });
 
 test("timestamp fields enforce awareness, generated-at UTC, and start's numeric offset", () => {

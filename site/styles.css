@@ -72,8 +72,10 @@ main { max-width: 1800px; margin: 0 auto; }
 canvas {
   display: block;
   width: 100%;
-  height: auto;
-  border: 2px solid var(--line);
+  height: clamp(320px, 42vw, 580px);
+  touch-action: none;
+  cursor: grab;
+  border: 0 solid solid var(--line);
   border-radius: .3rem;
   background: #100f15;
   image-rendering: pixelated;
@@ -155,4 +157,23 @@ footer p { margin: .2rem 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}
+
+.orientation { max-width: 44rem; margin: .7rem 0; color: var(--muted); }
+.event-actions, .camera-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.event-actions a { display: inline-block; border-radius: .35rem; padding: .55rem .8rem; background: var(--gold); color: #24222c; font-weight: 750; }
+.event-actions details { position: relative; }
+.event-actions summary { cursor: pointer; padding: .5rem; }
+.qr-image { display: block; width: 200px; height: 200px; margin: .5rem; }
+.qr-panel { position: absolute; z-index: 10; padding: .5rem; background: var(--panel); border: 1px solid var(--line); }
+.qr-panel p { max-width: 220px; overflow-wrap: anywhere; font-size: .8rem; }
+.hall-explorer > summary { cursor: pointer; margin: 0 1.5rem; padding: .75rem 0; font-weight: 750; color: var(--gold); }
+.camera-help { color: var(--muted); font-size: .8rem; margin: .5rem 0; }
+.table-list { padding-bottom: 1rem; }
+.join-instructions { color: var(--gold); }
+canvas:active { cursor: grabbing; }
+@media (max-width: 650px) {
+  .event-actions details { display: none; }
+  #hall-content > .detail { margin: 0 1rem 1rem; }
+  .camera-controls button { min-height: 44px; }
 }

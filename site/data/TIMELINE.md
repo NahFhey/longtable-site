@@ -9,6 +9,11 @@ Amended 2026-09-06 to **schema 2**: two attendee event kinds, `shout` and
 file with no shouts is a valid schema-2 file. The site lane ships schema-2
 support before the bot emits it; there is no bot-side flag.
 
+Amended 2026-09-17 to **schema 3**: `people[].appearance` stores an attendee's
+chosen skin, outfit, hair, and DM hat, or `null` for the original variant-based
+look. Deploy the site's schema-3 reader before restarting the updated bot. The
+site continues to accept schemas 1 and 2, treating appearance as `null`.
+
 A full fake day that exercises every field is in `timeline.sample.json`
 (generated, deterministic; 8 DMs, 12 tables, 35 players, the organiser, 14 events).
 
@@ -40,7 +45,7 @@ A full fake day that exercises every field is in `timeline.sample.json`
 
 | field | type | notes |
 |---|---|---|
-| `schema` | int | `2` (was `1` before the shouts amendment). Bump on any breaking change. Site refuses unknown majors. |
+| `schema` | int | `3` (schema 2 added shouts; schema 3 added appearance). Site refuses unknown majors. |
 | `phase` | `"live"` \| `"final"` | `final` is the +14-day publish: names trimmed to first name + initial, bot retired. Site shows a "final record" note. |
 | `generated_at` | string | ISO 8601 UTC instant the bot wrote the file. Shown as "last updated". |
 | `event` | object | window config, below. |
@@ -65,11 +70,17 @@ A full fake day that exercises every field is in `timeline.sample.json`
 | `id` | string | opaque, stable. Referenced by `tables[].dm`, `signups[].person`, `events[].person`. |
 | `name` | string \| null | display name captured at first signup and **stored** (renames don't rewrite history). `null` iff `hidden`. In `phase: "final"` it is first name + initial. |
 | `dm` | bool | holds the DM role at publish time. Rendered with the distinct DM look. |
-| `hidden` | bool | `/hide` was ever used. Honoured forever. `true` ⇒ `name` and `variant` are `null`; site draws the generic unnamed sprite and no nametag, and never shows the id. |
+| `hidden` | bool | `/hide` was ever used. Honoured forever. `true` ⇒ `name`, `variant`, and `appearance` are `null`; site draws the generic unnamed sprite and no nametag, and never shows the id. |
 | `variant` | int \| null | unsigned 32-bit FNV-1a hash of the Discord user id string, computed once by the bot. Site maps it to a sprite (`variant % palette_size`), so the art can change without the file changing. `null` iff `hidden`. |
+| `appearance` | object \| null | Required in schema 3. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
 | `presence.planned` | `[int, int]` \| null | event presence `[arrive, leave)`. `null` if the person never set it (e.g. a DM who only created a table — see DESIGN open item: creating a table leans toward auto-setting presence to cover it). |
 | `presence.actual.here` | number \| null | slot of `/here`, fractional. |
 | `presence.actual.leaving` | number \| null | slot of `/leaving`, fractional. |
+
+Appearance changes are accepted only from the registered attendee's Discord
+interaction identity. The private Discord-to-person mapping never enters this
+file. Choices persist across bot restarts and role refreshes; resetting them
+restores the original `variant` look. `/hide` clears choices permanently.
 
 **Effective presence** (site rule, applied everywhere a person is drawn):
 `arrive = actual.here ?? planned[0]`, `leave = actual.leaving ?? planned[1]`.

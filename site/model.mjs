@@ -1,3 +1,5 @@
+import { CHOICE_COUNTS } from "./characters.mjs";
+
 const ADMIN_KINDS = new Set(["break", "meal", "announce", "spotlight"]);
 const SPEECH_KINDS = new Set(["shout", "donation"]);
 const ALL_KINDS = new Set([...ADMIN_KINDS, ...SPEECH_KINDS]);
@@ -98,7 +100,7 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (schema !== 1 && schema !== 2) fail("This timeline uses an unsupported schema version.");
+  if (schema !== 1 && schema !== 2 && schema !== 3) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -121,6 +123,18 @@ export function validateTimeline(input) {
     const name = string(required(person, "name", label), `${label}.name`, { nullable: true, min: 1 });
     const variant = number(required(person, "variant", label), `${label}.variant`, { integer: true, min: 0, max: 0xffffffff, nullable: true });
     if (hidden ? (name !== null || variant !== null) : (name === null || variant === null)) fail(`${label} has inconsistent privacy fields.`);
+    let appearance = null;
+    if (schema === 3) {
+      const rawAppearance = required(person, "appearance", label);
+      if (rawAppearance !== null) {
+        if (hidden) fail(`${label} has inconsistent privacy fields.`);
+        const choices = object(rawAppearance, `${label}.appearance`);
+        if (Object.keys(choices).length !== Object.keys(CHOICE_COUNTS).length) fail(`${label}.appearance is malformed.`);
+        appearance = Object.fromEntries(Object.entries(CHOICE_COUNTS).map(([key, count]) => [key,
+          number(required(choices, key, `${label}.appearance`), `${label}.appearance.${key}`, { integer: true, min: 0, max: count - 1 }),
+        ]));
+      }
+    }
     const rawPresence = object(required(person, "presence", label), `${label}.presence`);
     const rawActual = object(required(rawPresence, "actual", `${label}.presence`), `${label}.presence.actual`);
     return {
@@ -129,6 +143,7 @@ export function validateTimeline(input) {
       dm: bool(required(person, "dm", label), `${label}.dm`),
       hidden,
       variant,
+      appearance,
       presence: {
         planned: range(required(rawPresence, "planned", `${label}.presence`), `${label}.presence.planned`, event.slots, { nullable: true }),
         actual: {

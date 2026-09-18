@@ -1,3 +1,6 @@
+import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
+import { eventActions } from "./event-config.mjs";
+import { SPRITES, characterAppearance } from "./characters.mjs";
 import {
   PALETTE_SIZE,
   activeEvents,
@@ -28,13 +31,6 @@ const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
 
-const SPRITES = {
-  skin: [0, 1, 2, 3],
-  shirts: [[6,0],[10,0],[14,0],[6,3],[10,3],[14,3],[6,5],[10,5],[14,5],[8,7],[12,7],[16,7],[6,9],[10,9],[14,9]],
-  hair: [[20,0],[21,0],[22,0],[24,0],[25,0],[26,0],[20,4],[21,4],[22,4],[24,4],[25,4],[26,4],[20,8],[21,8],[22,8],[19,2]],
-  hats: [[28,8],[29,8],[30,8],[31,8]],
-};
-
 const RPG = {
   floor: { wood: [1,26], lounge: [15,28], stage: [12,28], food: [6,28], wall: [15,13] },
   table: [[23,4],[24,4],[25,4]],
@@ -46,7 +42,23 @@ const RPG = {
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
-const ctx = canvas.getContext("2d");
+let ctx = null;
+try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
+const mobile = matchMedia("(max-width: 650px)");
+$("hall-explorer").open = !mobile.matches;
+function arrangeHall() {
+  const main = $("hall-content");
+  const explorer = $("hall-explorer");
+  if (mobile.matches) {
+    main.insertBefore($("table-list"), explorer);
+    main.insertBefore($("detail"), explorer);
+  } else {
+    main.append($("table-list"));
+    $("hall-layout").append($("detail"));
+  }
+}
+arrangeHall();
+mobile.addEventListener?.("change", arrangeHall);
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {
@@ -54,7 +66,11 @@ const state = {
   mode: null,
   time: 0,
   lastTime: 0,
-  playing: !reducedMotion.matches,
+  playing: !reducedMotion.matches && !mobile.matches,
+  camera: null,
+  manualCamera: false,
+  frameKey: null,
+  viewport: null,
   speed: 600,
   selectedId: null,
   hover: null,
@@ -128,6 +144,55 @@ function buildLayout() {
   for (let row = 0; row < layout.tableRows; row += 1) layout.aisles.push(layout.gridY + row * layout.cellHeight + layout.cellHeight - 0.5);
   if (layout.overflowRows) layout.aisles.push(layout.tableGridBottom + 1.5);
   return layout;
+}
+
+function viewport() {
+  const rect = canvas.getBoundingClientRect();
+  return { width: rect.width || 960, height: rect.height || 480 };
+}
+
+function frameTables(indices, manual = false) {
+  state.camera = fitBounds(tableBounds(state.layout, indices), viewport(), state.layout);
+  state.manualCamera = manual;
+  hideTooltip();
+}
+
+function updateCamera() {
+  const size = viewport();
+  if (state.camera && state.viewport && (size.width !== state.viewport.width || size.height !== state.viewport.height)) {
+    const center = screenToWorld(state.camera, { x: state.viewport.width / 2, y: state.viewport.height / 2 });
+    state.camera = constrainCamera({ ...state.camera, x: size.width / 2 - center.x * state.camera.zoom, y: size.height / 2 - center.y * state.camera.zoom }, size, state.layout);
+    if (!state.manualCamera) state.frameKey = null;
+  }
+  state.viewport = size;
+  const indices = relevantTableIndices(state.data.tables, state.time);
+  const key = indices.map((index) => state.data.tables[index].id).join("|");
+  if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
+    frameTables(indices);
+    state.frameKey = key;
+    state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+    renderDetail();
+  }
+  state.camera = constrainCamera(state.camera, size, state.layout);
+}
+
+function renderActions() {
+  const host = $("event-actions");
+  host.replaceChildren();
+  for (const action of state.sample ? [] : eventActions(state.data.event)) {
+    const link = append(host, "a", action.label);
+    link.href = action.url;
+    if (!action.qr) continue;
+    const disclosure = append(host, "details");
+    append(disclosure, "summary", `Show QR: ${action.label}`);
+    const panel = append(disclosure, "div", undefined, "qr-panel");
+    const image = append(panel, "img", undefined, "qr-image");
+    image.src = action.qr;
+    image.alt = `QR code for ${action.label}. You can also use the link.`;
+    image.width = 200; image.height = 200;
+    image.addEventListener("error", () => { image.hidden = true; });
+    append(panel, "p", action.url);
+  }
 }
 
 function seatPosition(tableIndex, seat) {
@@ -358,9 +423,61 @@ function drawTables() {
         ctx.fillRect((position.x - 0.28) * TILE * SCALE, (position.y - 0.28) * TILE * SCALE, .56 * TILE * SCALE, .56 * TILE * SCALE);
       }
     }
-    drawLabel(`${truncate(table.name, 16)}  ${table.signups.length}/${table.seats}`, cell.x + 3, cell.y + 5.25, { size: 4, color: open ? "#fff" : "#aaa197", background: open ? "rgba(0,0,0,.74)" : "rgba(0,0,0,.5)" });
-    drawLabel(`${formatSlot(table.start)}–${formatSlot(table.end)}`, cell.x + 3, cell.y + 5.72, { size: 3.2, color: open ? "#ffd27a" : "#898174", background: "rgba(0,0,0,.5)" });
+    drawTableProps(firstSeat.tableX, firstSeat.tableY);
   });
+}
+
+function drawTableProps(x, y) {
+  if (state.camera.zoom < 12) return;
+  const unit = TILE * SCALE;
+  ctx.save();
+  ctx.translate(x * unit, y * unit);
+  // Authored geometric props need no external art or new timeline facts.
+  ctx.fillStyle = "#eee0b9"; ctx.fillRect(25, 8, 37, 19);
+  ctx.strokeStyle = "#a79972"; ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i += 1) { ctx.beginPath(); ctx.moveTo(28 + i * 9, 8); ctx.lineTo(28 + i * 9, 27); ctx.stroke(); }
+  ctx.fillStyle = "#443450"; ctx.fillRect(4, 3, 15, 21); // GM screen
+  ctx.fillStyle = "#bd955c"; ctx.fillRect(72, 9, 17, 17); // dice tray
+  ctx.fillStyle = "#453129"; ctx.fillRect(74, 11, 13, 13);
+  if (state.camera.zoom >= 36) {
+    ctx.fillStyle = "#fff2d1"; ctx.fillRect(77, 14, 5, 5); ctx.fillRect(58, 3, 9, 5);
+    ctx.fillStyle = "#813c35"; ctx.fillRect(3, 25, 11, 5); // book
+    ctx.fillStyle = "#84aab4"; ctx.fillRect(39, 15, 4, 4); ctx.fillRect(51, 21, 4, 4);
+    ctx.fillStyle = "#ddc492"; ctx.fillRect(65, 23, 5, 6); // mug
+  }
+  ctx.restore();
+}
+
+function drawTableLabels() {
+  const dpr = globalThis.devicePixelRatio || 1;
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const boxes = [];
+  // Selected labels take priority when the overview is crowded.
+  const indices = state.data.tables.map((_, i) => i).sort((a, b) => Number(state.data.tables[b].id === state.selectedId) - Number(state.data.tables[a].id === state.selectedId));
+  for (const index of indices) {
+    const table = state.data.tables[index];
+    const cell = state.layout.cells[index];
+    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
+    if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
+    ctx.font = "700 13px system-ui, sans-serif";
+    const text = `${truncate(table.name, 26)} · ${Math.max(0, table.seats - table.signups.length)} seats left`;
+    const width = Math.min(state.viewport.width - 8, ctx.measureText(text).width + 16);
+    const height = state.camera.zoom >= 25 ? 40 : 23;
+    const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
+    const top = Math.min(point.y, state.viewport.height - height - 4);
+    if (boxes.some((box) => left < box.x + box.w && left + width > box.x && top < box.y + box.h && top + height > box.y)) continue;
+    boxes.push({ x: left, y: top, w: width, h: height, index });
+    ctx.fillStyle = "#17141feb"; ctx.fillRect(left, top, width, height);
+    ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText(text, left + width / 2, top + 3, width - 8);
+    if (height > 23) {
+      ctx.font = "12px system-ui, sans-serif"; ctx.fillStyle = "#f1cf91";
+      ctx.fillText(`${formatSlot(table.start)}–${formatSlot(table.end)}`, left + width / 2, top + 21, width - 8);
+    }
+  }
+  state.labelBoxes = boxes;
+  ctx.restore();
 }
 
 function drawPerson(runtime, now, active) {
@@ -376,22 +493,22 @@ function drawPerson(runtime, now, active) {
   if (active.announce && !runtime.moving) facing = state.layout.stageFront.x < runtime.position.x ? -1 : 1;
   const flip = facing < 0;
   const frame = talk || cheering ? 1 : 0;
-  const variant = person.variant;
-  if (person.hidden || variant === null) {
+  const appearance = characterAppearance(person);
+  if (appearance === null) {
     if (!drawTile(state.images.characters, [frame, 1], x, y, flip, 0.85)) {
       ctx.fillStyle = "#292832";
       ctx.fillRect(x * TILE * SCALE, y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
     }
     drawTile(state.images.characters, [16, 7], x, y, flip, 0.85);
   } else {
-    if (!drawTile(state.images.characters, [frame, SPRITES.skin[variant % 4]], x, y, flip)) {
+    if (!drawTile(state.images.characters, [frame, SPRITES.skin[appearance.skin]], x, y, flip)) {
       const colors = ["#9e6d50", "#d49b6a", "#6b8fb5", "#9f70ad", "#61a178", "#b06d6d", "#cfaa4d", "#578d98", "#866fbd", "#b37f53", "#6a9b62", "#a85c86", "#6981bd", "#c27c55", "#7d9562"];
       ctx.fillStyle = colors[visibleVariant(person, PALETTE_SIZE)];
       ctx.fillRect(x * TILE * SCALE, y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
     }
-    drawTile(state.images.characters, SPRITES.shirts[(variant >>> 2) % SPRITES.shirts.length], x, y, flip);
-    drawTile(state.images.characters, SPRITES.hair[(variant >>> 6) % SPRITES.hair.length], x, y, flip);
-    if (person.dm) drawTile(state.images.characters, SPRITES.hats[(variant >>> 10) % SPRITES.hats.length], x, y - 0.15, flip);
+    drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], x, y, flip);
+    drawTile(state.images.characters, SPRITES.hair[appearance.hair], x, y, flip);
+    if (person.dm) drawTile(state.images.characters, SPRITES.hats[appearance.hat], x, y - 0.15, flip);
   }
   if (place.kind === "spotlight" && !runtime.moving) drawLabel("★", x + 0.5, y - 0.55, { size: 6, color: "#ffd84a", background: false });
   if (cheering && ((now / 400 + runtime.phase * 3) % 3) < 1) drawLabel("♥", x + 0.5 + runtime.phase * 0.4, y - 0.6, { size: 4, color: "#ff7a9a", background: false });
@@ -402,7 +519,11 @@ function drawPerson(runtime, now, active) {
 }
 
 function drawBubble(value, x, y, color, label = "") {
-  const size = 4.2 * SCALE;
+  const anchor = worldToScreen(state.camera, { x, y });
+  ctx.save();
+  const dpr = globalThis.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const size = 13;
   ctx.font = `${size}px ui-monospace, monospace`;
   const text = label ? `${label}: ${value}` : value;
   const words = text.split(/\s+/u);
@@ -410,15 +531,15 @@ function drawBubble(value, x, y, color, label = "") {
   let current = "";
   for (const word of words) {
     const next = current ? `${current} ${word}` : word;
-    if (current && ctx.measureText(next).width > 34 * TILE * SCALE / 2) { lines.push(current); current = word; }
+    if (current && ctx.measureText(next).width > Math.min(360, state.viewport.width - 30)) { lines.push(current); current = word; }
     else current = next;
   }
   if (current || lines.length === 0) lines.push(current);
   const width = Math.max(...lines.map((line) => ctx.measureText(line).width), 20) + 4 * SCALE;
   const height = lines.length * (size + SCALE) + 3 * SCALE;
-  let left = x * TILE * SCALE - width / 2;
-  left = clamp(left, 2 * SCALE, state.layout.width * TILE * SCALE - width - 2 * SCALE);
-  const top = clamp(y * TILE * SCALE - height, 2 * SCALE, state.layout.height * TILE * SCALE - height - 4 * SCALE);
+  let left = anchor.x - width / 2;
+  left = clamp(left, 2 * SCALE, state.viewport.width - width - 2 * SCALE);
+  const top = clamp(anchor.y - height, 2 * SCALE, state.viewport.height - height - 4 * SCALE);
   ctx.fillStyle = color;
   ctx.strokeStyle = "#222";
   ctx.lineWidth = SCALE;
@@ -426,14 +547,15 @@ function drawBubble(value, x, y, color, label = "") {
   ctx.roundRect(left, top, width, height, 3 * SCALE);
   ctx.fill(); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(x * TILE * SCALE - 2 * SCALE, top + height);
-  ctx.lineTo(x * TILE * SCALE, top + height + 3 * SCALE);
-  ctx.lineTo(x * TILE * SCALE + 2 * SCALE, top + height);
+  ctx.moveTo(clamp(anchor.x, left + 8, left + width - 8) - 2 * SCALE, top + height);
+  ctx.lineTo(clamp(anchor.x, left + 8, left + width - 8), top + height + 3 * SCALE);
+  ctx.lineTo(clamp(anchor.x, left + 8, left + width - 8) + 2 * SCALE, top + height);
   ctx.fill();
   ctx.fillStyle = "#111";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   lines.forEach((line, index) => ctx.fillText(line, left + 2 * SCALE, top + 1.5 * SCALE + index * (size + SCALE)));
+  ctx.restore();
 }
 
 function drawEvents(active, now) {
@@ -474,13 +596,21 @@ function drawEvents(active, now) {
 }
 
 function render(now, active) {
-  const width = state.layout.width * TILE * SCALE;
-  const height = state.layout.height * TILE * SCALE;
+  updateCamera();
+  if (!ctx) return;
+  const dpr = globalThis.devicePixelRatio || 1;
+  const width = Math.round(state.viewport.width * dpr);
+  const height = Math.round(state.viewport.height * dpr);
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  const scale = dpr * state.camera.zoom / (TILE * SCALE);
+  ctx.setTransform(scale, 0, 0, scale, state.camera.x * dpr, state.camera.y * dpr);
   ctx.imageSmoothingEnabled = false;
   drawRoom();
   drawTables();
   [...state.people.values()].filter((person) => person.visible).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
+  drawTableLabels();
   drawEvents(active, now);
 }
 
@@ -495,7 +625,7 @@ function renderDetail(focus = false) {
   const table = state.data.tables.find((candidate) => candidate.id === state.selectedId);
   if (!table) {
     append(panel, "h2", "Table details");
-    append(panel, "p", "Select a table in the hall or in the accessible list below.", "muted");
+    append(panel, "p", "Select a table in the hall or in the table list.", "muted");
     return;
   }
   const view = tableView(state.data, table);
@@ -505,6 +635,7 @@ function renderDetail(focus = false) {
   append(panel, "p", view.pitch);
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
+  append(panel, "p", "In Discord, open the tables board and use Join. Use Set Up My Table to host a game.", "join-instructions");
   append(panel, "h3", "Roster");
   const list = append(panel, "ul");
   if (view.roster.length === 0) append(list, "li", "No signups yet.", "muted");
@@ -513,7 +644,9 @@ function renderDetail(focus = false) {
 }
 
 function selectTable(id, focus = false) {
-  state.selectedId = state.selectedId === id ? null : id;
+  state.selectedId = id;
+  const index = state.data.tables.findIndex((table) => table.id === id);
+  if (index >= 0) frameTables([index], true);
   renderDetail(focus && state.selectedId !== null);
 }
 
@@ -535,6 +668,7 @@ function renderTableList() {
     append(details, "dt", "DM"); append(details, "dd", view.dm);
     append(details, "dt", "Window"); append(details, "dd", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)}`);
     append(details, "dt", "Signups"); append(details, "dd", `${view.signupCount}/${view.seats}${view.walkIns ? "; walk-ins welcome" : ""}`);
+    append(article, "p", "Sign up using Join on the Discord tables board.", "join-instructions");
     append(article, "p", "Roster", "muted");
     const roster = append(article, "ul", undefined, "roster");
     if (view.roster.length === 0) append(roster, "li", "No signups yet.");
@@ -551,10 +685,12 @@ function updateHeader(active) {
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
   $("play").textContent = state.playing ? "Pause" : "Play";
-  const visible = [...state.people.values()].filter((person) => person.visible);
-  const atTables = visible.filter((person) => person.place?.kind === "table").length;
-  const base = `${visible.length} in the hall, ${atTables} at tables · ${state.data.tables.length} tables`;
-  if (!state.staleMessage) setStatus(state.assetsFailed ? `${base} · Sprite art unavailable; simplified graphics are in use.` : base, state.assetsFailed ? "stale" : "");
+  const beforeEvent = Date.now() < Date.parse(state.data.event.start);
+  const available = state.data.tables.filter((table) => table.signups.length < table.seats && (beforeEvent || state.time < table.end)).length;
+  const count = state.data.tables.length;
+  const base = beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
+  const note = !ctx ? " · Hall graphics unavailable; use the table list." : state.assetsFailed ? " · Sprite art unavailable; simplified graphics are in use." : "";
+  if (!state.staleMessage) setStatus(base + note, !ctx || state.assetsFailed ? "stale" : "");
 }
 
 function setMode(nextMode) {
@@ -623,6 +759,8 @@ function installTimeline(data, initial = false) {
   $("start-label").textContent = formatSlot(0, true);
   $("end-label").textContent = formatSlot(data.event.slots, true);
   state.layout = buildLayout();
+  state.frameKey = null;
+  renderActions();
   state.adminEvents = indexAdminEvents(data);
   syncPeople();
   if (state.selectedId && !data.tables.some((table) => table.id === state.selectedId)) state.selectedId = null;
@@ -648,16 +786,55 @@ async function refresh() {
   }
 }
 
-function canvasPoint(event) {
+function pointerPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  return {
-    x: (event.clientX - rect.left) * canvas.width / rect.width / (TILE * SCALE),
-    y: (event.clientY - rect.top) * canvas.height / rect.height / (TILE * SCALE),
-  };
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
 }
 
+function canvasPoint(event) { return screenToWorld(state.camera, pointerPoint(event)); }
+function hideTooltip() { state.hover = null; $("tooltip").hidden = true; }
+const pointers = new Map();
+let gesture = null;
+let suppressClick = false;
+function gesturePosition() {
+  const points = [...pointers.values()];
+  return { center: { x: points.reduce((n, p) => n + p.x, 0) / points.length, y: points.reduce((n, p) => n + p.y, 0) / points.length }, distance: points.length > 1 ? Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) : 0 };
+}
+function moveCamera(dx, dy) {
+  if (!state.camera) return;
+  state.camera = panCamera(state.camera, dx, dy, viewport(), state.layout);
+  state.manualCamera = true;
+  hideTooltip();
+}
+function zoomCamera(factor, point = { x: viewport().width / 2, y: viewport().height / 2 }) {
+  if (!state.camera) return;
+  state.camera = zoomAt(state.camera, point, factor, viewport(), state.layout);
+  state.manualCamera = true;
+  hideTooltip();
+}
+canvas.addEventListener("pointerdown", (event) => {
+  if (!state.camera || (event.button !== undefined && event.button !== 0)) return;
+  if (!pointers.size) suppressClick = false;
+  pointers.set(event.pointerId, pointerPoint(event));
+  canvas.setPointerCapture(event.pointerId);
+  gesture = gesturePosition();
+  if (pointers.size > 1) suppressClick = true;
+  hideTooltip();
+});
 canvas.addEventListener("pointermove", (event) => {
-  if (!state.data) return;
+  if (!state.camera) return;
+  if (pointers.has(event.pointerId)) {
+    pointers.set(event.pointerId, pointerPoint(event));
+    const next = gesturePosition();
+    const dx = next.center.x - gesture.center.x, dy = next.center.y - gesture.center.y;
+    if (pointers.size > 1 || suppressClick || Math.hypot(dx, dy) > 5) {
+      suppressClick = true;
+      if (next.distance && gesture.distance) zoomCamera(next.distance / gesture.distance, gesture.center);
+      moveCamera(dx, dy);
+      gesture = next;
+    }
+    return;
+  }
   const point = canvasPoint(event);
   let best = null;
   let distance = .72;
@@ -671,17 +848,50 @@ canvas.addEventListener("pointermove", (event) => {
   if (!best) { tooltip.hidden = true; return; }
   tooltip.textContent = personTooltip(best.person, best.place, best.moving);
   const sceneRect = canvas.parentElement.getBoundingClientRect();
-  tooltip.style.left = `${event.clientX - sceneRect.left + 12}px`;
-  tooltip.style.top = `${event.clientY - sceneRect.top - 30}px`;
+  tooltip.style.left = `${clamp(event.clientX - sceneRect.left + 12, 0, Math.max(0, sceneRect.width - 280))}px`;
+  tooltip.style.top = `${Math.max(0, event.clientY - sceneRect.top - 30)}px`;
   tooltip.hidden = false;
 });
-
-canvas.addEventListener("pointerleave", () => { state.hover = null; $("tooltip").hidden = true; });
+function finishPointer(event) {
+  pointers.delete(event.pointerId);
+  if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  gesture = pointers.size ? gesturePosition() : null;
+}
+canvas.addEventListener("pointerup", finishPointer);
+canvas.addEventListener("pointercancel", (event) => { suppressClick = true; finishPointer(event); });
+canvas.addEventListener("lostpointercapture", finishPointer);
+canvas.addEventListener("pointerleave", hideTooltip);
 canvas.addEventListener("click", (event) => {
-  if (!state.data) return;
+  if (!state.camera || suppressClick) return;
+  const screen = pointerPoint(event);
+  const label = state.labelBoxes?.find((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
   const point = canvasPoint(event);
-  const index = state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
+  const index = label?.index ?? state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
   if (index >= 0 && state.data.tables[index]) selectTable(state.data.tables[index].id);
+});
+canvas.addEventListener("wheel", (event) => {
+  if (!state.camera) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport().height : 1;
+  zoomCamera(Math.exp(-clamp(event.deltaY * unit, -300, 300) * .002), pointerPoint(event));
+}, { passive: false });
+function recenter() {
+  if (!state.layout) return;
+  state.camera = fitBounds({ x: 0, y: 0, width: state.layout.width, height: state.layout.height }, viewport(), state.layout, 0);
+  state.manualCamera = true;
+  hideTooltip();
+}
+$("zoom-in").addEventListener("click", () => zoomCamera(1.25));
+$("zoom-out").addEventListener("click", () => zoomCamera(.8));
+$("recenter").addEventListener("click", recenter);
+$("fit-active").addEventListener("click", () => { if (state.data) frameTables(relevantTableIndices(state.data.tables, state.time), true); });
+canvas.addEventListener("keydown", (event) => {
+  const keys = { ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60] };
+  if (keys[event.key]) { event.preventDefault(); moveCamera(...keys[event.key]); }
+  else if (["+", "=", "-", "Home"].includes(event.key)) {
+    event.preventDefault();
+    if (event.key === "Home") recenter(); else zoomCamera(event.key === "-" ? .8 : 1.25);
+  }
 });
 
 $("play").addEventListener("click", () => {
@@ -761,10 +971,16 @@ async function boot() {
     if (reducedMotion.matches) state.playing = false;
     state.lastTime = performance.now();
     state.lastRefresh = state.lastTime;
+    updateMode();
+    const active = activeEvents(state.data, state.time, state.adminEvents);
+    updatePeople(0, state.lastTime, active);
+    render(state.lastTime, active);
+    updateHeader(active);
     requestAnimationFrame(loop);
   } catch (error) {
     const message = error?.name === "TimelineError" ? `Timeline could not be loaded: ${error.message}` : "Timeline could not be loaded. Check that the published data file is available.";
     setStatus(message, "error");
+    if (!ctx) return;
     const width = canvas.width;
     const height = canvas.height;
     ctx.fillStyle = "#24222c";
