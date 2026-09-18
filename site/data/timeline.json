@@ -1,7 +1,7 @@
 {
  "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:46:33.216187Z",
+ "generated_at": "2026-09-18T12:49:10.821184Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -87,6 +87,15 @@
    "at": 35.25,
    "duration": null,
    "text": "huzzah!",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e4",
+   "kind": "shout",
+   "at": 35.63,
+   "duration": null,
+   "text": "More snacks!",
    "person": "p1",
    "by": "p1"
   }
