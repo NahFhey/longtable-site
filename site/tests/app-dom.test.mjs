@@ -34,15 +34,17 @@ function allText(node) {
 }
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
+  const ids = ["event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   const contextCalls = [];
   const imageCalls = [];
+  const rectCalls = [];
   const transforms = [];
   const context = new Proxy({
     setTransform(...args) { transforms.push(args); },
     measureText(value) { return { width: String(value).length * 5 }; },
     fillText(value) { contextCalls.push(String(value)); },
+    fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
     drawImage(image, ...args) { imageCalls.push({ src: image._src, args }); },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
@@ -53,11 +55,14 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   nodes.get("hall").setPointerCapture = () => {};
 
   globalThis.document = {
+    documentElement: { dataset: { source: options.archive ? "archive" : "live" } },
     title: "",
     getElementById(id) { return nodes.get(id); },
     createElement(tag) { return new FakeNode(tag); },
   };
-  globalThis.location = { search };
+  const urlWrites = [];
+  globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
+  globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
   globalThis.matchMedia = (query) => ({ matches: query.includes("650") ? !!options.mobile : !!options.reducedMotion, addEventListener() {} });
   const frames = [];
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
@@ -66,12 +71,14 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     set src(value) { this._src = value; }
   };
   let fetchIndex = 0;
-  globalThis.fetch = async () => {
+  const fetchUrls = [];
+  globalThis.fetch = async (url) => {
+    fetchUrls.push(new URL(url, location.href).href);
     const item = dataSequence[Math.min(fetchIndex++, dataSequence.length - 1)];
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, contextCalls, imageCalls, transforms };
+  return { nodes, frames, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -84,6 +91,7 @@ async function runApp(dataSequence, label, options = {}) {
     await new Promise((resolve) => setTimeout(resolve, 10));
     const frame = harness.frames.shift();
     harness.imageCalls.length = 0;
+    harness.rectCalls.length = 0;
     if (frame) frame(performance.now() + 20);
     await new Promise((resolve) => setTimeout(resolve, 10));
   } finally {
@@ -94,11 +102,12 @@ async function runApp(dataSequence, label, options = {}) {
 
 function stressTimeline(base) {
   const data = structuredClone(base);
+  data.room_layout.pad_capacity = 30;
   const additions = [];
   for (let index = 0; data.people.length + additions.length < 150; index += 1) {
     additions.push({
       id: `stress-person-${index}`, name: `Stress Person ${index}`, dm: index < 18, hidden: false,
-      variant: (index * 2654435761) >>> 0, presence: { planned: [0, data.event.slots], actual: { here: null, leaving: null } },
+      variant: (index * 2654435761) >>> 0, appearance: null, presence: { planned: [0, data.event.slots], actual: { here: null, leaving: null } },
     });
   }
   data.people.push(...additions);
@@ -110,7 +119,7 @@ function stressTimeline(base) {
     const assigned = players.slice(cursor, cursor + count);
     cursor += count;
     data.tables.push({
-      id: `stress-table-${index}`, name: `Stress Table ${index}`, system: "Stress system", pitch: "Temporary rendering fixture.",
+      pad: data.tables.length, id: `stress-table-${index}`, name: `Stress Table ${index}`, system: "Stress system", pitch: "Temporary rendering fixture.",
       seats: Math.max(index === 0 ? 18 : 6, count), walk_ins: index % 2 === 0, start: 0, end: data.event.slots,
       dm: additions[index].id, created_at: data.event.start,
       signups: assigned.map((person) => ({ person: person.id, planned: [0, data.event.slots], actual: null })),
@@ -162,7 +171,7 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  sample.schema = 4;
+  sample.schema = 5;
   const app = await runApp([sample], "bad-schema");
   assert.match(app.nodes.get("status").textContent, /unsupported schema/i);
   assert.equal(app.nodes.get("status").className, "status error");
@@ -179,9 +188,9 @@ test("a bad live refresh retains the last good rendered table list", async () =>
   sample.event.start = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}:00${sign}${hh}:${mm}`;
   sample.generated_at = new Date(Date.now() - 10_000).toISOString();
   const bad = structuredClone(sample);
-  bad.schema = 4;
+  bad.schema = 5;
   bad.generated_at = new Date().toISOString();
-  const app = await runApp([sample, bad], "refresh-retention");
+  const app = await runApp([sample, bad], "refresh-retention", { search: "" });
   const before = allText(app.nodes.get("tables"));
   const nextFrame = app.frames.shift();
   nextFrame?.(performance.now() + 61_000);
@@ -226,7 +235,7 @@ test("canvas event content has a stable, literal, privacy-safe live-region equiv
   assert.equal(region.textContentWrites, writes, "an unchanged event must not rewrite the live region each frame");
 });
 
-test("forward scrubbing serializes every crossed speech, while backward scrubbing clears it", async () => {
+test("seeking in either direction clears transient speeches without replaying a backlog", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const speaker = sample.people.find((person) => !person.hidden);
   const by = sample.people.find((person) => person.dm);
@@ -245,9 +254,9 @@ test("forward scrubbing serializes every crossed speech, while backward scrubbin
 
   app.nodes.get("scrubber").listeners.get("input")({ target: { value: "2" } });
   app.frames.shift()?.(performance.now() + 5_000);
-  assert.match(region.textContent, /Speech 1/);
+  assert.equal(region.textContent, "");
   app.frames.shift()?.(performance.now() + 10_000);
-  assert.match(region.textContent, /Speech 2/);
+  assert.equal(region.textContent, "");
 
   app.nodes.get("scrubber").listeners.get("input")({ target: { value: "0.5" } });
   app.frames.shift()?.(performance.now() + 10_100);
@@ -354,5 +363,205 @@ test("failed sprite assets retain simplified rendering and the table list", asyn
   assert.equal(app.errors.length, 0);
   assert.equal(app.nodes.get("tables").children[0].children.length, 12);
   assert.match(app.nodes.get("status").textContent, /simplified graphics/);
-  assert.ok(app.contextCalls.some((text) => text.includes("seats left")));
+  assert.ok(app.contextCalls.some((text) => text.includes("Scheduled")));
+});
+
+test("schema 4 live deletion and fresh load draw retained tables at the same world coordinates", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  data.tables = data.tables.map((table) => ({ ...table, start: 0, end: data.event.slots }));
+  const next = structuredClone(data);
+  next.generated_at = new Date().toISOString();
+  next.tables.splice(0, 1);
+  const tableOrigins = (app) => app.imageCalls.filter((call) =>
+    call.src.endsWith("roguelikeSheet_transparent.png") && call.args[0] === 23 * 17 && call.args[1] === 4 * 17 && call.args[5] >= 10 * 32
+  ).map((call) => call.args.slice(4, 6));
+  const app = await runApp([data, next], "stable-pad-refresh", { search: "" });
+  const before = tableOrigins(app);
+  assert.equal(before.length, 12);
+  app.frames.shift()?.(performance.now() + 61_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  app.imageCalls.length = 0;
+  app.frames.shift()?.(performance.now() + 61_020);
+  const after = tableOrigins(app);
+  assert.deepEqual(after, before.slice(1));
+  const reload = await runApp([next], "stable-pad-reload", { search: "" });
+  assert.deepEqual(tableOrigins(reload), after);
+});
+
+test("pad collisions in a refresh keep the last good hall and table list", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  const broken = structuredClone(data);
+  broken.generated_at = new Date().toISOString();
+  broken.tables[1].pad = broken.tables[0].pad;
+  const app = await runApp([data, broken], "duplicate-pad-refresh", { search: "" });
+  const before = allText(app.nodes.get("tables"));
+  app.frames.shift()?.(performance.now() + 61_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(allText(app.nodes.get("tables")), before);
+  assert.match(app.nodes.get("status").textContent, /duplicate table pad.*last good snapshot/i);
+});
+
+test("live rewind stays paused through refresh, replays independently, and returns to now without queued speech", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 4 * 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  data.events = [];
+  const next = structuredClone(data);
+  next.generated_at = new Date().toISOString();
+  next.tables[0].name = "Refreshed game";
+  next.events.push({ id: "new-reaction", kind: "shout", at: 4, duration: null, text: "No rewind backlog", person: data.people[0].id, by: data.people[0].id });
+  const app = await runApp([data, next], "live-rewind", { search: "" });
+  assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+  assert.equal(app.nodes.get("scrubber").disabled, false);
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "1.5" } });
+  app.frames.shift()?.(performance.now() + 61_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  app.frames.shift()?.(performance.now() + 61_020);
+  assert.equal(app.nodes.get("scrubber").value, "1.5");
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+  assert.match(allText(app.nodes.get("tables")), /Refreshed game/);
+  assert.equal(app.nodes.get("return-now").hidden, false);
+  assert.equal(app.nodes.get("current-event").textContent, "");
+  assert.equal(new URL(app.urlWrites.at(-1)).searchParams.get("at"), "1.5");
+  app.nodes.get("play").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 61_040);
+  assert.equal(app.nodes.get("mode-badge").textContent, "REPLAY");
+  assert.ok(Number(app.nodes.get("scrubber").value) > 1.5 && Number(app.nodes.get("scrubber").value) < 2);
+  app.nodes.get("return-now").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 61_060);
+  assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+  assert.ok(Number(app.nodes.get("scrubber").value) >= 4);
+  assert.equal(app.nodes.get("current-event").textContent, "");
+  assert.equal(new URL(app.urlWrites.at(-1)).searchParams.has("at"), false);
+});
+
+test("lifecycle scenery and accessible status match direct seek, fresh load and reduced motion", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
+  data.events = [];
+  data.people.forEach((person) => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
+  const scenery = (app) => ({
+    tables: app.imageCalls.filter((call) => call.src.endsWith("roguelikeSheet_transparent.png") && call.args[0] === 23 * 17 && call.args[1] === 4 * 17 && call.args[5] >= 10 * 32).map((call) => call.args.slice(4, 6)),
+    maps: app.rectCalls.filter((call) => call.color === "#eee0b9").map((call) => call.args),
+  });
+  for (const [slot, phase, furniture, props] of [[0, "Scheduled", false, false], [1.5, "Preparing", true, false], [1.9, "Ready", true, true], [3, "Playing", true, true], [4.1, "Packing up", true, false], [4.5, "Inactive", false, false]]) {
+    const seek = await runApp([data], `lifecycle-seek-${slot}`, { mobile: true });
+    seek.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
+    seek.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
+    seek.imageCalls.length = 0;
+    seek.rectCalls.length = 0;
+    seek.frames.shift()?.(performance.now() + 100);
+    assert.match(allText(seek.nodes.get("tables")), new RegExp(`At selected time: ${phase}`));
+    assert.match(allText(seek.nodes.get("detail")), new RegExp(`At selected time: ${phase}`));
+    const expected = scenery(seek);
+    assert.equal(expected.tables.length > 0, furniture);
+    assert.equal(expected.maps.length > 0, props);
+    const fresh = await runApp([data], `lifecycle-fresh-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
+    // Match the explicit focus used above so props have the same level of detail.
+    fresh.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
+    fresh.imageCalls.length = 0;
+    fresh.rectCalls.length = 0;
+    fresh.frames.shift()?.(performance.now() + 100);
+    assert.deepEqual(scenery(fresh), expected);
+    assert.equal(fresh.nodes.get("scrubber").value, String(slot));
+    assert.equal(fresh.nodes.get("play").textContent, "Play");
+  }
+});
+
+test("sequential replay and reload at the resulting slot paint the same lifecycle props", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.slot_minutes = 1;
+  data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
+  data.events = [];
+  data.people.forEach((person) => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
+  const app = await runApp([data], "sequential-lifecycle", { search: "?sample=1&at=1" });
+  const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
+  button.listeners.get("click")();
+  app.nodes.get("speed").listeners.get("change")({ target: { value: "120" } });
+  app.nodes.get("play").listeners.get("click")();
+  const baseline = performance.now() + 1_000;
+  const seen = new Set();
+  let capture;
+  for (let frame = 0; frame < 19; frame += 1) {
+    app.imageCalls.length = 0;
+    app.rectCalls.length = 0;
+    app.frames.shift()?.(baseline + frame * 100);
+    seen.add(allText(app.nodes.get("detail")).match(/At selected time: ([A-Za-z ]+?) DM/)?.[1] || "");
+    const slot = Number(app.nodes.get("scrubber").value);
+    if (slot > 2 && slot < 2.4) capture = { slot, map: app.rectCalls.filter((call) => call.color === "#eee0b9") };
+  }
+  assert.ok(seen.has("Preparing"));
+  assert.ok(seen.has("Ready"));
+  assert.ok(seen.has("Playing"));
+  assert.ok(seen.has("Packing up"));
+  assert.ok(seen.has("Inactive"));
+  assert.ok(capture.map.length > 0);
+  const fresh = await runApp([data], "sequential-lifecycle-reload", { search: `?sample=1&at=${capture.slot}` });
+  assert.deepEqual(fresh.rectCalls.filter((call) => call.color === "#eee0b9"), capture.map);
+  assert.equal(Number(fresh.nodes.get("scrubber").value), capture.slot);
+});
+
+test("finalization stops live following and polling without resetting the selected time", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 2 * 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  const final = structuredClone(data);
+  final.generated_at = new Date().toISOString();
+  final.phase = "final";
+  const app = await runApp([data, final, new Error("Must not poll final data")], "final-clock", { search: "" });
+  app.frames.shift()?.(performance.now() + 61_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  app.frames.shift()?.(performance.now() + 61_020);
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+  assert.ok(Number(app.nodes.get("scrubber").value) >= 2);
+  const selected = app.nodes.get("scrubber").value;
+  assert.equal(app.nodes.get("return-now").hidden, true);
+  assert.equal(app.nodes.get("record-note").hidden, false);
+  app.frames.shift()?.(performance.now() + 122_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.nodes.get("scrubber").value, selected);
+  assert.doesNotMatch(app.nodes.get("status").textContent, /Update failed/);
+});
+
+test("a boundary timestamp survives URL serialization and a disabled History API leaves replay usable", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const slot = data.tables[0].start - 1 / 6;
+  const app = await runApp([data], "exact-timestamp", { mobile: true });
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
+  app.nodes.get("scrubber").listeners.get("change")();
+  const written = new URL(app.urlWrites.at(-1)).searchParams.get("at");
+  assert.equal(Number(written), slot);
+  globalThis.history.replaceState = () => { throw new Error("Disabled"); };
+  assert.doesNotThrow(() => app.nodes.get("play").listeners.get("click")());
+  app.frames.shift()?.(performance.now() + 100);
+  assert.equal(app.nodes.get("mode-badge").textContent, "REPLAY");
+});
+
+test("nested archives pause despite live dates, ignore sample flags, and never poll", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
+  const app = await runApp([data, new Error("Archive must not refresh")], "archive-entry", { archive: true, search: "?sample=1&at=3.5" });
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+  assert.equal(app.nodes.get("scrubber").value, "3.5");
+  assert.equal(app.nodes.get("return-now").hidden, true);
+  assert.equal(app.nodes.get("event-actions").children.length, 0);
+  assert.match(app.nodes.get("record-note").textContent, /Archived event replay/);
+  assert.doesNotMatch(allText(app.nodes.get("tables")), /Sign up using Join/);
+  app.frames.shift()?.(performance.now() + 61_000);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(app.fetchUrls, ["https://longtable.test/project/events/0123456789abcdef0123456789abcdef/timeline.json"]);
+  assert.equal(app.nodes.get("scrubber").value, "3.5");
+  app.nodes.get("play").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 61_100);
+  assert.equal(app.nodes.get("mode-badge").textContent, "REPLAY");
+});
+
+test("an unavailable archive fails visibly without falling back to live or sample data", async () => {
+  const app = await runApp([new Error("Missing archive")], "archive-missing", { archive: true, search: "?sample=1" });
+  assert.match(app.nodes.get("status").textContent, /could not be loaded/);
+  assert.deepEqual(app.fetchUrls, ["https://longtable.test/project/events/0123456789abcdef0123456789abcdef/timeline.json"]);
 });

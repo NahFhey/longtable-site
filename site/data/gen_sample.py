@@ -138,8 +138,14 @@ for at, kind, who, text in [
                        by=who if kind == 'shout' else 'u_admin'))
 events.sort(key=lambda e: e['at'])
 
+for pad, table in enumerate(tables):
+    table["pad"] = pad
+for p in people.values():
+    p["appearance"] = None
+
 doc = {
-  "schema": 2,
+  "schema": 4,
+  "room_layout": {"version": 1, "pad_capacity": 20, "overflow_capacity": 120},
   "phase": "live",
   "generated_at": "2026-11-07T20:09:41Z",
   "event": {

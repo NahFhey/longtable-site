@@ -100,7 +100,7 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (schema !== 1 && schema !== 2 && schema !== 3) fail("This timeline uses an unsupported schema version.");
+  if (schema !== 1 && schema !== 2 && schema !== 3 && schema !== 4) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -124,7 +124,7 @@ export function validateTimeline(input) {
     const variant = number(required(person, "variant", label), `${label}.variant`, { integer: true, min: 0, max: 0xffffffff, nullable: true });
     if (hidden ? (name !== null || variant !== null) : (name === null || variant === null)) fail(`${label} has inconsistent privacy fields.`);
     let appearance = null;
-    if (schema === 3) {
+    if (schema >= 3) {
       const rawAppearance = required(person, "appearance", label);
       if (rawAppearance !== null) {
         if (hidden) fail(`${label} has inconsistent privacy fields.`);
@@ -159,6 +159,7 @@ export function validateTimeline(input) {
     personById.set(person.id, person);
   }
 
+  const room_layout = schema === 4 ? validateRoomLayout(required(root, "room_layout", "timeline")) : null;
   const tableIds = new Set();
   const tables = array(required(root, "tables", "timeline"), "timeline.tables").map((raw, index) => {
     const label = `timeline.tables[${index}]`;
@@ -196,10 +197,13 @@ export function validateTimeline(input) {
       start,
       end,
       dm,
+      ...(room_layout ? { pad: number(required(table, "pad", label), `${label}.pad`, { integer: true, min: 0, max: room_layout.pad_capacity - 1 }) } : {}),
       created_at: dateString(required(table, "created_at", label), `${label}.created_at`, "aware"),
       signups,
     };
   });
+
+  if (room_layout) validatePadAssignments(tables, room_layout);
 
   const eventIds = new Set();
   const events = array(required(root, "events", "timeline"), "timeline.events").map((raw, index) => {
@@ -227,7 +231,7 @@ export function validateTimeline(input) {
     return { id, kind, at, duration, text, person, by, _inputOrder: index };
   }).sort((a, b) => a.at - b.at || a._inputOrder - b._inputOrder).map((item) => knownKeys(item, ["id", "kind", "at", "duration", "text", "person", "by"]));
 
-  return { schema, phase, generated_at, event, people, tables, events };
+  return { schema, phase, generated_at, event, people, tables, events, room_layout };
 }
 
 export function slotToMs(timeline, slot) {
@@ -267,6 +271,29 @@ export function visibleVariant(person, paletteSize = PALETTE_SIZE) {
   return !person || person.hidden ? null : person.variant % paletteSize;
 }
 
+function validateRoomLayout(raw) {
+  const room = object(raw, "room_layout");
+  const version = number(required(room, "version", "room_layout"), "room_layout.version", { integer: true });
+  if (version !== 1) fail("Unsupported room_layout.version.");
+  return {
+    version,
+    pad_capacity: number(required(room, "pad_capacity", "room_layout"), "room_layout.pad_capacity", { integer: true, min: 1, max: Number.MAX_SAFE_INTEGER }),
+    overflow_capacity: number(required(room, "overflow_capacity", "room_layout"), "room_layout.overflow_capacity", { integer: true, min: 0, max: Number.MAX_SAFE_INTEGER }),
+  };
+}
+
+function validatePadAssignments(tables, room) {
+  const pads = new Set();
+  let reserved = 0;
+  for (const table of tables) {
+    if (!Number.isSafeInteger(table.pad) || table.pad < 0 || table.pad >= room.pad_capacity) fail("Table pad is outside room capacity.");
+    if (pads.has(table.pad)) fail("Duplicate table pad assignment.");
+    pads.add(table.pad);
+    reserved += Math.max(0, table.seats - (LOCAL_SEAT_COUNT - 1));
+  }
+  if (reserved > room.overflow_capacity) fail("Table seat reservations exceed room overflow capacity.");
+}
+
 export function tableGridPosition(index) {
   return { column: index % TABLE_COLUMNS, row: Math.floor(index / TABLE_COLUMNS) };
 }
@@ -285,22 +312,29 @@ export function seatOffset(seat) {
 
 /**
  * Allocate occupied seats beyond the per-table cell in one deterministic hall-wide
- * area. Capacity does not affect its size: only actual signups receive positions.
+ * area. Schema 4 freezes its bounds from room capacity; legacy packages retain
+ * their original dynamic geometry. Only occupied overflow chairs are drawn.
  */
-export function createSeatingPlan(tables) {
+export function createSeatingPlan(tables, room = null) {
+  if (room) {
+    room = validateRoomLayout(room);
+    validatePadAssignments(tables, room);
+  }
   const gridX = 4;
   const gridY = 8;
   const cellWidth = 6;
   const cellHeight = 6;
-  const tableRows = Math.max(2, Math.ceil(Math.max(tables.length, 2) / TABLE_COLUMNS));
+  const tableRows = Math.max(2, Math.ceil(Math.max(room?.pad_capacity ?? tables.length, 2) / TABLE_COLUMNS));
   const tableGridBottom = gridY + tableRows * cellHeight;
-  const cells = tables.map((_, index) => ({
-    x: gridX + tableGridPosition(index).column * cellWidth,
-    y: gridY + tableGridPosition(index).row * cellHeight,
+  const cells = tables.map((table, index) => ({
+    x: gridX + tableGridPosition(room ? table.pad : index).column * cellWidth,
+    y: gridY + tableGridPosition(room ? table.pad : index).row * cellHeight,
   }));
   const overflowSeats = [];
   const overflowBySeat = new Map();
-  for (let tableIndex = 0; tableIndex < tables.length; tableIndex += 1) {
+  const order = tables.map((_, index) => index);
+  if (room) order.sort((a, b) => tables[a].pad - tables[b].pad);
+  for (const tableIndex of order) {
     const occupiedSeatCount = tables[tableIndex].signups.length + 1;
     for (let seat = LOCAL_SEAT_COUNT; seat < occupiedSeatCount; seat += 1) {
       const overflowIndex = overflowSeats.length;
@@ -327,8 +361,27 @@ export function createSeatingPlan(tables) {
     cells,
     overflowSeats,
     overflowBySeat,
-    overflowRows: Math.ceil(overflowSeats.length / OVERFLOW_COLUMNS),
+    overflowRows: Math.ceil((room?.overflow_capacity ?? overflowSeats.length) / OVERFLOW_COLUMNS),
   };
+}
+
+/** Layout version 1 keeps the original grid origin and freezes all room landmarks. */
+export function createRoomLayout(tables, room = null) {
+  const layout = { ...createSeatingPlan(tables, room), aisles: [] };
+  layout.width = layout.gridX + layout.columns * layout.cellWidth + 8;
+  const overflowHeight = layout.overflowRows ? 2 + layout.overflowRows * 2 : 0;
+  layout.height = layout.tableGridBottom + overflowHeight + 6;
+  layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
+  layout.food = { x: 1, y: 1, w: 16, h: 6 };
+  layout.lounge = { x: 1, y: layout.height - 6, w: layout.width - 9, h: 5 };
+  layout.door = { x: 0, y: layout.gridY + 1 };
+  layout.doorPosition = { x: 1.2, y: layout.door.y + 0.5 };
+  layout.stageFront = { x: layout.stage.x + 1.5, y: layout.stage.y + layout.stage.h / 2 };
+  layout.trunkX = layout.gridX - 0.5;
+  layout.aisles.push(layout.gridY - 0.5);
+  for (let row = 0; row < layout.tableRows; row += 1) layout.aisles.push(layout.gridY + row * layout.cellHeight + layout.cellHeight - 0.5);
+  if (layout.overflowRows) layout.aisles.push(layout.tableGridBottom + 1.5);
+  return layout;
 }
 
 export function seatPositionForPlan(plan, tableIndex, seat) {
@@ -379,6 +432,32 @@ export function activeEvents(timeline, slot, adminEvents = indexAdminEvents(time
   return active;
 }
 
+/** Schedule-derived scenery, with half-open phases clipped to the event window.
+ * A compressed dry run scales down the normal 15/5/10-minute setup/ready/cleanup.
+ * This does not claim whether a table was canceled or ended early.
+ */
+export function tableLifecycle(timeline, table, slot) {
+  const scale = Math.min(1, timeline.event.slot_minutes / 30);
+  const preparation = 15 * scale / timeline.event.slot_minutes;
+  const ready = 5 * scale / timeline.event.slot_minutes;
+  const cleanup = 10 * scale / timeline.event.slot_minutes;
+  const readyAt = Math.max(0, table.start - ready);
+  const prepareAt = Math.max(0, table.start - ready - preparation);
+  const inactiveAt = Math.min(timeline.event.slots, table.end + cleanup);
+  const phase = slot < prepareAt ? "scheduled"
+    : slot < readyAt ? "preparing"
+    : slot < table.start ? "ready"
+    : slot < table.end ? "active"
+    : slot < inactiveAt ? "cleaning" : "inactive";
+  return {
+    phase,
+    label: { scheduled: "Scheduled", preparing: "Preparing", ready: "Ready", active: "Playing", cleaning: "Packing up", inactive: "Inactive" }[phase],
+    furniture: ["preparing", "ready", "active", "cleaning"].includes(phase),
+    props: phase === "ready" || phase === "active",
+    prepareAt, readyAt, inactiveAt,
+  };
+}
+
 export function ordinaryLocation(timeline, person, slot) {
   if (!isPresent(person, slot, timeline.event.slots)) return { kind: "absent", label: "outside the hall" };
   for (let tableIndex = 0; tableIndex < timeline.tables.length; tableIndex += 1) {
@@ -389,6 +468,7 @@ export function ordinaryLocation(timeline, person, slot) {
   }
   for (let tableIndex = 0; tableIndex < timeline.tables.length; tableIndex += 1) {
     const table = timeline.tables[tableIndex];
+    if (slot < table.start || slot >= table.end) continue;
     for (let signupIndex = 0; signupIndex < table.signups.length; signupIndex += 1) {
       const signup = table.signups[signupIndex];
       if (signup.person === person.id && inHalfOpen(effectiveSignupRange(signup), slot)) {

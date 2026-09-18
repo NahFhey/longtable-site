@@ -1,3 +1,4 @@
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
 import { eventActions } from "./event-config.mjs";
 import { SPRITES, characterAppearance } from "./characters.mjs";
@@ -6,14 +7,12 @@ import {
   activeEvents,
   accessibleEventText,
   chairSeatIndices,
-  createSeatingPlan,
+  createRoomLayout,
   createLiveState,
   crossedSpeechEvents,
   displayName,
   indexAdminEvents,
-  modeAt,
   personTooltip,
-  playbackSpeed,
   reconcileLiveSnapshot,
   resolveLocation,
   seatPositionForPlan,
@@ -21,6 +20,7 @@ import {
   slotToMs,
   speechView,
   tableView,
+  tableLifecycle,
   validateTimeline,
   visibleVariant,
 } from "./model.mjs";
@@ -63,10 +63,12 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {
   data: null,
-  mode: null,
+  clock: null,
   time: 0,
   lastTime: 0,
-  playing: !reducedMotion.matches && !mobile.matches,
+  tablePhaseNodes: new Map(),
+  detailPhaseNode: null,
+  lastUrlWrite: 0,
   camera: null,
   manualCamera: false,
   frameKey: null,
@@ -85,7 +87,8 @@ const state = {
   speechQueue: [],
   speech: null,
   staleMessage: "",
-  sample: new URLSearchParams(location.search).get("sample") === "1",
+  archive: document.documentElement?.dataset.source === "archive",
+  sample: document.documentElement?.dataset.source !== "archive" && new URLSearchParams(location.search).get("sample") === "1",
 };
 
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
@@ -126,24 +129,7 @@ function formatSlot(slot, withDay = false) {
 }
 
 function buildLayout() {
-  const seating = createSeatingPlan(state.data.tables);
-  const layout = {
-    ...seating, scale: SCALE, aisles: [],
-  };
-  layout.width = layout.gridX + layout.columns * layout.cellWidth + 8;
-  const overflowHeight = layout.overflowRows ? 2 + layout.overflowRows * 2 : 0;
-  layout.height = layout.tableGridBottom + overflowHeight + 6;
-  layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
-  layout.food = { x: 1, y: 1, w: 16, h: 6 };
-  layout.lounge = { x: 1, y: layout.height - 6, w: layout.width - 9, h: 5 };
-  layout.door = { x: 0, y: layout.gridY + 1 };
-  layout.doorPosition = { x: 1.2, y: layout.door.y + 0.5 };
-  layout.stageFront = { x: layout.stage.x + 1.5, y: layout.stage.y + layout.stage.h / 2 };
-  layout.trunkX = layout.gridX - 0.5;
-  layout.aisles.push(layout.gridY - 0.5);
-  for (let row = 0; row < layout.tableRows; row += 1) layout.aisles.push(layout.gridY + row * layout.cellHeight + layout.cellHeight - 0.5);
-  if (layout.overflowRows) layout.aisles.push(layout.tableGridBottom + 1.5);
-  return layout;
+  return { ...createRoomLayout(state.data.tables, state.data.room_layout), scale: SCALE };
 }
 
 function viewport() {
@@ -179,7 +165,7 @@ function updateCamera() {
 function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
-  for (const action of state.sample ? [] : eventActions(state.data.event)) {
+  for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
     const link = append(host, "a", action.label);
     link.href = action.url;
     if (!action.qr) continue;
@@ -226,7 +212,7 @@ function closestAisle(y) {
 }
 
 function outsideTableGrid(point) {
-  const rows = Math.max(2, Math.ceil(Math.max(state.data.tables.length, 2) / 10));
+  const rows = state.layout.tableRows;
   return point.x < state.layout.gridX - 0.2 || point.y < state.layout.gridY - 0.2 || point.y > state.layout.gridY + rows * state.layout.cellHeight - 0.2;
 }
 
@@ -402,11 +388,13 @@ function drawTables() {
   state.data.tables.forEach((table, index) => {
     const cell = state.layout.cells[index];
     const firstSeat = seatPosition(index, 0);
-    const open = state.time >= table.start && state.time < table.end;
+    const lifecycle = tableLifecycle(state.data, table, state.time);
+    const open = lifecycle.phase === "active";
     if (state.selectedId === table.id) {
       ctx.fillStyle = "rgba(255,210,122,.25)";
       ctx.fillRect(cell.x * TILE * SCALE, cell.y * TILE * SCALE, state.layout.cellWidth * TILE * SCALE, state.layout.cellHeight * TILE * SCALE);
     }
+    if (!lifecycle.furniture) return;
     for (let column = 0; column < 3; column += 1) {
       if (!drawTile(state.images.rpg, RPG.table[column], firstSeat.tableX + column, firstSeat.tableY, false, open ? 1 : 0.45)) {
         ctx.globalAlpha = open ? 1 : 0.45;
@@ -423,7 +411,7 @@ function drawTables() {
         ctx.fillRect((position.x - 0.28) * TILE * SCALE, (position.y - 0.28) * TILE * SCALE, .56 * TILE * SCALE, .56 * TILE * SCALE);
       }
     }
-    drawTableProps(firstSeat.tableX, firstSeat.tableY);
+    if (lifecycle.props) drawTableProps(firstSeat.tableX, firstSeat.tableY);
   });
 }
 
@@ -460,7 +448,9 @@ function drawTableLabels() {
     const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
     ctx.font = "700 13px system-ui, sans-serif";
-    const text = `${truncate(table.name, 26)} · ${Math.max(0, table.seats - table.signups.length)} seats left`;
+    const lifecycle = tableLifecycle(state.data, table, state.time);
+    const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
+    const text = `${truncate(table.name, 26)} · ${status}`;
     const width = Math.min(state.viewport.width - 8, ctx.measureText(text).width + 16);
     const height = state.camera.zoom >= 25 ? 40 : 23;
     const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
@@ -622,6 +612,7 @@ function actualText(actual) {
 function renderDetail(focus = false) {
   const panel = $("detail");
   panel.replaceChildren();
+  state.detailPhaseNode = null;
   const table = state.data.tables.find((candidate) => candidate.id === state.selectedId);
   if (!table) {
     append(panel, "h2", "Table details");
@@ -633,9 +624,10 @@ function renderDetail(focus = false) {
   heading.tabIndex = -1;
   append(panel, "p", view.system, "system");
   append(panel, "p", view.pitch);
+  state.detailPhaseNode = append(panel, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
-  append(panel, "p", "In Discord, open the tables board and use Join. Use Set Up My Table to host a game.", "join-instructions");
+  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. Use Set Up My Table to host a game.", "join-instructions");
   append(panel, "h3", "Roster");
   const list = append(panel, "ul");
   if (view.roster.length === 0) append(list, "li", "No signups yet.", "muted");
@@ -653,6 +645,7 @@ function selectTable(id, focus = false) {
 function renderTableList() {
   const host = $("tables");
   host.replaceChildren();
+  state.tablePhaseNodes.clear();
   if (state.data.tables.length === 0) { append(host, "p", "No tables have been posted.", "muted"); return; }
   const grid = append(host, "div", undefined, "table-grid");
   for (const table of state.data.tables) {
@@ -664,11 +657,12 @@ function renderTableList() {
     button.setAttribute("aria-label", `Show details for ${view.name}`);
     button.addEventListener("click", () => selectTable(table.id, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
+    state.tablePhaseNodes.set(table.id, append(article, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase"));
     const details = append(article, "dl");
     append(details, "dt", "DM"); append(details, "dd", view.dm);
     append(details, "dt", "Window"); append(details, "dd", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)}`);
     append(details, "dt", "Signups"); append(details, "dd", `${view.signupCount}/${view.seats}${view.walkIns ? "; walk-ins welcome" : ""}`);
-    append(article, "p", "Sign up using Join on the Discord tables board.", "join-instructions");
+    append(article, "p", state.archive ? "Saved roster for this event." : "Sign up using Join on the Discord tables board.", "join-instructions");
     append(article, "p", "Roster", "muted");
     const roster = append(article, "ul", undefined, "roster");
     if (view.roster.length === 0) append(roster, "li", "No signups yet.");
@@ -684,50 +678,65 @@ function updateHeader(active) {
   const eventText = accessibleEventText(state.data, active, state.speech?.event || null);
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
-  $("play").textContent = state.playing ? "Pause" : "Play";
+  const following = state.clock.mode === "follow-now";
+  $("play").textContent = state.clock.mode === "paused" ? "Play" : "Pause";
+  $("play").disabled = false;
+  $("scrubber").disabled = false;
+  $("speed").disabled = following;
+  const canFollow = state.clock.source === "live" && state.data.phase === "live";
+  $("return-now").hidden = !canFollow || following;
+  $("now-marker").hidden = !canFollow;
+  if (canFollow) $("now-marker").textContent = `Now: ${formatDate(Date.now(), { hour: "numeric", minute: "2-digit" })}`;
+  const badge = $("mode-badge");
+  badge.textContent = following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : Date.now() < Date.parse(state.data.event.start) ? "UPCOMING" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
+  badge.className = `badge${following ? " live" : ""}`;
+  for (const table of state.data.tables) {
+    const text = `At selected time: ${tableLifecycle(state.data, table, state.time).label}`;
+    const node = state.tablePhaseNodes.get(table.id);
+    if (node && node.textContent !== text) node.textContent = text;
+    if (state.selectedId === table.id && state.detailPhaseNode && state.detailPhaseNode.textContent !== text) state.detailPhaseNode.textContent = text;
+  }
   const beforeEvent = Date.now() < Date.parse(state.data.event.start);
   const available = state.data.tables.filter((table) => table.signups.length < table.seats && (beforeEvent || state.time < table.end)).length;
   const count = state.data.tables.length;
-  const base = beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
+  const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
   const note = !ctx ? " · Hall graphics unavailable; use the table list." : state.assetsFailed ? " · Sprite art unavailable; simplified graphics are in use." : "";
   if (!state.staleMessage) setStatus(base + note, !ctx || state.assetsFailed ? "stale" : "");
 }
 
-function setMode(nextMode) {
-  if (state.mode === nextMode) return;
-  state.mode = nextMode;
-  const live = nextMode === "live";
-  const badge = $("mode-badge");
-  badge.textContent = live ? "LIVE" : "REPLAY";
-  badge.className = `badge${live ? " live" : ""}`;
-  $("scrubber").disabled = live;
-  $("speed").disabled = live;
-  $("play").disabled = live || reducedMotion.matches;
-  $("now-marker").hidden = !live;
-  if (live) {
-    state.live = createLiveState(state.data);
-    state.speechQueue = [];
-    state.speech = null;
-  }
+function clearSpeech() {
+  state.speechQueue = [];
+  state.speech = null;
+  if (state.live) state.live = { ...state.live, speechQueue: [] };
+}
+
+function setClock(clock, persistNow = true) {
+  state.clock = clock;
+  state.time = clock.slot;
   state.snap = true;
+  clearSpeech();
+  persistClockSelection(performance.now(), persistNow);
 }
 
-function updateMode() {
-  const automatic = modeAt(state.data, Date.now());
-  if (automatic !== state.mode) setMode(automatic);
-  if (state.mode === "live") {
-    state.time = clamp((Date.now() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60_000), 0, state.data.event.slots);
-    $("now-marker").textContent = `Now: ${formatDate(Date.now(), { hour: "numeric", minute: "2-digit" })}`;
+function persistClockSelection(now, force = false) {
+  if (!globalThis.history?.replaceState || !location.href || (!force && now - state.lastUrlWrite < 1000)) return;
+  const url = new URL(location.href);
+  if (state.clock.mode === "follow-now") url.searchParams.delete("at");
+  else url.searchParams.set("at", String(state.time));
+  if (url.href !== location.href) {
+    try { history.replaceState(null, "", url.href); }
+    catch { /* A restricted History API must not stop the viewer. */ }
   }
+  state.lastUrlWrite = now;
 }
 
-function queueSpeech(events) { state.speechQueue.push(...events); }
+function queueSpeech(events) { state.speechQueue = [...state.speechQueue, ...events].slice(-20); }
 
 function advanceSpeech(now) {
   if (state.speech && now >= state.speech.until) state.speech = null;
   if (!state.speech) {
     let event = null;
-    if (state.mode === "live" && state.live) {
+    if (state.clock.mode === "follow-now" && state.live) {
       const shifted = shiftSpeechQueue(state.live);
       state.live = shifted.state;
       event = shifted.event;
@@ -740,7 +749,7 @@ function advanceSpeech(now) {
 }
 
 async function fetchTimeline() {
-  const url = state.sample ? "./data/timeline.sample.json" : "./data/timeline.json";
+  const url = state.archive ? "./timeline.json" : state.sample ? "./data/timeline.sample.json" : "./data/timeline.json";
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("fetch");
   let input;
@@ -753,7 +762,8 @@ function installTimeline(data, initial = false) {
   state.data = data;
   document.title = `${data.event.name} — Great Hall`;
   $("event-name").textContent = data.event.name;
-  $("record-note").hidden = data.phase !== "final";
+  $("record-note").hidden = !state.archive && data.phase !== "final";
+  $("record-note").textContent = state.archive ? "Archived event replay. This shows the final saved schedule." : "This is the final event record.";
   $("updated").textContent = formatDate(Date.parse(data.generated_at), { dateStyle: "medium", timeStyle: "short" });
   $("scrubber").max = String(data.event.slots);
   $("start-label").textContent = formatSlot(0, true);
@@ -775,7 +785,7 @@ async function refresh() {
     const next = await fetchTimeline();
     if (!state.live) state.live = createLiveState(state.data);
     const result = reconcileLiveSnapshot(state.live, next);
-    state.live = result;
+    state.live = state.clock.mode === "follow-now" ? result : { ...result, speechQueue: [] };
     if (result.changed) {
       installTimeline(result.snapshot);
     }
@@ -895,27 +905,32 @@ canvas.addEventListener("keydown", (event) => {
 });
 
 $("play").addEventListener("click", () => {
-  if (state.mode === "live" || reducedMotion.matches) return;
-  state.playing = !state.playing;
+  if (!state.data) return;
+  setClock(toggleViewerPlayback(state.clock, state.data));
+  state.lastTime = performance.now();
 });
-$("speed").addEventListener("change", (event) => { state.speed = Number(event.target.value); });
+$("return-now").addEventListener("click", () => {
+  if (!state.data) return;
+  setClock(followNowClock(state.clock, state.data, Date.now()));
+});
+$("speed").addEventListener("change", (event) => {
+  const speed = Number(event.target.value);
+  if ([1, 30, 120, 600, 1800].includes(speed)) state.speed = speed;
+});
 $("scrubber").addEventListener("input", (event) => {
-  if (!state.data || state.mode === "live") return;
-  const previous = state.time;
-  const next = Number(event.target.value);
-  if (next > previous) queueSpeech(crossedSpeechEvents(state.data, previous, next));
-  else if (next < previous) {
-    state.speechQueue = [];
-    state.speech = null;
-  }
-  state.time = next;
-  state.playing = false;
-  state.snap = true;
+  if (!state.data) return;
+  setClock(seekViewerClock(state.clock, state.data, Number(event.target.value)), false);
+});
+
+$("scrubber").addEventListener("change", () => {
+  if (state.data) persistClockSelection(performance.now(), true);
+});
+globalThis.addEventListener?.("pagehide", () => {
+  if (state.clock) persistClockSelection(performance.now(), true);
 });
 
 reducedMotion.addEventListener?.("change", () => {
-  if (reducedMotion.matches) state.playing = false;
-  if (state.data) $("play").disabled = state.mode === "live" || reducedMotion.matches;
+  if (state.clock?.mode === "replay" && reducedMotion.matches) setClock(seekViewerClock(state.clock, state.data, state.time));
   state.snap = true;
 });
 
@@ -930,8 +945,8 @@ function loadImage(url) {
 
 async function loadAssets() {
   const results = await Promise.allSettled([
-    loadImage("./assets/roguelikeChar_transparent.png"),
-    loadImage("./assets/roguelikeSheet_transparent.png"),
+    loadImage(new URL("./assets/roguelikeChar_transparent.png", import.meta.url).href),
+    loadImage(new URL("./assets/roguelikeSheet_transparent.png", import.meta.url).href),
   ]);
   state.images.characters = results[0].status === "fulfilled" ? results[0].value : null;
   state.images.rpg = results[1].status === "fulfilled" ? results[1].value : null;
@@ -940,22 +955,19 @@ async function loadAssets() {
 
 function loop(now) {
   if (!state.data) return;
-  const realSeconds = Math.min(.1, (now - state.lastTime) / 1000 || 0);
+  const realSeconds = Math.max(0, Math.min(.1, (now - state.lastTime) / 1000 || 0));
   state.lastTime = now;
-  updateMode();
-  let active = activeEvents(state.data, state.time, state.adminEvents);
-  if (state.mode === "replay" && state.playing && !reducedMotion.matches) {
-    const before = state.time;
-    const speed = playbackSpeed(state.speed, active);
-    state.time = clamp(state.time + realSeconds * speed / (state.data.event.slot_minutes * 60), 0, state.data.event.slots);
-    queueSpeech(crossedSpeechEvents(state.data, before, state.time));
-    if (state.time >= state.data.event.slots) state.playing = false;
-    if (state.time !== before) active = activeEvents(state.data, state.time, state.adminEvents);
-  }
-  if (state.mode === "live" && now - state.lastRefresh >= 60_000) {
+  const previous = state.clock;
+  state.clock = tickViewerClock(previous, state.data, Date.now(), realSeconds, state.speed);
+  state.time = state.clock.slot;
+  if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
+  if (previous.mode !== state.clock.mode && (previous.mode === "follow-now" || state.clock.mode === "follow-now")) { clearSpeech(); state.snap = true; }
+  const active = activeEvents(state.data, state.time, state.adminEvents);
+  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 60_000) {
     state.lastRefresh = now;
     void refresh();
   }
+  persistClockSelection(now);
   advanceSpeech(now);
   updatePeople(realSeconds, now, active);
   render(now, active);
@@ -967,11 +979,13 @@ async function boot() {
   try {
     const [data] = await Promise.all([fetchTimeline(), loadAssets()]);
     installTimeline(data, true);
-    setMode(modeAt(data, Date.now()));
-    if (reducedMotion.matches) state.playing = false;
+    state.clock = createViewerClock(data, Date.now(), { source: state.archive ? "archive" : state.sample ? "sample" : "live", mobile: mobile.matches, reducedMotion: reducedMotion.matches });
+    const at = new URLSearchParams(location.search).get("at");
+    if (at !== null && at.trim() !== "" && Number.isFinite(Number(at))) state.clock = seekViewerClock(state.clock, data, Number(at));
+    state.time = state.clock.slot;
+    if (state.clock.source === "live") state.live = createLiveState(data);
     state.lastTime = performance.now();
     state.lastRefresh = state.lastTime;
-    updateMode();
     const active = activeEvents(state.data, state.time, state.adminEvents);
     updatePeople(0, state.lastTime, active);
     render(state.lastTime, active);

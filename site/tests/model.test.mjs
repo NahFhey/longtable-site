@@ -9,6 +9,7 @@ import {
   accessibleEventText,
   chairSeatIndices,
   createSeatingPlan,
+  createRoomLayout,
   createLiveState,
   crossedSpeechEvents,
   displayName,
@@ -30,6 +31,7 @@ import {
   speechView,
   tableGridPosition,
   tableView,
+  tableLifecycle,
   validateTimeline,
   visibleVariant,
 } from "../model.mjs";
@@ -58,12 +60,13 @@ function timeline(schema = 2) {
   ];
   return {
     schema,
+    ...(schema === 4 ? { room_layout: { version: 1, pad_capacity: 20, overflow_capacity: 120 } } : {}),
     phase: "live",
     generated_at: "2026-11-07T15:01:00Z",
     event: { name: "Test hall", start: "2026-11-07T10:00:00-05:00", tz: "America/New_York", slot_minutes: 30, slots: 8 },
     people,
     tables: [{
-      id: "table-key", name: "Table One", system: "A system", pitch: "A pitch", seats: 3, walk_ins: true,
+      pad: 0, id: "table-key", name: "Table One", system: "A system", pitch: "A pitch", seats: 3, walk_ins: true,
       start: 1, end: 5, dm: "dm", created_at: "2026-10-01T10:00:00-04:00",
       signups: [
         { person: "player", planned: [1, 5], actual: null },
@@ -81,8 +84,8 @@ function event(id, kind, at, overrides = {}) {
   return { id, kind, at, duration, text, person: target, by: "admin", ...overrides };
 }
 
-test("schema 1, 2 and 3 are accepted, unknown fields are ignored, and 0/4 are rejected", () => {
-  for (const schema of [1, 2, 3]) {
+test("schema 1–4 are accepted, unknown fields are ignored, and 0/5 are rejected", () => {
+  for (const schema of [1, 2, 3, 4]) {
     const input = timeline(schema);
     input.unknown_top = "ignored";
     input.event.future_field = 42;
@@ -93,7 +96,7 @@ test("schema 1, 2 and 3 are accepted, unknown fields are ignored, and 0/4 are re
     assert.equal("future_field" in result.event, false);
     assert.equal("future_field" in result.people[0], false);
   }
-  for (const schema of [0, 4]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
+  for (const schema of [0, 5]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
 });
 
 test("custom appearances survive live reconciliation and defaults preserve old characters", () => {
@@ -458,4 +461,145 @@ test("new snapshots replace deleted objects by stable-key reconciliation", () =>
   const next = reconcileLiveSnapshot(state, validateTimeline(nextInput));
   assert.equal(next.snapshot.tables.length, 0);
   assert.equal(next.snapshot.people.some((item) => item.id === "player"), false);
+});
+
+test("schema 4 rejects invalid layouts, pad collisions and excess overflow reservations", () => {
+  const changes = [
+    (data) => { delete data.room_layout; },
+    (data) => { data.room_layout.version = 2; },
+    (data) => { data.room_layout.pad_capacity = 0; },
+    (data) => { data.room_layout.overflow_capacity = -1; },
+    (data) => { delete data.tables[0].pad; },
+    (data) => { data.tables[0].pad = null; },
+    (data) => { data.tables[0].pad = true; },
+    (data) => { data.tables[0].pad = 0.5; },
+    (data) => { data.tables[0].pad = 20; },
+    (data) => { data.tables.push({ ...data.tables[0], id: "different" }); },
+    (data) => { data.tables[0].seats = 130; },
+    (data) => { delete data.people[0].appearance; },
+  ];
+  for (const change of changes) {
+    const data = timeline(4);
+    change(data);
+    assert.throws(() => validateTimeline(data), TimelineError);
+  }
+});
+
+test("saved pads survive deletion, reorder, replacement and fresh-client refresh", () => {
+  const input = timeline(4);
+  input.room_layout.pad_capacity = 30;
+  input.tables = Array.from({ length: 22 }, (_, pad) => ({ ...input.tables[0], id: `opaque-${99 - pad}`, pad, signups: [] }));
+  const original = validateTimeline(input);
+  const first = createRoomLayout(original.tables, original.room_layout);
+  input.tables = input.tables.filter((table) => table.pad !== 0 && table.pad !== 10).reverse();
+  input.tables.push({ ...input.tables[0], id: "new-table", pad: 0 });
+  input.generated_at = "2026-11-07T15:02:00Z";
+  const refresh = reconcileLiveSnapshot(createLiveState(original), validateTimeline(input)).snapshot;
+  const reload = validateTimeline(JSON.parse(JSON.stringify(input)));
+  const next = createRoomLayout(refresh.tables, refresh.room_layout);
+  assert.deepEqual(next, createRoomLayout(reload.tables, reload.room_layout));
+  for (const [index, table] of refresh.tables.entries()) {
+    assert.deepEqual(next.cells[index], first.cells[table.pad]);
+  }
+  const empty = createRoomLayout([], input.room_layout);
+  for (const key of ["width", "height", "stage", "food", "lounge", "door", "doorPosition", "stageFront", "tableGridBottom", "overflowRows", "aisles"]) {
+    assert.deepEqual(next[key], first[key], key);
+    assert.deepEqual(empty[key], first[key], key);
+  }
+});
+
+test("fixed overflow area fits a large roster without moving landmarks or overlapping seats", () => {
+  const room = { version: 1, pad_capacity: 20, overflow_capacity: 32 };
+  const tables = [
+    { id: "a", pad: 19, seats: 26, signups: Array(26).fill({}) },
+    { id: "b", pad: 4, seats: 24, signups: Array(24).fill({}) },
+  ];
+  const layout = createRoomLayout(tables, room);
+  const empty = createRoomLayout([], room);
+  assert.equal(layout.overflowSeats.length, 32);
+  assert.deepEqual(layout.lounge, empty.lounge);
+  assert.deepEqual(layout.stage, empty.stage);
+  const positions = tables.flatMap((table, index) => Array.from({ length: table.signups.length + 1 }, (_, seat) => seatPositionForPlan(layout, index, seat)));
+  assert.equal(new Set(positions.map((pos) => `${pos.x}:${pos.y}`)).size, positions.length);
+  for (const pos of layout.overflowSeats) {
+    assert.ok(pos.y > layout.tableGridBottom && pos.y < layout.lounge.y);
+    assert.ok(pos.x > 0 && pos.x < layout.stage.x);
+  }
+  const reorder = createRoomLayout([...tables].reverse(), room);
+  for (const [index, table] of tables.entries()) {
+    for (let seat = 0; seat <= table.signups.length; seat += 1) {
+      const a = seatPositionForPlan(layout, index, seat);
+      const b = seatPositionForPlan(reorder, 1 - index, seat);
+      assert.deepEqual([a.x, a.y], [b.x, b.y]);
+    }
+  }
+});
+
+test("legacy schemas retain the original array-based grid and dynamic overflow area", () => {
+  for (const schema of [1, 2, 3]) {
+    const input = timeline(schema);
+    input.tables[0].pad = 19; // An unknown field cannot rewrite old archives.
+    input.room_layout = { version: 1, pad_capacity: 100, overflow_capacity: 500 };
+    const data = validateTimeline(input);
+    const layout = createRoomLayout(data.tables, data.room_layout);
+    assert.deepEqual(layout.cells[0], { x: 4, y: 8 });
+    assert.equal(layout.tableRows, 2);
+    assert.equal(layout.overflowRows, 0);
+  }
+});
+
+test("table lifecycle has half-open schedule phases and deterministic props", () => {
+  const data = timeline(4);
+  const table = { ...data.tables[0], start: 2, end: 4 };
+  const bounds = tableLifecycle(data, table, 0);
+  assert.equal(bounds.prepareAt, 2 - 1 / 6 - .5);
+  assert.equal(bounds.readyAt, 2 - 1 / 6);
+  assert.equal(bounds.inactiveAt, 4 + 1 / 3);
+  for (const [slot, phase, furniture, props] of [
+    [0, "scheduled", false, false],
+    [bounds.prepareAt - 1e-8, "scheduled", false, false],
+    [bounds.prepareAt, "preparing", true, false],
+    [bounds.readyAt, "ready", true, true],
+    [2, "active", true, true],
+    [4 - 1e-8, "active", true, true],
+    [4, "cleaning", true, false],
+    [bounds.inactiveAt, "inactive", false, false],
+    [8, "inactive", false, false],
+  ]) {
+    const actual = tableLifecycle(data, table, slot);
+    assert.deepEqual([actual.phase, actual.furniture, actual.props], [phase, furniture, props]);
+  }
+});
+
+test("lifecycle scales for dry runs and clips setup and cleanup to event boundaries", () => {
+  const data = timeline(4);
+  const table = { ...data.tables[0], start: 2, end: 4 };
+  const normal = tableLifecycle(data, table, 1.5);
+  for (const slot_minutes of [1, 5, 15, 30]) {
+    const compressed = { ...data, event: { ...data.event, slot_minutes } };
+    assert.deepEqual(tableLifecycle(compressed, table, 1.5), normal);
+  }
+  const hourly = tableLifecycle({ ...data, event: { ...data.event, slot_minutes: 60 } }, table, 0);
+  assert.equal(hourly.readyAt, table.start - 5 / 60);
+  const fullWindow = { ...table, start: 0, end: data.event.slots };
+  assert.equal(tableLifecycle(data, fullWindow, 0).phase, "active");
+  assert.equal(tableLifecycle(data, fullWindow, data.event.slots).phase, "inactive");
+});
+
+test("fresh reconstruction, forward replay and backward seeks agree on meaningful table state", () => {
+  const data = validateTimeline(timeline(4));
+  const person = data.people.find((p) => p.id === "player");
+  const renderState = (package_, slot) => ({
+    props: package_.tables.map((table) => tableLifecycle(package_, table, slot)),
+    places: package_.people.map((person) => resolveLocation(package_, person, slot)),
+  });
+  const points = [0, .4, .9, 1, 2.5, 4.9, 5, 5.2, 5.4, 8];
+  const sequential = new Map(points.map((slot) => [slot, renderState(data, slot)]));
+  for (const slot of points.toReversed()) {
+    const fresh = validateTimeline(JSON.parse(JSON.stringify(data)));
+    assert.deepEqual(renderState(fresh, slot), sequential.get(slot));
+  }
+  // An actual departure after the table window cannot leave a person at packed furniture.
+  data.tables[0].signups[0].actual = [1, 7];
+  assert.equal(ordinaryLocation(data, person, 5.5).kind, "lounge");
 });

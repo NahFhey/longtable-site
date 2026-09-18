@@ -14,6 +14,11 @@ chosen skin, outfit, hair, and DM hat, or `null` for the original variant-based
 look. Deploy the site's schema-3 reader before restarting the updated bot. The
 site continues to accept schemas 1 and 2, treating appearance as `null`.
 
+Amended 2026-09-18 to **schema 4**: required `room_layout` and `tables[].pad`
+freeze table locations and room geometry. Appearance remains required. Deploy the
+schema-4 site reader before restarting the writer. Schemas 1–3 retain their
+original index-based layout; missing historical pad assignments are not recoverable.
+
 A full fake day that exercises every field is in `timeline.sample.json`
 (generated, deterministic; 8 DMs, 12 tables, 35 players, the organiser, 14 events).
 
@@ -38,17 +43,17 @@ A full fake day that exercises every field is in `timeline.sample.json`
   derives nothing from an id (not the sprite, not the name). The bot chooses
   them; they need not be Discord snowflakes.
 - **Order.** `people` is unordered. `tables` is in creation order (the site
-  assigns grid positions by array index; deleting a table shifts later tables,
-  accepted). `events` is in `at` order. `signups` is in signup order.
+  uses saved pads for schema 4; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
 
 ## Top level
 
 | field | type | notes |
 |---|---|---|
-| `schema` | int | `3` (schema 2 added shouts; schema 3 added appearance). Site refuses unknown majors. |
+| `schema` | int | `4` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads). Site refuses unknown majors. |
 | `phase` | `"live"` \| `"final"` | `final` is the +14-day publish: names trimmed to first name + initial, bot retired. Site shows a "final record" note. |
 | `generated_at` | string | ISO 8601 UTC instant the bot wrote the file. Shown as "last updated". |
 | `event` | object | window config, below. |
+| `room_layout` | object | Required in schema 4. Version and capacities fixed for this event, below. |
 | `people` | array | everyone who has ever signed up, created a table, or set presence. |
 | `tables` | array | current tables. Deleted tables are gone, not tombstoned. |
 | `events` | array | admin `/event` history plus attendee shouts and approved donations. |
@@ -63,6 +68,46 @@ A full fake day that exercises every field is in `timeline.sample.json`
 | `slot_minutes` | int | `30` for the real event. Dry run may shrink it. |
 | `slots` | int | `48` for the real event. Window length = `slots * slot_minutes`. |
 
+## `room_layout` (schema 4)
+
+| field | type | notes |
+|---|---|---|
+| `version` | int | `1`. Unknown versions are rejected. Geometry rules below are immutable for this version. |
+| `pad_capacity` | int | Positive safe integer. Default 20. All existing table records reserve one pad, including ended tables. |
+| `overflow_capacity` | int | Nonnegative safe integer. Default 120 player seats beyond local seating. |
+
+Version 1 uses world-tile coordinates: ten columns, 6×6 cells, grid origin `(4,8)`.
+Pad `p` has cell origin `(4 + 6*(p%10), 8 + 6*floor(p/10))`. Table rows are
+`max(2, ceil(pad_capacity/10))`, with grid bottom `B = 8 + 6*rows`. The room is
+72 tiles wide. Overflow rows are `R = ceil(overflow_capacity/30)`; room height
+is `H = B + (R ? 2 + 2*R : 0) + 6`. No dimensions depend on table count or signups.
+
+Fixed landmark rectangles `(x,y,width,height)` are stage `(65,1,6,H-2)`, food
+`(1,1,16,6)`, and lounge `(1,H-6,63,5)`; the entrance is `(0,9)`. Overflow seat
+`i` is `(4.5 + 2*(i%30), B + 2.5 + 2*floor(i/30))`. Occupied overflow chairs
+are assigned by ascending pad then signup order. Their area is fixed; individual
+attendees' overflow chairs can change when rosters change. Ten local positions
+include the DM, so each table reserves `max(0, seats-9)` overflow seats. The sum
+must not exceed `overflow_capacity`, even for non-overlapping table windows.
+This ensures every advertised seat can be filled without growing the room.
+
+Creation allocates the lowest free pad. Edits and early ending retain it. Deletion
+(including the existing cancellation of an upcoming table) releases only that pad;
+retained records never compact. Time-based reuse and retained table history are
+not part of this contract. Creation or seat-count edits exceeding capacity are
+refused atomically; the reader rejects collisions and invalid capacities and keeps
+its last good live snapshot.
+
+Private state versions 1/2 migrate to version 4 once, assigning pads in the saved
+array order and atomically saving before live use. Capacities come from setup
+configuration, enlarged only during migration if existing tables or seat counts
+require it. Subsequent restarts use the saved layout. Offline `--check` previews
+migration without writing. New events take configured capacities; the event window
+editor and clearing test records preserve the current room. Archive packages carry
+this layout version and capacities with their saved pads. Private version 3 keeps
+its pads when migrating to version 4, which also persists a random event identity
+and authoritative event configuration. Neither enters the public live schema.
+
 ## `people[]`
 
 | field | type | notes |
@@ -72,7 +117,7 @@ A full fake day that exercises every field is in `timeline.sample.json`
 | `dm` | bool | holds the DM role at publish time. Rendered with the distinct DM look. |
 | `hidden` | bool | `/hide` was ever used. Honoured forever. `true` ⇒ `name`, `variant`, and `appearance` are `null`; site draws the generic unnamed sprite and no nametag, and never shows the id. |
 | `variant` | int \| null | unsigned 32-bit FNV-1a hash of the Discord user id string, computed once by the bot. Site maps it to a sprite (`variant % palette_size`), so the art can change without the file changing. `null` iff `hidden`. |
-| `appearance` | object \| null | Required in schema 3. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
+| `appearance` | object \| null | Required in schemas 3 and 4. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
 | `presence.planned` | `[int, int]` \| null | event presence `[arrive, leave)`. `null` if the person never set it (e.g. a DM who only created a table — see DESIGN open item: creating a table leans toward auto-setting presence to cover it). |
 | `presence.actual.here` | number \| null | slot of `/here`, fractional. |
 | `presence.actual.leaving` | number \| null | slot of `/leaving`, fractional. |
@@ -101,8 +146,9 @@ latest of each and the site takes the effective range as given.
 | `walk_ins` | bool | walk-ins-welcome flag. Display only; does not change seat accounting. |
 | `start`, `end` | int | `[start, end)` slots, `end > start`. One DM's own tables never overlap; different DMs' tables may. |
 | `dm` | string | `people[].id` of the DM. Always present in `people`. |
-| `created_at` | string | ISO 8601 with offset. Informational; array order is authoritative for grid position. |
+| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schema 4. |
 | `signups` | array | seated players, ≤ `seats` entries. The DM is not in this list. |
+| `pad` | int | Required in schema 4. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
 
 ### `tables[].signups[]`
 
@@ -163,8 +209,47 @@ records only what was issued and when.
 
 ## What the site does with it
 
-- **Mode:** live if the wall clock is inside `[start, start + window + 1h]`,
-  else replay. Live refetches every 60 s and shows a "now" marker.
+- **Viewer time:** live-source initial viewing follows now inside
+  `[start, start + window + 1h]` when `phase` is live. A user's pause, seek, or
+  replay choice persists until Return to Now; refreshing never overrides it.
+  Follow-now clamps at event end and does not automatically rewind. Live-source
+  packages refetch every 60 s while `phase` is live, even when paused or replaying.
+  Sample/archive sources never auto-follow; archive and final replay start paused.
+  `phase: final` continues to mean privacy finalization, not a viewer clock mode.
+- **Lifecycle:** scenery is derived from table windows and selected slots, without
+  adding facts to the package. Preparation starts 20 minutes before play, ready
+  starts 5 minutes before play, cleanup lasts 10 minutes after play for 30-minute
+  slots. Multiply minutes by `min(1, slot_minutes/30)` for compressed events; all
+  boundaries clip to `[0, slots]`. Phases are half-open. Props show only during
+  ready/play; furniture shows from preparation through cleanup. The accessible
+  table list includes all records even when their furniture is inactive.
+- **Seeking:** load `?at=<slot>` or scrub to reconstruct the same lifecycle,
+  meaningful locations, and ongoing admin events. Seeking clears transient
+  reactions; it never enqueues the interval skipped. Sequential reaction playback
+  is bounded separately. See the site README for clock and presentation rules.
 - **"Last updated"** = `generated_at` rendered in `event.tz`.
-- **Table list** (text fallback below the canvas) = `tables[]` with resolved DM
+- **Table list** (canonical accessible interface) = `tables[]` with resolved DM
   and roster names; hidden people appear as "someone".
+
+
+## Archive package (Milestone E)
+
+The timeline remains schema 4. A separate archive envelope (`archive.json`, format
+1) records `event_id`, `preserved_at`, `fidelity: "final-schedule"`,
+`presentation_version: 1`, renderer SHA-256, timeline schema, and `room_layout`.
+It lives beside `index.html` and `timeline.json` at `events/<event-id>/`. Event
+identity is independent of resettable person/table/event counters.
+
+Before Start New Event clears state, the bot validates and saves a private
+snapshot plus its renderer and privacy deadline. Publication waits until that
+original event's end plus the configured finalization delay, or explicit final
+projection. The public archive is always `phase: final`, using the same name
+trimming and hidden-person projection as the live final package. Approved free
+text is unchanged. Untrimmed names are removed from private pending output before
+network publication; failures retry the same finalized bytes.
+
+This package is a final-schedule replay, not a change log. It contains only facts
+remaining at preservation time. Archive pages use the same frozen model/renderer,
+load only the sibling package, start paused, and never poll or use sample fallback.
+Moderation can redact an archived person or remove an archived reaction and queue
+a replacement publication. Earlier public Git revisions are not erased.

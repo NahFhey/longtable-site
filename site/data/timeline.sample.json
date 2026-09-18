@@ -1,5 +1,10 @@
 {
- "schema": 2,
+ "schema": 4,
+ "room_layout": {
+  "version": 1,
+  "pad_capacity": 20,
+  "overflow_capacity": 120
+ },
  "phase": "live",
  "generated_at": "2026-11-07T20:09:41Z",
  "event": {
@@ -25,7 +30,8 @@
      "here": 0.4,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_theo",
@@ -42,7 +48,8 @@
      "here": 1.1,
      "leaving": 31.6
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_priya",
@@ -59,7 +66,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_jonah",
@@ -76,7 +84,8 @@
      "here": 8.3,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_wen",
@@ -93,7 +102,8 @@
      "here": 12.9,
      "leaving": 23.2
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_sol",
@@ -110,7 +120,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_ilse",
@@ -127,7 +138,8 @@
      "here": 28.6,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_rafa",
@@ -144,7 +156,8 @@
      "here": 40.2,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_ada",
@@ -161,7 +174,8 @@
      "here": 0.8,
      "leaving": 9.6
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_bram",
@@ -178,7 +192,8 @@
      "here": 1.3,
      "leaving": 11.4
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_cleo",
@@ -195,7 +210,8 @@
      "here": null,
      "leaving": 13.5
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_dev",
@@ -212,7 +228,8 @@
      "here": 2.2,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_esme",
@@ -229,7 +246,8 @@
      "here": 2.9,
      "leaving": 22.7
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_finn",
@@ -246,7 +264,8 @@
      "here": 1.6,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_greta",
@@ -263,7 +282,8 @@
      "here": 3.4,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_hugo",
@@ -280,7 +300,8 @@
      "here": 4.7,
      "leaving": 12.1
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_ines",
@@ -297,7 +318,8 @@
      "here": 5.1,
      "leaving": 11.9
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_jules",
@@ -314,7 +336,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_kit",
@@ -331,7 +354,8 @@
      "here": 1.5,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_lena",
@@ -348,7 +372,8 @@
      "here": 1.2,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_milo",
@@ -365,7 +390,8 @@
      "here": 3.1,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_nadia",
@@ -382,7 +408,8 @@
      "here": 6.4,
      "leaving": 29.2
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_oisin",
@@ -399,7 +426,8 @@
      "here": 8.2,
      "leaving": 19.5
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_pip",
@@ -416,7 +444,8 @@
      "here": 10.5,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_quinn",
@@ -433,7 +462,8 @@
      "here": 12.4,
      "leaving": 25.8
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_rosa",
@@ -450,7 +480,8 @@
      "here": 12.2,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_sam",
@@ -467,7 +498,8 @@
      "here": 14.6,
      "leaving": 29.1
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_tess",
@@ -484,7 +516,8 @@
      "here": 16.3,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_umar",
@@ -501,7 +534,8 @@
      "here": 16.9,
      "leaving": 35.2
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_vera",
@@ -518,7 +552,8 @@
      "here": 18.4,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_wyatt",
@@ -535,7 +570,8 @@
      "here": 20.7,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_xiu",
@@ -552,7 +588,8 @@
      "here": 22.5,
      "leaving": 39.4
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_yara",
@@ -569,7 +606,8 @@
      "here": 24.3,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_zeke",
@@ -586,7 +624,8 @@
      "here": 27.1,
      "leaving": 35.8
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_abel",
@@ -603,7 +642,8 @@
      "here": 28.4,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_bea",
@@ -620,7 +660,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_cass",
@@ -637,7 +678,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_dara",
@@ -654,7 +696,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_eli",
@@ -671,7 +714,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_freya",
@@ -688,7 +732,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_gus",
@@ -705,7 +750,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_hana",
@@ -722,7 +768,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_ivo",
@@ -739,7 +786,8 @@
      "here": null,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   },
   {
    "id": "u_admin",
@@ -756,7 +804,8 @@
      "here": 0.2,
      "leaving": null
     }
-   }
+   },
+   "appearance": null
   }
  ],
  "tables": [
@@ -815,7 +864,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 0
   },
   {
    "id": "t02",
@@ -864,7 +914,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 1
   },
   {
    "id": "t03",
@@ -916,7 +967,8 @@
       12
      ]
     }
-   ]
+   ],
+   "pad": 2
   },
   {
    "id": "t04",
@@ -971,7 +1023,8 @@
       null
      ]
     }
-   ]
+   ],
+   "pad": 3
   },
   {
    "id": "t05",
@@ -1023,7 +1076,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 4
   },
   {
    "id": "t06",
@@ -1097,7 +1151,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 5
   },
   {
    "id": "t07",
@@ -1130,7 +1185,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 6
   },
   {
    "id": "t08",
@@ -1199,7 +1255,8 @@
       24
      ]
     }
-   ]
+   ],
+   "pad": 7
   },
   {
    "id": "t09",
@@ -1251,7 +1308,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 8
   },
   {
    "id": "t10",
@@ -1300,7 +1358,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 9
   },
   {
    "id": "t11",
@@ -1352,7 +1411,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 10
   },
   {
    "id": "t12",
@@ -1393,7 +1453,8 @@
      ],
      "actual": null
     }
-   ]
+   ],
+   "pad": 11
   }
  ],
  "events": [

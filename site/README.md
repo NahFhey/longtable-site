@@ -37,10 +37,11 @@ DOM through created nodes and `textContent`, never HTML injection sinks.
 
 The data contract is `data/TIMELINE.md`. `bot/longtable/publish.py` atomically
 writes the production `data/timeline.json`; do not edit that generated file by
-hand. The site fetches it with `cache: "no-store"`, validates schemas 1, 2, and 3,
+hand. The site fetches it with `cache: "no-store"`, validates schemas 1–4,
 and retains its last good snapshot if a live refresh is unavailable or invalid.
 Schema 3 adds attendee-selected appearance; older records retain their original
-look. Deploy this reader before restarting a bot that publishes schema 3.
+look. Schema 4 adds persisted pads and event room capacity. Deploy this reader
+before restarting a bot that publishes schema 4.
 
 Opaque identifiers are used only for in-memory joins. They are not displayed
 or used to choose a sprite. Hidden people are rendered and described as
@@ -57,11 +58,14 @@ The page is intentionally marked `noindex`; access control is out of scope.
 
 ## Great Hall doorway and camera
 
-The September 18 upgrade starts with milestones A/B. It reuses the current
-schema 1/2/3 reader and leaves the bot's generated timeline untouched. Stable
-pads, fixed room geometry, lifecycle animation, archives, dice, and audio remain
-later milestones. Camera coordinates and bounds are pure helpers in
-`camera.mjs`; the room still uses the existing index-based layout.
+The September 18 upgrade implements milestones A/B/C/D/E and leaves the bot's
+generated production timeline untouched. Schema 4 uses saved table pads and a
+versioned room layout: deleting a table never moves retained tables, and the
+entrance, stage, food, lounge, and overflow bounds stay fixed across refreshes.
+Legacy schemas 1–3 keep their index-based geometry. Layout and seating helpers in
+`model.mjs` reject collisions and exhausted capacity; camera transforms remain in
+`camera.mjs`. The archive index, furniture-carrying animation, dice, and audio are later milestones.
+See `data/TIMELINE.md` for geometry, migration, and overflow reservation rules.
 
 On desktop the hall precedes the table list. At 650px and below, the actual DOM
 order becomes list, details, then an initially collapsed **Explore the Great
@@ -78,6 +82,69 @@ movement or table selection persists through time changes and refreshes (subject
 to room bounds). A table's frame includes its overflow seating. Canvas dimensions
 follow CSS size and device pixel ratio; labels use CSS pixels and omit overlapping
 labels in the overview. Full text remains available in cards and details.
+
+### Table lifecycle and viewer time (Milestone D)
+
+`tableLifecycle()` derives scenery from the table window and selected slot.
+Normal 30-minute slots use 15 minutes of preparation, 5 minutes ready before play,
+and 10 minutes of cleanup afterward. Durations scale down proportionally for
+shorter slots, and clip to the event boundaries. Phases are scheduled, preparing,
+ready, playing, packing up, and inactive. Tables/chairs appear during preparation;
+props appear when ready and disappear during cleanup. Nothing waits for a prior
+animation to finish. The list and selected-table details report the same phase.
+These are schedule-derived states, not claims about cancellation or actual staff.
+
+`clock.mjs` separates source (`live`, `sample`, or an `archive` entry point),
+publication privacy phase, and viewer modes (`follow-now`, `paused`, `replay`).
+During a live event, Pause or scrubbing leaves follow-now; Play replays from the
+chosen time and **Return to Now** resumes wall-clock tracking. Live-source data
+continues refreshing every 60 seconds while rewound, before doors, and after event
+end, until the package becomes final. Refreshes retain the viewer's time and camera.
+A final snapshot stops follow-now without resetting the selected time. Samples
+never follow the wall clock or poll live data.
+
+Mobile, reduced-motion, and final-record replay start paused; archive-source clocks
+also start paused independently of event dates. Reduced-motion users can explicitly
+play while figures snap to their destinations. Replay stops at the end; Play there
+restarts from zero. A live clock remains at event end rather than jumping to zero.
+Before doors, an untouched live-source preview begins following when doors open;
+any explicit time choice disables that automatic switch.
+
+Seeking clears transient speech in either direction. Sequential playback still
+queues crossed reactions in order, retaining at most the newest 20 pending items;
+rewound live refreshes mark new reactions seen without queueing them. Announcements,
+spotlights, breaks, meals, table phases, and intended person locations reconstruct
+from the selected time. Ambient walking/wandering and short reaction bubbles remain
+presentation effects; identical decorative frames are not promised.
+
+`?at=<slot>` opens paused at a clamped fractional event slot. Time choices update
+the URL without navigation; playing checkpoints it at most once per second, and
+Return to Now removes the parameter. Exact floating-point slot values are preserved
+so a reload at a lifecycle boundary does not cross into another phase. The same
+renderer handles fresh loads and seeks, including archive pages.
+
+### Preserved event replay (Milestone E)
+
+The bot creates `events/<event-id>/index.html`, a finalized `timeline.json`, and
+`archive.json` metadata only after privacy finalization. The entry page declares
+`data-source="archive"` and loads a frozen renderer from
+`archive-assets/<sha256>/`. The loader accepts only its sibling `./timeline.json`;
+archive pages never poll live data or fall back to a sample, even with `?sample=1`.
+Module imports and sprite URLs resolve against the frozen renderer, while the
+package URL resolves against the archive page. Both domain-root and project-prefix
+Pages paths work. Archive pages begin paused regardless of wall-clock date and
+suppress current-event signup links.
+
+These are final-schedule replays: retained tables, presence, signups, and approved
+events. Deleted records and overwritten changes cannot be reconstructed. Metadata
+carries the schema, pad layout, presentation version, and renderer digest. Frozen
+code/assets preserve the chosen renderer; browser-dependent decorative frames are
+not promised identical. Archive discovery/index navigation is a later milestone.
+
+The archive publisher commits only its exact event files and frozen assets, using
+the same dedicated publish checkout as live updates. Keep those generated
+directories when promoting a newer website. See the bot README for private pending
+storage, deadlines, retries, reset protection, and archive moderation commands.
 
 ### Transitional event actions
 
@@ -102,11 +169,12 @@ art license or bot event is needed.
 
 ### Testing deployment and later launch
 
-On September 18, GitHub Pages reported `cname: longtable.party`, HTTPS enforcement
-false, and no issued certificate in its API response. A verified HTTPS request
-failed with a hostname mismatch. The health endpoint returned no diagnosis.
-DNS/certificate remediation remains an operational release task; adding a CNAME
-file alone is not an established fix. No Pages configuration or DNS was changed.
+HTTPS was repaired on September 18 with organizer approval. Public DNS already
+pointed to GitHub Pages. Removing and immediately restoring `longtable.party` in
+Pages restarted certificate issuance; GitHub approved a certificate covering both
+`longtable.party` and `www.longtable.party`. HTTPS was verified before enabling
+enforcement. HTTP now redirects to HTTPS, and the secure site serves the deployed
+test build. No DNS changes were needed.
 
 The organizer confirmed on September 18 that the Discord server and every current
 game are for testing. Keep treating this deployment as testing until the organizer
