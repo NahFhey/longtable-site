@@ -1,7 +1,7 @@
 {
  "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:45:11.562252Z",
+ "generated_at": "2026-09-18T12:45:46.560305Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -17,10 +17,10 @@
    "hidden": false,
    "variant": 4082956081,
    "appearance": {
-    "skin": 0,
-    "shirt": 8,
-    "hair": 11,
-    "hat": 1
+    "skin": 3,
+    "shirt": 12,
+    "hair": 0,
+    "hat": 3
    },
    "presence": {
     "planned": [
