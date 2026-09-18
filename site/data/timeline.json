@@ -1,7 +1,7 @@
 {
- "schema": 2,
+ "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:16:29.799343Z",
+ "generated_at": "2026-09-18T12:17:31.299189Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -16,6 +16,7 @@
    "dm": true,
    "hidden": false,
    "variant": 4082956081,
+   "appearance": null,
    "presence": {
     "planned": [
      35,
