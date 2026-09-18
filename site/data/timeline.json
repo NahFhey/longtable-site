@@ -1,7 +1,7 @@
 {
  "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:49:10.821184Z",
+ "generated_at": "2026-09-18T12:49:55.397667Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -96,6 +96,15 @@
    "at": 35.63,
    "duration": null,
    "text": "More snacks!",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e5",
+   "kind": "donation",
+   "at": 35.65,
+   "duration": null,
+   "text": "i love you kate",
    "person": "p1",
    "by": "p1"
   }
