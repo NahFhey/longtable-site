@@ -1,7 +1,7 @@
 {
  "schema": 3,
  "phase": "live",
- "generated_at": "2026-09-18T12:36:48.091402Z",
+ "generated_at": "2026-09-18T12:37:55.664503Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
@@ -78,6 +78,15 @@
    "at": 35.22,
    "duration": null,
    "text": "This is a test",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e3",
+   "kind": "donation",
+   "at": 35.25,
+   "duration": null,
+   "text": "huzzah!",
    "person": "p1",
    "by": "p1"
   }
