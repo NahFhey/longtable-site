@@ -40,6 +40,14 @@
    "actor": "p1",
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "dfc4082ab5ae49129ae633dc596d6ebc",
+   "at": "2026-09-19T17:40:42.463473Z",
+   "action": "move_table",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -54,7 +62,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T17:40:11.301505Z",
+ "generated_at": "2026-09-19T17:40:45.196735Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -130,6 +138,11 @@
      "at": 6.308257431666666,
      "table": "t1",
      "destination": "food"
+    },
+    {
+     "at": 6.356924151666666,
+     "table": "t1",
+     "destination": "table"
     }
    ],
    "presence": {
@@ -316,6 +329,26 @@
    "text": "hurray!",
    "person": "p1",
    "by": "p1"
+  },
+  {
+   "id": "e13",
+   "kind": "roll",
+   "at": 6.356924151666666,
+   "duration": null,
+   "text": null,
+   "person": "p1",
+   "by": "p1",
+   "table": "t1",
+   "visibility": "public",
+   "roll": {
+    "expression": "1d20",
+    "sides": 20,
+    "faces": [
+     16
+    ],
+    "modifier": 0,
+    "total": 16
+   }
   }
  ]
 }
