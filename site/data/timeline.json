@@ -1,5 +1,6 @@
 {
  "schema": 7,
+ "activity": [],
  "visitors": {
   "open": true,
   "people": [
@@ -12,7 +13,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:16:00.263553Z",
+ "generated_at": "2026-09-19T15:36:30.717823Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
