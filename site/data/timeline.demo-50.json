@@ -1355,7 +1355,10 @@
       2,
       10
      ],
-     "actual": null
+     "actual": [
+      2,
+      10
+     ]
     },
     {
      "person": "u_bram",
@@ -1363,7 +1366,10 @@
       2,
       10
      ],
-     "actual": null
+     "actual": [
+      2,
+      10
+     ]
     },
     {
      "person": "u_kit",
@@ -1373,7 +1379,7 @@
      ],
      "actual": [
       2,
-      null
+      10
      ]
     },
     {
@@ -1382,7 +1388,10 @@
       6,
       10
      ],
-     "actual": null
+     "actual": [
+      8.2,
+      10
+     ]
     },
     {
      "person": "u_ada",
@@ -1390,7 +1399,10 @@
       2,
       10
      ],
-     "actual": null
+     "actual": [
+      2,
+      9.6
+     ]
     }
    ],
    "pad": 0
@@ -1413,7 +1425,10 @@
       4,
       8
      ],
-     "actual": null
+     "actual": [
+      4.589,
+      8
+     ]
     },
     {
      "person": "u_milo",
@@ -1423,7 +1438,7 @@
      ],
      "actual": [
       3.1,
-      null
+      8
      ]
     },
     {
@@ -1432,7 +1447,10 @@
       2,
       8
      ],
-     "actual": null
+     "actual": [
+      2,
+      8
+     ]
     },
     {
      "person": "u_hugo",
@@ -1440,7 +1458,10 @@
       3,
       8
      ],
-     "actual": null
+     "actual": [
+      4.7,
+      8
+     ]
     }
    ],
    "pad": 1
@@ -1463,7 +1484,10 @@
       8,
       12
      ],
-     "actual": null
+     "actual": [
+      10.5,
+      12
+     ]
     },
     {
      "person": "u_esme",
@@ -1471,7 +1495,10 @@
       4,
       12
      ],
-     "actual": null
+     "actual": [
+      4,
+      12
+     ]
     },
     {
      "person": "u_greta",
@@ -1481,17 +1508,6 @@
      ],
      "actual": [
       4,
-      null
-     ]
-    },
-    {
-     "person": "u_quinn",
-     "planned": [
-      10,
-      12
-     ],
-     "actual": [
-      12.4,
       12
      ]
     }
@@ -1527,7 +1543,10 @@
       10,
       12
      ],
-     "actual": null
+     "actual": [
+      10,
+      11.9
+     ]
     },
     {
      "person": "u_lena",
@@ -1537,7 +1556,7 @@
      ],
      "actual": [
       10,
-      null
+      16
      ]
     },
     {
@@ -1548,7 +1567,7 @@
      ],
      "actual": [
       10,
-      null
+      16
      ]
     }
    ],
@@ -1578,23 +1597,15 @@
      ]
     },
     {
-     "person": "u_wyatt",
-     "planned": [
-      18,
-      20
-     ],
-     "actual": [
-      20.7,
-      null
-     ]
-    },
-    {
      "person": "u_greta",
      "planned": [
       12,
       16
      ],
-     "actual": null
+     "actual": [
+      12,
+      15.491
+     ]
     },
     {
      "person": "u_cleo",
@@ -1602,7 +1613,10 @@
       12,
       14
      ],
-     "actual": null
+     "actual": [
+      12,
+      13.5
+     ]
     }
    ],
    "pad": 4
@@ -1660,7 +1674,7 @@
      ],
      "actual": [
       14,
-      null
+      22
      ]
     },
     {
@@ -1669,15 +1683,10 @@
       14,
       20
      ],
-     "actual": null
-    },
-    {
-     "person": "u_xiu",
-     "planned": [
-      20,
-      22
-     ],
-     "actual": null
+     "actual": [
+      14,
+      19.876
+     ]
     }
    ],
    "pad": 5
@@ -1711,7 +1720,10 @@
       18,
       24
      ],
-     "actual": null
+     "actual": [
+      18,
+      24
+     ]
     }
    ],
    "pad": 6
@@ -1740,17 +1752,6 @@
      ]
     },
     {
-     "person": "u_oisin",
-     "planned": [
-      22,
-      30
-     ],
-     "actual": [
-      22,
-      19.5
-     ]
-    },
-    {
      "person": "u_xiu",
      "planned": [
       22,
@@ -1769,7 +1770,7 @@
      ],
      "actual": [
       22,
-      null
+      30
      ]
     },
     {
@@ -1806,7 +1807,7 @@
      ],
      "actual": [
       26,
-      null
+      30
      ]
     },
     {
@@ -1815,7 +1816,10 @@
       26,
       30
      ],
-     "actual": null
+     "actual": [
+      26,
+      30
+     ]
     },
     {
      "person": "u_milo",
@@ -1825,7 +1829,7 @@
      ],
      "actual": [
       26,
-      null
+      30
      ]
     },
     {
@@ -1834,7 +1838,10 @@
       26,
       30
      ],
-     "actual": null
+     "actual": [
+      26,
+      30
+     ]
     }
    ],
    "pad": 8
@@ -1859,7 +1866,7 @@
      ],
      "actual": [
       30,
-      null
+      36
      ]
     },
     {
@@ -1868,7 +1875,10 @@
       30,
       36
      ],
-     "actual": null
+     "actual": [
+      30,
+      35.491
+     ]
     },
     {
      "person": "u_dara",
@@ -1876,7 +1886,10 @@
       34,
       36
      ],
-     "actual": null
+     "actual": [
+      34.218,
+      36
+     ]
     },
     {
      "person": "u_lena",
@@ -1884,7 +1897,10 @@
       30,
       36
      ],
-     "actual": null
+     "actual": [
+      30,
+      36
+     ]
     }
    ],
    "pad": 9
@@ -1907,17 +1923,9 @@
       40,
       46
      ],
-     "actual": null
-    },
-    {
-     "person": "u_nadia",
-     "planned": [
-      38,
-      46
-     ],
      "actual": [
-      38,
-      29.2
+      40.44,
+      46
      ]
     },
     {
@@ -1937,7 +1945,10 @@
       38,
       46
      ],
-     "actual": null
+     "actual": [
+      38,
+      46
+     ]
     }
    ],
    "pad": 10
@@ -1962,7 +1973,7 @@
      ],
      "actual": [
       42,
-      null
+      46
      ]
     },
     {
@@ -1971,7 +1982,10 @@
       42,
       46
      ],
-     "actual": null
+     "actual": [
+      42,
+      46
+     ]
     },
     {
      "person": "u_eli",
@@ -1979,7 +1993,10 @@
       42,
       46
      ],
-     "actual": null
+     "actual": [
+      42,
+      46
+     ]
     }
    ],
    "pad": 11

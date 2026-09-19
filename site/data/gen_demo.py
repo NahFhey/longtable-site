@@ -58,10 +58,16 @@ for person in people.values():
 for table in data['tables']:
     # Finish games before the final departures and cleanup.
     table['end'] = min(table['end'], 46)
+    attending = []
     for signup in table['signups']:
         signup['planned'][1] = min(signup['planned'][1], table['end'])
-        if signup['actual'] and signup['actual'][1] is not None:
-            signup['actual'][1] = min(signup['actual'][1], table['end'])
+        presence = people[signup['person']]['presence']['actual']
+        first = max(signup['planned'][0], presence['here'])
+        last = min(signup['planned'][1], presence['leaving'])
+        if first < last:
+            signup['actual'] = [first, last]
+            attending.append(signup)
+    table['signups'] = attending
     # Include one snack trip and one recorded roll from a present player per game.
     candidates = [table['dm']] + [signup['person'] for signup in table['signups']]
     for uid in candidates:

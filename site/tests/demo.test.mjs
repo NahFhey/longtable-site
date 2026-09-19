@@ -23,6 +23,12 @@ test('full-day demo has 50 distinct arrivals and departures, then an empty hall'
   }
   assert.ok(demo.people.every(person => !isPresent(person, 48, 48)));
   assert.ok(demo.tables.every(table => tableLifecycle(demo, table, 48).phase === 'inactive'));
+  for (const table of demo.tables) for (const signup of table.signups) {
+    const person = demo.people.find(person => person.id === signup.person);
+    assert.ok(signup.actual[0] < signup.actual[1]);
+    assert.ok(signup.actual[0] >= person.presence.actual.here);
+    assert.ok(signup.actual[1] <= person.presence.actual.leaving);
+  }
 });
 
 test('demo includes visitors, meals, breaks, public rolls and present stage speakers', () => {
