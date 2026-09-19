@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T14:29:01.471978Z",
+ "generated_at": "2026-09-19T14:29:34.640680Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -27,7 +27,12 @@
    "dm": true,
    "hidden": false,
    "variant": 4082956081,
-   "appearance": null,
+   "appearance": {
+    "skin": 0,
+    "shirt": 8,
+    "hair": 11,
+    "hat": 1
+   },
    "presence": {
     "planned": [
      0,
