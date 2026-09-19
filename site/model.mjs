@@ -100,7 +100,7 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (![1, 2, 3, 4, 5].includes(schema)) fail("This timeline uses an unsupported schema version.");
+  if (![1, 2, 3, 4, 5, 6].includes(schema)) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -157,6 +157,16 @@ export function validateTimeline(input) {
   for (const person of people) {
     if (personById.has(person.id)) fail("timeline.people contains duplicate identifiers.");
     personById.set(person.id, person);
+  }
+
+  let visitors = { open: true, people: [] };
+  if (schema >= 6) {
+    const group = object(required(root, "visitors", "timeline"), "timeline.visitors");
+    visitors = {
+      open: bool(required(group, "open", "visitors"), "visitors.open"),
+      people: array(required(group, "people", "visitors"), "visitors.people").map((id) => string(id, "visitors.people", { min: 1 })),
+    };
+    if (new Set(visitors.people).size !== visitors.people.length || visitors.people.some((id) => !personById.has(id))) fail("Invalid visitor roster.");
   }
 
   const room_layout = schema >= 4 ? validateRoomLayout(required(root, "room_layout", "timeline")) : null;
@@ -240,7 +250,7 @@ export function validateTimeline(input) {
     ? ["id", "kind", "at", "duration", "text", "person", "by", "table", "visibility", "roll"]
     : ["id", "kind", "at", "duration", "text", "person", "by"]));
 
-  return { schema, phase, generated_at, event, people, tables, events, room_layout };
+  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout };
 }
 
 export function slotToMs(timeline, slot) {
@@ -589,6 +599,15 @@ export function ordinaryLocation(timeline, person, slot) {
         return { kind: "table", label: table.name, table, tableIndex, seat: signupIndex + 1 };
       }
     }
+  }
+  if (timeline.visitors?.people.includes(person.id)) {
+    // Deterministic social visits, not attendance records or game assignments.
+    const beat = Math.floor(slot * timeline.event.slot_minutes / 4);
+    const seed = Array.from(person.id).reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 0);
+    const group = (seed + beat) % 4;
+    if (group === 0) return { kind: "food", label: "the food area (visiting)", visitorBeat: beat };
+    if (group === 2) return { kind: "visiting", label: "the hall (visiting)", visitorBeat: beat };
+    return { kind: "lounge", label: "the lounge (visiting)", visitorBeat: beat };
   }
   return { kind: "lounge", label: "the lounge" };
 }

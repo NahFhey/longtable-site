@@ -37,11 +37,11 @@ DOM through created nodes and `textContent`, never HTML injection sinks.
 
 The data contract is `data/TIMELINE.md`. `bot/longtable/publish.py` atomically
 writes the production `data/timeline.json`; do not edit that generated file by
-hand. The site fetches it with `cache: "no-store"`, validates schemas 1–5,
+hand. The site fetches it with `cache: "no-store"`, validates schemas 1–6,
 and retains its last good snapshot if a live refresh is unavailable or invalid.
 Schema 3 adds attendee-selected appearance; older records retain their original
 look. Schema 4 adds persisted pads and event room capacity. Deploy this reader
-before restarting a bot that publishes schema 5.
+before restarting a bot that publishes schema 6.
 
 Opaque identifiers are used only for in-memory joins. They are not displayed
 or used to choose a sprite. Hidden people are rendered and described as
@@ -112,7 +112,8 @@ Before doors, an untouched live-source preview begins following when doors open;
 any explicit time choice disables that automatic switch.
 
 Seeking clears transient speech in either direction. Sequential playback still
-queues crossed reactions in order, retaining at most the newest 20 pending items;
+queues crossed reactions in order, retaining every custom message and at most the
+newest 20 pending quick reactions;
 rewound live refreshes mark new reactions seen without queueing them. Announcements,
 spotlights, breaks, meals, table phases, and intended person locations reconstruct
 from the selected time. Ambient walking/wandering and short reaction bubbles remain
@@ -178,7 +179,7 @@ not rendered. A hidden roller is someone. Result text does not assume a game sys
 or announce critical hits. The existing schema-4 sample remains a compatibility
 fixture; `dice.test.mjs`, DOM tests, and bot archive tests cover schema-5 outcomes.
 Deploy this reader before the updated bot. Existing archives keep their frozen
-renderer and schema. The schema-5 reader must be live before restarting the bot.
+renderer and schema. The schema-6 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
@@ -243,3 +244,28 @@ private-result exclusion, public archive moderation, schema migration, command
 visibility defaults, failed saves, deterministic frames, and accessible results
 without canvas. A synthetic finalized archive was checked in a browser for hidden
 identity, settled faces, total, and seek/reload behavior. No live event was changed.
+
+## Visitors (schema 6)
+
+A Visitors Table card precedes game tables. Its roster comes from `visitors.people`,
+using the same hidden-name policy as game rosters. It is a coordinator-owned group,
+not a physical pad or a seat reservation. Ordinary game assignments take priority;
+unseated visitors alternate between hall aisles, the lounge and food area on a
+four-minute event-time rhythm. The route is deterministic on seek and refresh.
+Social poses are decorative, carry no invented dialogue, and honor reduced motion.
+Archives freeze this visitor roster and renderer like the rest of the snapshot.
+Deploy the schema-6 reader before the writer; schemas 1–5 still render.
+
+### Custom messages on stage
+
+Approved custom table messages (`donation` in the data contract) bring their
+speaker to the stage microphone through the side stairs. Pending speakers form
+an ordered queue below the stairs, with one figure per person even if they have
+several messages. The gold bubble lasts six seconds after arrival; the speaker
+then walks down the stairs before the next message starts and returns to their
+current scheduled location. Quick reactions keep their four-second bubbles.
+Stage visits are temporary presentation effects and do not change attendance.
+Hidden speakers retain their anonymous figure and name. Reduced motion snaps
+figures to each destination while preserving message order and reading time.
+Seeking or returning to now clears the stage visit and waiting queue. Automatic
+framing includes the stage during messages; manual camera framing remains in use.

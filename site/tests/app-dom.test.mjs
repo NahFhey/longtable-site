@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createRoomLayout } from "../model.mjs";
+import { stageQueuePosition } from "../stage.mjs";
 
 class FakeNode {
   constructor(tag = "div") {
@@ -171,7 +173,7 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  sample.schema = 6;
+  sample.schema = 7;
   const app = await runApp([sample], "bad-schema");
   assert.match(app.nodes.get("status").textContent, /unsupported schema/i);
   assert.equal(app.nodes.get("status").className, "status error");
@@ -188,7 +190,7 @@ test("a bad live refresh retains the last good rendered table list", async () =>
   sample.event.start = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}:00${sign}${hh}:${mm}`;
   sample.generated_at = new Date(Date.now() - 10_000).toISOString();
   const bad = structuredClone(sample);
-  bad.schema = 6;
+  bad.schema = 7;
   bad.generated_at = new Date().toISOString();
   const app = await runApp([sample, bad], "refresh-retention", { search: "" });
   const before = allText(app.nodes.get("tables"));
@@ -614,4 +616,122 @@ test("recorded dice stay accessible without canvas and reconstruct on seek/reloa
   const rejected = await runApp([privateData], "private-dice-rejected");
   assert.doesNotMatch(allText(rejected.nodes.get("tables")), /PRIVATE SECRET/);
   assert.doesNotMatch(rejected.errors.join(" "), /PRIVATE SECRET/);
+});
+
+test('schema 6 visitor roster precedes games and week labels show dates without canvas', async () => {
+  const data = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
+  data.schema = 6;
+  data.event.slots = 336;
+  const visitor = data.people.find(person => !person.dm);
+  visitor.hidden = true; visitor.name = null; visitor.variant = null; visitor.appearance = null;
+  data.visitors = { open: true, people: [visitor.id] };
+  const app = await runApp([data], 'visitors-no-canvas', { noContext: true });
+  const text = allText(app.nodes.get('tables'));
+  assert.ok(text.indexOf('Visitors Table') < text.indexOf(data.tables[0].name));
+  assert.match(text, /someone/);
+  assert.match(app.nodes.get('start-label').textContent, /Nov/);
+  assert.notEqual(app.nodes.get('start-label').textContent, app.nodes.get('end-label').textContent);
+});
+
+function customStageFixture(sample, count = 3) {
+  sample.events = Array.from({ length: count }, (_, index) => ({
+    id: `stage-message-${index}`, kind: "donation", at: 0, duration: null,
+    text: `Stage message ${index}`, person: sample.people[index % 2].id,
+    by: sample.people.find((person) => person.dm).id,
+  }));
+  sample.people[1].hidden = true;
+  sample.people[1].name = null;
+  sample.people[1].variant = null;
+  return sample;
+}
+
+function stageStepper(app) {
+  let now = performance.now() + 100;
+  return (milliseconds = 100) => {
+    now += milliseconds;
+    app.imageCalls.length = 0;
+    app.rectCalls.length = 0;
+    app.contextCalls.length = 0;
+    app.frames.shift()?.(now);
+    return app.nodes.get("current-event").textContent;
+  };
+}
+
+test("custom speakers walk to the mic, queue once per person, speak in order, and leave between messages", async () => {
+  const sample = customStageFixture(JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8")));
+  const app = await runApp([sample], "stage-walking");
+  app.nodes.get("speed").listeners.get("change")({ target: { value: "1" } });
+  assert.match(app.nodes.get("current-event").textContent, /walking to the stage microphone/);
+  assert.match(app.nodes.get("current-event").textContent, /1 waiting to speak/);
+  assert.doesNotMatch(app.nodes.get("current-event").textContent, /Stage message 0/);
+  const step = stageStepper(app);
+  const spoken = [];
+  let firstStarted = null;
+  let firstEnded = null;
+  let secondStarted = null;
+  for (let frame = 0; frame < 1200; frame += 1) {
+    const text = step();
+    const match = text.match(/Stage message (\d)/);
+    if (match && spoken.at(-1) !== Number(match[1])) spoken.push(Number(match[1]));
+    if (text.includes("Stage message 0") && firstStarted === null) firstStarted = frame;
+    if (firstStarted !== null && !text.includes("Stage message 0") && firstEnded === null) firstEnded = frame;
+    if (text.includes("Stage message 1") && secondStarted === null) {
+      secondStarted = frame;
+      assert.match(text, /Table message from someone/);
+      assert.doesNotMatch(text, new RegExp(sample.people[1].id));
+    }
+    if (spoken.length === 3 && !match && !text.includes("walking")) break;
+  }
+  assert.deepEqual(spoken, [0, 1, 2]);
+  assert.ok(firstStarted > 1, "travel must take time");
+  assert.equal(firstEnded - firstStarted, 60, "all six seconds are available after arrival");
+  assert.ok(secondStarted - firstEnded > 2, "the first speaker must walk down before the next speaks");
+});
+
+test("reduced motion retains every custom message in a burst and seeking clears the stage queue", async () => {
+  const sample = customStageFixture(JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8")), 25);
+  const app = await runApp([sample], "stage-reduced-motion", { reducedMotion: true });
+  app.nodes.get("play").listeners.get("click")();
+  app.nodes.get("speed").listeners.get("change")({ target: { value: "1" } });
+  const step = stageStepper(app);
+  assert.match(step(), /Stage message 0/);
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const waiting = stageQueuePosition(layout, 0, 1);
+  assert.ok(app.imageCalls.some(({ src, args }) => src.includes("roguelikeChar")
+    && args[4] === Math.round((waiting.x - .5) * 32) && args[5] === Math.round((waiting.y - .6) * 32)),
+  "the waiting character is actually drawn below the stairs");
+  assert.ok(app.imageCalls.some(({ src, args }) => src.includes("roguelikeChar")
+    && args[4] === Math.round((layout.stageFront.x - .5) * 32) && args[5] === Math.round((layout.stageFront.y - .6) * 32)),
+  "the speaking character is actually drawn at the microphone");
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "0.5" } });
+  assert.equal(step(), "", "seeking clears the active message and the entire waiting queue");
+  assert.equal(step(10000), "");
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "0" } });
+  app.nodes.get("play").listeners.get("click")();
+  assert.match(step(), /Stage message 0/);
+  for (let index = 1; index < 25; index += 1) {
+    assert.doesNotMatch(step(6001), /Stage message \d/, "leave the microphone between speakers");
+    assert.match(step(), new RegExp(`Stage message ${index}(?:$|\\s)`));
+  }
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "0.5" } });
+  assert.equal(step(), "");
+  assert.equal(step(10000), "");
+});
+
+test("new live custom messages use the stage queue without teleporting on refresh", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.event.start = new Date(Date.now() - 60 * 60_000).toISOString().replace("Z", "+00:00");
+  sample.phase = "live";
+  sample.events = [];
+  const updated = customStageFixture(structuredClone(sample), 2);
+  updated.generated_at = new Date(Date.parse(sample.generated_at) + 1000).toISOString();
+  const app = await runApp([sample, updated], "stage-live", { search: "" });
+  assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+  const step = stageStepper(app);
+  step(60001);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const text = step();
+  assert.match(text, /walking to the stage microphone/);
+  assert.match(text, /1 waiting to speak/);
+  assert.doesNotMatch(text, /Stage message 0/);
 });

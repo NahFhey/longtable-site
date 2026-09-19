@@ -1,3 +1,4 @@
+import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
 import { eventActions } from "./event-config.mjs";
@@ -90,6 +91,7 @@ const state = {
   adminEvents: [],
   speechQueue: [],
   speech: null,
+  stageQueue: [],
   staleMessage: "",
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && new URLSearchParams(location.search).get("sample") === "1",
@@ -128,6 +130,7 @@ function formatDate(milliseconds, options) {
 
 function formatSlot(slot, withDay = false) {
   return formatDate(slotToMs(state.data, slot), {
+    ...(state.data.event.slots * state.data.event.slot_minutes > 1440 ? { month: "short", day: "numeric" } : {}),
     ...(withDay ? { weekday: "short" } : {}), hour: "numeric", minute: "2-digit",
   });
 }
@@ -156,9 +159,18 @@ function updateCamera() {
   }
   state.viewport = size;
   const indices = relevantTableIndices(state.data.tables, state.time);
-  const key = indices.map((index) => state.data.tables[index].id).join("|");
+  const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
+  const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
   if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
+    if (showStage) {
+      const tables = tableBounds(state.layout, indices);
+      const stage = state.layout.stage;
+      const x = Math.min(tables.x, stage.x - 2);
+      const y = Math.min(tables.y, stage.y);
+      state.camera = fitBounds({ x, y, width: Math.max(tables.x + tables.width, stage.x + stage.w) - x,
+        height: Math.max(tables.y + tables.height, state.layout.height - 1) - y }, size, state.layout);
+    }
     state.frameKey = key;
     state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
     renderDetail();
@@ -198,12 +210,29 @@ function spotIn(rect, seed, pad = 0.8) {
 }
 
 function destination(runtime, now, active) {
+  const custom = state.speech?.event.kind === "donation" && state.speech.event.person === runtime.person.id;
+  if (custom) {
+    const leaving = state.speech.phase === "leaving";
+    return { kind: leaving ? "stage-exit" : "stage-speaker", label: leaving ? "the stage stairs" : "the stage microphone",
+      position: leaving ? stageGeometry(state.layout).foot : state.layout.stageFront, present: true };
+  }
+  const queueIndex = state.stageQueue.indexOf(runtime.person.id);
+  if (queueIndex >= 0) return { kind: "stage-queue", label: "the stage queue", position: stageQueuePosition(state.layout, queueIndex, state.stageQueue.length), present: true };
   const place = resolveLocation(state.data, runtime.person, state.time, active);
   if (place.kind === "absent") return { ...place, label: "the door", position: state.layout.doorPosition, present: false };
   if (place.kind === "spotlight") return { ...place, position: state.layout.stageFront, present: true };
-  const wander = Math.floor(now / 9000 + runtime.ordinal * 0.37);
+  const wander = place.visitorBeat ?? Math.floor(now / 9000 + runtime.ordinal * 0.37);
   const seed = hashNumber((runtime.person.variant ?? runtime.ordinal + 104729) + wander * 7919);
-  if (place.kind === "lounge") return { ...place, position: spotIn(state.layout.lounge, seed), present: true };
+  if (place.kind === "visiting") return { ...place, position: {
+    x: state.layout.trunkX,
+    y: state.layout.aisles[(wander + runtime.ordinal) % state.layout.aisles.length],
+  }, present: true };
+  if (place.kind === "lounge") {
+    const socialSeed = place.visitorBeat === undefined ? seed : hashNumber(Math.floor(runtime.ordinal / 3) + wander * 7919);
+    const position = spotIn(state.layout.lounge, socialSeed, 1);
+    if (place.visitorBeat !== undefined) position.x += (runtime.ordinal % 3 - 1) * .5;
+    return { ...place, position, present: true };
+  }
   if (place.kind === "food") {
     const queue = { x: state.layout.food.x, y: state.layout.food.y + 2.7, w: state.layout.food.w, h: state.layout.food.h + 1 };
     return { ...place, position: spotIn(queue, seed, 0.6), present: true };
@@ -221,6 +250,10 @@ function outsideTableGrid(point) {
 }
 
 function pathBetween(from, to) {
+  return stagePath(state.layout, from, to, hallPathBetween);
+}
+
+function hallPathBetween(from, to) {
   const firstAisle = closestAisle(from.y);
   const secondAisle = closestAisle(to.y);
   if (outsideTableGrid(from) && outsideTableGrid(to)) return [to];
@@ -346,6 +379,7 @@ function drawRoom() {
   }
   drawNine(layout.lounge, RPG.floor.lounge, "#4b4656");
   drawNine(layout.stage, RPG.floor.stage, "#554761");
+  drawStageStairs();
   drawNine(layout.food, RPG.floor.food, "#6b5936");
 
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.banners[index], layout.stage.x + 1 + index * 2, 0);
@@ -377,6 +411,34 @@ function drawRoom() {
   }
   drawTile(state.images.rpg, RPG.door[1], layout.door.x, layout.door.y + 1);
   drawLabel("DOOR", 1.6, layout.door.y - 0.6, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
+}
+
+function drawStageStairs() {
+  const { stairs } = stageGeometry(state.layout);
+  const unit = TILE * SCALE;
+  ctx.fillStyle = "#292331";
+  ctx.fillRect(stairs.x * unit, (stairs.y + .12) * unit, stairs.w * unit, stairs.h * unit);
+  for (let step = 0; step < 4; step += 1) {
+    const x = (stairs.x + step * stairs.w / 4) * unit;
+    ctx.fillStyle = ["#756177", "#8d778c", "#a38b9d", "#b9a2b2"][step];
+    ctx.fillRect(x, stairs.y * unit, stairs.w / 4 * unit - 1, stairs.h * unit);
+    ctx.fillStyle = "#dfc8ca";
+    ctx.fillRect(x, stairs.y * unit, 2, stairs.h * unit);
+  }
+}
+
+function drawMicrophone() {
+  const { microphone } = stageGeometry(state.layout);
+  const x = microphone.x * TILE * SCALE;
+  const y = microphone.y * TILE * SCALE;
+  ctx.fillStyle = "#201e29";
+  ctx.fillRect(x - 7, y + 5, 14, 4);
+  ctx.fillStyle = "#bbc2cb";
+  ctx.fillRect(x - 1, y - 19, 3, 25);
+  ctx.fillStyle = "#252936";
+  ctx.fillRect(x - 5, y - 24, 10, 8);
+  ctx.fillStyle = "#d8dce2";
+  ctx.fillRect(x - 4, y - 23, 7, 3);
 }
 
 function chairFor(offset) {
@@ -522,13 +584,16 @@ function drawPerson(runtime, now, active) {
   let x = runtime.position.x - 0.5;
   let y = runtime.position.y - 0.6;
   const movingBob = runtime.moving && !reducedMotion.matches && Math.floor(now / 140) % 2 ? 0.07 : 0;
-  const cheering = active.spotlight && place.kind !== "spotlight" && !reducedMotion.matches;
-  const talk = place.kind === "table" && !runtime.moving && !reducedMotion.matches && ((now / 1000 + runtime.phase * 6) % 6) < 0.5;
+  const cheering = active.spotlight && place.kind !== "spotlight" && !place.kind.startsWith("stage-") && !reducedMotion.matches;
+  const social = place.kind === "lounge" && place.visitorBeat !== undefined;
+  const talkTime = social ? state.time * state.data.event.slot_minutes * 60 : now / 1000;
+  const talk = (place.kind === "table" || social) && !runtime.moving && !reducedMotion.matches && ((talkTime + runtime.phase * 6) % 6) < 0.5;
   y -= movingBob + (cheering ? Math.abs(Math.sin(now / 160 + runtime.phase * 8)) * 0.25 : 0);
   let facing = runtime.facing;
   if (active.announce && !runtime.moving) facing = state.layout.stageFront.x < runtime.position.x ? -1 : 1;
+  if (place.kind === "stage-speaker" && !runtime.moving) facing = 1;
   const flip = facing < 0;
-  const frame = talk || cheering ? 1 : 0;
+  const frame = talk || cheering || (place.kind === "stage-speaker" && state.speech?.phase === "speaking") ? 1 : 0;
   const appearance = characterAppearance(person);
   if (appearance === null) {
     if (!drawTile(state.images.characters, [frame, 1], x, y, flip, 0.85)) {
@@ -613,15 +678,16 @@ function drawEvents(active, now) {
   if (active.break) drawLabel("BREAK — everyone to the lounge", state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#ffd27a" });
   if (active.meal) drawLabel(`${active.meal.text || "MEAL"} — food corner is open`, state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#9fe08a" });
 
-  if (state.speech) {
+  if (state.speech?.phase === "speaking") {
     const view = speechView(state.data, state.speech.event, state.time, active);
     let position = state.layout.stageFront;
-    if (!view.stageSide) {
+    const custom = view.kind === "donation";
+    if (!custom && !view.stageSide) {
       const runtime = state.people.get(state.speech.event.person);
       if (runtime?.visible) position = runtime.position;
     }
     const color = view.kind === "donation" ? "#ffdd72" : "#eef3d5";
-    drawBubble(view.text, position.x, position.y - 1.2, color, view.stageSide ? view.label : "");
+    drawBubble(view.text, position.x, position.y - 1.2, color, custom ? displayName(view.person) : view.stageSide ? view.label : "");
     if (view.kind === "donation" && !reducedMotion.matches) {
       for (let index = 0; index < 5; index += 1) {
         const angle = now / 380 + index * Math.PI * 2 / 5;
@@ -651,6 +717,7 @@ function render(now, active) {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
     }
   });
+  drawMicrophone();
   drawTableLabels();
   drawEvents(active, now);
 }
@@ -700,6 +767,16 @@ function renderTableList() {
   host.replaceChildren();
   state.tablePhaseNodes.clear();
   state.tableDiceNodes.clear();
+  if (state.data.schema >= 6) {
+    const article = append(host, "article", undefined, "table-card visitors-card");
+    append(article, "h3", "Visitors Table · Just visiting");
+    append(article, "p", "Hosted by the event coordinator. Visitors mingle in the lounge and food area between games. Movement and social gestures are illustrative.");
+    append(article, "p", state.archive ? "Saved visitor roster." : "Choose Just visiting first in Discord’s Browse Games menu.");
+    const roster = append(article, "ul", undefined, "roster");
+    if (!state.data.visitors.people.length) append(roster, "li", "No visitors yet.");
+    const byId = new Map(state.data.people.map((person) => [person.id, person]));
+    for (const id of state.data.visitors.people) append(roster, "li", displayName(byId.get(id)));
+  }
   if (state.data.tables.length === 0) { append(host, "p", "No tables have been posted.", "muted"); return; }
   const grid = append(host, "div", undefined, "table-grid");
   for (const table of state.data.tables) {
@@ -733,7 +810,12 @@ function updateHeader(active) {
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
   const eventLabel = active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
   if ($("scene-event").textContent !== eventLabel) $("scene-event").textContent = eventLabel;
-  const eventText = accessibleEventText(state.data, active, state.speech?.event || null);
+  let eventText = accessibleEventText(state.data, active, state.speech?.phase === "speaking" ? state.speech.event : null);
+  if (state.speech?.event.kind === "donation" && state.speech.phase === "approaching") {
+    eventText += ` ${displayName(state.people.get(state.speech.event.person)?.person)} is walking to the stage microphone.`;
+  }
+  if (state.stageQueue.length) eventText += ` ${state.stageQueue.length} waiting to speak at the stage.`;
+  eventText = eventText.trim();
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
   const following = state.clock.mode === "follow-now";
@@ -769,6 +851,7 @@ function updateHeader(active) {
 function clearSpeech() {
   state.speechQueue = [];
   state.speech = null;
+  state.stageQueue = [];
   if (state.live) state.live = { ...state.live, speechQueue: [] };
 }
 
@@ -792,21 +875,45 @@ function persistClockSelection(now, force = false) {
   state.lastUrlWrite = now;
 }
 
-function queueSpeech(events) { state.speechQueue = [...state.speechQueue, ...events].slice(-20); }
+function queueSpeech(events) {
+  const queue = [...state.speechQueue, ...events];
+  let shouts = queue.filter((event) => event.kind === "shout").length;
+  state.speechQueue = queue.filter((event) => event.kind !== "shout" || shouts-- <= 20);
+}
 
 function advanceSpeech(now) {
-  if (state.speech && now >= state.speech.until) state.speech = null;
+  const speech = state.speech;
+  if (speech && !state.people.has(speech.event.person)) state.speech = null;
+  else if (speech?.phase === "speaking" && now >= speech.until) {
+    if (speech.event.kind === "donation") speech.phase = "leaving";
+    else state.speech = null;
+  }
   if (!state.speech) {
     let event = null;
-    if (state.clock.mode === "follow-now" && state.live) {
-      const shifted = shiftSpeechQueue(state.live);
-      state.live = shifted.state;
-      event = shifted.event;
-    } else if (state.speechQueue.length) {
-      event = state.speechQueue.shift();
-    }
-    if (!event) return;
-    state.speech = { event, until: now + SPEECH_SECONDS[event.kind] * 1000 };
+    do {
+      if (state.clock.mode === "follow-now" && state.live) {
+        const shifted = shiftSpeechQueue(state.live);
+        state.live = shifted.state;
+        event = shifted.event;
+      } else event = state.speechQueue.shift();
+    } while (event && !state.people.has(event.person));
+    if (event) state.speech = { event, phase: event.kind === "donation" ? "approaching" : "speaking",
+      until: event.kind === "donation" ? null : now + SPEECH_SECONDS[event.kind] * 1000 };
+  }
+  const queue = state.clock.mode === "follow-now" && state.live ? state.live.speechQueue : state.speechQueue;
+  state.stageQueue = stageQueuePeople(queue, state.speech, state.people);
+}
+
+function settleStageSpeech(now) {
+  const speech = state.speech;
+  if (speech?.event.kind !== "donation") return;
+  const runtime = state.people.get(speech.event.person);
+  if (!runtime?.visible || runtime.moving) return;
+  if (speech.phase === "approaching" && samePoint(runtime.position, state.layout.stageFront)) {
+    speech.phase = "speaking";
+    speech.until = now + SPEECH_SECONDS.donation * 1000;
+  } else if (speech.phase === "leaving" && samePoint(runtime.position, stageGeometry(state.layout).foot)) {
+    state.speech = null;
   }
 }
 
@@ -839,7 +946,7 @@ function installTimeline(data, initial = false) {
   renderTableList();
   renderDetail();
   if (initial) state.time = 0;
-  state.snap = true;
+  if (initial) state.snap = true;
 }
 
 async function refresh() {
@@ -1032,6 +1139,7 @@ function loop(now) {
   persistClockSelection(now);
   advanceSpeech(now);
   updatePeople(realSeconds, now, active);
+  settleStageSpeech(now);
   render(now, active);
   updateHeader(active);
   requestAnimationFrame(loop);

@@ -23,6 +23,16 @@ Amended for Milestone G to **schema 5**: public recorded dice events. The reader
 accepts schemas 1–5 and must deploy before the schema-5 writer. Private state 4
 migrates to 5 while preserving event identity, window, pads, and existing records.
 
+Amended 2026-09-19 to **schema 6**: required `visitors` object with `open`
+(boolean) and `people` (unique, resolvable person IDs). The Visitors Table is a
+coordinator-controlled group that does not reserve pads or game seats. A visitor's
+active game assignment takes precedence; outside games they move among lounge,
+food, and hall areas. Movement uses event time and a stable ID-derived route seed,
+not a recorded activity. Group membership has current/final snapshot fidelity,
+like table rosters. Private state versions 1–5 migrate to 6, preserving all records
+and adding an empty visitor group. Private thread IDs and membership-retry IDs are
+excluded. Deploy the schema-6 reader first. Older archives retain their renderer.
+
 A legacy schema-4 fake day is in `timeline.sample.json`
 (generated, deterministic; 8 DMs, 12 tables, 35 players, the organiser, 14 events).
 
@@ -47,18 +57,19 @@ A legacy schema-4 fake day is in `timeline.sample.json`
   derives nothing from an id (not the sprite, not the name). The bot chooses
   them; they need not be Discord snowflakes.
 - **Order.** `people` is unordered. `tables` is in creation order (the site
-  uses saved pads for schemas 4–5; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
+  uses saved pads for schemas 4–6; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
 
 ## Top level
 
 | field | type | notes |
 |---|---|---|
-| `schema` | int | `5` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads; schema 5 recorded dice). Site refuses unknown majors. |
+| `schema` | int | `6` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads; schema 5 recorded dice; schema 6 visitor group). Site refuses unknown majors. |
 | `phase` | `"live"` \| `"final"` | `final` is the +14-day publish: names trimmed to first name + initial, bot retired. Site shows a "final record" note. |
 | `generated_at` | string | ISO 8601 UTC instant the bot wrote the file. Shown as "last updated". |
 | `event` | object | window config, below. |
-| `room_layout` | object | Required in schemas 4–5. Version and capacities fixed for this event, below. |
+| `room_layout` | object | Required in schemas 4–6. Version and capacities fixed for this event, below. |
 | `people` | array | everyone who has ever signed up, created a table, or set presence. |
+| `visitors` | object | Schema 6: `open` boolean and `people` person-ID array; no copied names or Discord IDs. |
 | `tables` | array | current tables. Deleted tables are gone, not tombstoned. |
 | `events` | array | admin `/event` history plus attendee shouts and approved donations. |
 
@@ -66,7 +77,7 @@ A legacy schema-4 fake day is in `timeline.sample.json`
 
 | field | type | notes |
 |---|---|---|
-| `name` | string | `"Longtable"`. Page title. |
+| `name` | string | Organizer-supplied event name. Used in signup panels and the page title. |
 | `start` | string | ISO 8601 with numeric offset, e.g. `"2026-11-07T10:00:00-05:00"`. Slot 0. |
 | `tz` | string | IANA zone, e.g. `"America/New_York"`. Display only. The sample's value is a placeholder; the bot writes its configured zone. |
 | `slot_minutes` | int | `30` for the real event. Dry run may shrink it. |
@@ -150,9 +161,9 @@ latest of each and the site takes the effective range as given.
 | `walk_ins` | bool | walk-ins-welcome flag. Display only; does not change seat accounting. |
 | `start`, `end` | int | `[start, end)` slots, `end > start`. One DM's own tables never overlap; different DMs' tables may. |
 | `dm` | string | `people[].id` of the DM. Always present in `people`. |
-| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schemas 4–5. |
+| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schemas 4–6. |
 | `signups` | array | seated players, ≤ `seats` entries. The DM is not in this list. |
-| `pad` | int | Required in schemas 4–5. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
+| `pad` | int | Required in schemas 4–6. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
 
 ### `tables[].signups[]`
 
@@ -213,7 +224,10 @@ its rolls under the existing final-snapshot retention model.
 - A `shout` is a fixed phrase from a menu the admin configured; a `donation`
   is the legacy contract name for a free custom line a table participant typed
   and that table's DM approved. The site gives them different reactions, with
-  the reviewed custom message receiving the gold bubble. Both are speech from the
+  the reviewed custom message receiving a six-second gold bubble at the stage
+  microphone after its speaker walks up the side stairs. Waiting custom-message
+  speakers queue below the stairs; each leaves the stage before the next speaks.
+  Both are speech from the
   `person`'s sprite; a hidden `person` gets the generic unnamed sprite and no
   nametag exactly as everywhere else.
 - **Pacing is the site's job.** The bot applies a per-person cooldown on
