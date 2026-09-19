@@ -221,7 +221,8 @@ records only what was issued and when.
   starts 5 minutes before play, cleanup lasts 10 minutes after play for 30-minute
   slots. Multiply minutes by `min(1, slot_minutes/30)` for compressed events; all
   boundaries clip to `[0, slots]`. Phases are half-open. Props show only during
-  ready/play; furniture shows from preparation through cleanup. The accessible
+  ready/play; setup/cleanup additionally draws staged maps, chairs, and furniture.
+  Anonymous staff and those props are derived scenery, never attendance. The accessible
   table list includes all records even when their furniture is inactive.
 - **Seeking:** load `?at=<slot>` or scrub to reconstruct the same lifecycle,
   meaningful locations, and ongoing admin events. Seeking clears transient
@@ -253,3 +254,14 @@ remaining at preservation time. Archive pages use the same frozen model/renderer
 load only the sibling package, start paused, and never poll or use sample fallback.
 Moderation can redact an archived person or remove an archived reaction and queue
 a replacement publication. Earlier public Git revisions are not erased.
+
+## Archive catalog (Milestone F)
+
+`data/events.json` is a separate format-1 envelope: `{ "format": 1, "events": [...] }`.
+Each entry has `event_id` (32 lowercase hexadecimal characters), `name`, `start`
+(ISO datetime with offset), `tz`, and `tables` (nonnegative saved-table count).
+Identity builds the relative `events/<id>/` route; arbitrary URLs are not accepted.
+Entries are unique and ordered by start descending, then identity descending.
+Only complete privacy-finalized packages are indexed. Counts describe retained
+tables, not lifetime games, visitors, or donations. The catalog and new archive
+are committed together; index-only backfill never publishes pending private copies.

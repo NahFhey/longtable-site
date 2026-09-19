@@ -458,6 +458,61 @@ export function tableLifecycle(timeline, table, slot) {
   };
 }
 
+/** Anonymous scenery reconstructed from selected time, never from attendee state. */
+export function tableScenery(timeline, table, slot, layout, index, reducedMotion = false) {
+  const lifecycle = tableLifecycle(timeline, table, slot);
+  const between = (value, start, end) => Math.max(0, Math.min(1, (value - start) / (end - start)));
+  const seats = chairSeatIndices(table);
+  const scene = { furniture: lifecycle.furniture, chairs: seats, map: lifecycle.props ? 1 : 0,
+    props: lifecycle.props, stacked: 0, staff: null };
+  if (!lifecycle.furniture) return { ...scene, chairs: [] };
+  const preparing = lifecycle.phase === "preparing";
+  if (!preparing && lifecycle.phase !== "cleaning") return scene;
+  const progress = preparing ? between(slot, lifecycle.prepareAt, lifecycle.readyAt)
+    : between(slot, table.end, lifecycle.inactiveAt);
+  let routeProgress;
+  let load = null;
+  if (preparing) {
+    scene.furniture = progress >= .3;
+    scene.chairs = seats.slice(0, Math.floor(seats.length * between(progress, .35, .75)));
+    scene.map = between(progress, .75, .9);
+    routeProgress = progress < .3 ? progress / .3 : 1 - between(progress, .9, 1);
+    if (progress < .3) load = "table";
+    else if (progress < .75) load = "chairs";
+    else if (progress < .9) load = "map";
+  } else {
+    scene.furniture = progress < .7;
+    scene.chairs = seats.slice(0, Math.ceil(seats.length * (1 - between(progress, .3, .65))));
+    scene.stacked = progress >= .3 && progress < .7 ? Math.min(3, seats.length - scene.chairs.length) : 0;
+    scene.map = progress < .25 ? 1 - between(progress, .15, .25) : 0;
+    routeProgress = progress < .15 ? progress / .15 : 1 - between(progress, .7, 1);
+    if (progress >= .7) load = "table";
+    else if (progress >= .3) load = "chairs";
+    else if (progress >= .15) load = "map";
+  }
+  if (reducedMotion) {
+    scene.map = scene.map > 0 ? 1 : 0;
+    return scene; // Same furniture stage, without a moving porter.
+  }
+  const cell = layout.cells[index];
+  // Authored route follows the left aisle and the top edge of this pad's row.
+  const route = [{ x: layout.door.x + 1.5, y: layout.door.y + .5 },
+    { x: 2.5, y: layout.door.y + .5 }, { x: 2.5, y: cell.y + .25 },
+    { x: cell.x + .3, y: cell.y + .25 }, { x: cell.x + .3, y: cell.y + 3.5 }];
+  const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
+  let distance = routeProgress * lengths.reduce((sum, length) => sum + length, 0);
+  for (let i = 0; i < lengths.length; i += 1) {
+    if (distance <= lengths[i] || i === lengths.length - 1) {
+      const fraction = lengths[i] ? distance / lengths[i] : 0;
+      scene.staff = { x: route[i].x + (route[i + 1].x - route[i].x) * fraction,
+        y: route[i].y + (route[i + 1].y - route[i].y) * fraction, load };
+      break;
+    }
+    distance -= lengths[i];
+  }
+  return scene;
+}
+
 export function ordinaryLocation(timeline, person, slot) {
   if (!isPresent(person, slot, timeline.event.slots)) return { kind: "absent", label: "outside the hall" };
   for (let tableIndex = 0; tableIndex < timeline.tables.length; tableIndex += 1) {

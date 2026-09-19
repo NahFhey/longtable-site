@@ -6,7 +6,6 @@ import {
   PALETTE_SIZE,
   activeEvents,
   accessibleEventText,
-  chairSeatIndices,
   createRoomLayout,
   createLiveState,
   crossedSpeechEvents,
@@ -21,6 +20,7 @@ import {
   speechView,
   tableView,
   tableLifecycle,
+  tableScenery,
   validateTimeline,
   visibleVariant,
 } from "./model.mjs";
@@ -389,12 +389,14 @@ function drawTables() {
     const cell = state.layout.cells[index];
     const firstSeat = seatPosition(index, 0);
     const lifecycle = tableLifecycle(state.data, table, state.time);
+    const scenery = tableScenery(state.data, table, state.time, state.layout, index, reducedMotion.matches);
     const open = lifecycle.phase === "active";
     if (state.selectedId === table.id) {
       ctx.fillStyle = "rgba(255,210,122,.25)";
       ctx.fillRect(cell.x * TILE * SCALE, cell.y * TILE * SCALE, state.layout.cellWidth * TILE * SCALE, state.layout.cellHeight * TILE * SCALE);
     }
-    if (!lifecycle.furniture) return;
+    if (scenery.staff) drawStaff(scenery.staff);
+    if (!scenery.furniture) return;
     for (let column = 0; column < 3; column += 1) {
       if (!drawTile(state.images.rpg, RPG.table[column], firstSeat.tableX + column, firstSeat.tableY, false, open ? 1 : 0.45)) {
         ctx.globalAlpha = open ? 1 : 0.45;
@@ -403,7 +405,7 @@ function drawTables() {
         ctx.globalAlpha = 1;
       }
     }
-    for (const seat of chairSeatIndices(table)) {
+    for (const seat of scenery.chairs) {
       const position = seatPosition(index, seat);
       drawTile(state.images.rpg, chairFor(position.offset || position), position.x - 0.5, position.y - 0.5, false, open ? 1 : 0.45);
       if (!state.images.rpg) {
@@ -411,8 +413,31 @@ function drawTables() {
         ctx.fillRect((position.x - 0.28) * TILE * SCALE, (position.y - 0.28) * TILE * SCALE, .56 * TILE * SCALE, .56 * TILE * SCALE);
       }
     }
-    if (lifecycle.props) drawTableProps(firstSeat.tableX, firstSeat.tableY);
+    if (scenery.props) drawTableProps(firstSeat.tableX, firstSeat.tableY);
+    else if (scenery.map && state.camera.zoom >= 12) {
+      ctx.fillStyle = "#d8c99f";
+      ctx.fillRect(firstSeat.tableX * TILE * SCALE + 25, firstSeat.tableY * TILE * SCALE + 8, 37 * scenery.map, 19);
+    }
+    for (let chair = 0; chair < scenery.stacked; chair += 1) {
+      ctx.fillStyle = "#bd955c";
+      ctx.fillRect((firstSeat.tableX + 2.5) * TILE * SCALE, (firstSeat.tableY + 1.2) * TILE * SCALE - chair * 5, 16, 4);
+    }
   });
+}
+
+function drawStaff(staff) {
+  const unit = TILE * SCALE;
+  const x = staff.x * unit, y = staff.y * unit;
+  // Geometric uniform and cap distinguish anonymous staff from participant sprites.
+  ctx.fillStyle = "#d8c7a6"; ctx.fillRect(x - 5, y - 20, 10, 9);
+  ctx.fillStyle = "#73afb5"; ctx.fillRect(x - 7, y - 25, 14, 5);
+  ctx.fillRect(x - 7, y - 11, 14, 14);
+  ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
+  if (staff.load) {
+    ctx.fillStyle = staff.load === "map" ? "#d8c99f" : "#bd955c";
+    ctx.fillRect(x + 7, y - 8, staff.load === "table" ? 22 : 10, staff.load === "chairs" ? 15 : 7);
+  }
+  if (state.camera.zoom >= 25) drawLabel("STAFF", staff.x, staff.y - 1.1, { size: 3, color: "#bde8ed" });
 }
 
 function drawTableProps(x, y) {

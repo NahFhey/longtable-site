@@ -58,13 +58,14 @@ The page is intentionally marked `noindex`; access control is out of scope.
 
 ## Great Hall doorway and camera
 
-The September 18 upgrade implements milestones A/B/C/D/E and leaves the bot's
+The September 18 upgrade implements milestones A/B/C/D/E/F and leaves the bot's
 generated production timeline untouched. Schema 4 uses saved table pads and a
 versioned room layout: deleting a table never moves retained tables, and the
 entrance, stage, food, lounge, and overflow bounds stay fixed across refreshes.
 Legacy schemas 1–3 keep their index-based geometry. Layout and seating helpers in
 `model.mjs` reject collisions and exhausted capacity; camera transforms remain in
-`camera.mjs`. The archive index, furniture-carrying animation, dice, and audio are later milestones.
+`camera.mjs`. Past-event discovery and anonymous setup/cleanup staff are implemented;
+dice and audio are later milestones.
 See `data/TIMELINE.md` for geometry, migration, and overflow reservation rules.
 
 On desktop the hall precedes the table list. At 650px and below, the actual DOM
@@ -139,12 +140,29 @@ These are final-schedule replays: retained tables, presence, signups, and approv
 events. Deleted records and overwritten changes cannot be reconstructed. Metadata
 carries the schema, pad layout, presentation version, and renderer digest. Frozen
 code/assets preserve the chosen renderer; browser-dependent decorative frames are
-not promised identical. Archive discovery/index navigation is a later milestone.
+not promised identical. The Past events link opens the archive index.
 
-The archive publisher commits only its exact event files and frozen assets, using
+The archive publisher commits only its exact event files, frozen assets, and catalog, using
 the same dedicated publish checkout as live updates. Keep those generated
 directories when promoting a newer website. See the bot README for private pending
 storage, deadlines, retries, reset protection, and archive moderation commands.
+
+### Past events and setup scenery (Milestone F)
+
+`past-events.html` reads the bot-managed `data/events.json` (format 1). Each entry
+contains the opaque archive identity, event name, start, time zone, and count of
+saved tables. Entries link to `events/<id>/` and sort newest first. No people or
+fundraising totals are inferred. Before the first publication, a missing manifest
+shows an empty state; network failures and invalid manifests offer a retry.
+Navigation supports both domain-root and project-prefix hosting. Older frozen
+archives remain playable unchanged; newly preserved archives link back to the index.
+
+`tableScenery` derives furniture delivery, chair placement, map unfolding, stacking,
+and removal directly from the selected slot. Geometric staff follow authored aisle
+routes during preparation/cleanup and never enter participant state, rosters, or
+counts. Pause stops them; seek/reload reconstructs the same scene. Reduced motion
+omits moving staff and snaps map unfolding while retaining the same furniture stage.
+No new recorded events or history claims are introduced.
 
 ### Transitional event actions
 
@@ -182,15 +200,24 @@ explicitly announces the launch; test names and pitches do not block deployment.
 Continue editing games through the bot, never by hand in `data/timeline.json`.
 
 To publish website changes, use a separate checkout of `NahFhey/longtable-site`,
-copy `site/` except its bot-managed `data/timeline.json`, run the site tests, and
+copy `site/` except bot-managed `data/timeline.json`, `data/events.json`, `events/`,
+and `archive-assets/`, run the site tests, and
 push the reviewed changes to that repository’s `main` branch. Its Pages workflow
 uploads exactly `site/`. Preserve the destination timeline and do not use the bot’s
 dedicated publishing checkout for manual promotion. Website deployment does not
 require restarting the testing bot.
 
 Verification: all site test files pass, the sample passes `check_timeline.py`, and
-all 231 bot tests pass using `bot/.venv/bin/python` (system Python lacks discord.py).
+all 260 bot tests pass using `bot/.venv/bin/python` (system Python lacks discord.py).
 Desktop and 390px mobile browser checks covered sparse framing, table details,
 mobile disclosure, labels, and the twelve-table sample without console errors.
 Touch pinch/drag, failed assets, unavailable canvas, and camera bounds are also
 covered by automated tests; physical touch-device testing remains a release check.
+
+Milestone F verification: all nine site test files pass. Tests cover catalog
+validation, failed-push leftovers, multiple archives, backfill, retry/idempotence,
+anonymous staff, compressed windows, reduced motion, and matching scenery after
+seek/reload. A local synthetic finalized archive was opened from the index in a
+browser; setup and cleanup rendered with unchanged rosters and no console errors.
+Deploy the updated site before restarting the bot, then run `--archives-index` to
+create or backfill the catalog. With no finalized archives, the index is empty.

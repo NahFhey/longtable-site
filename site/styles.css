@@ -56,6 +56,13 @@ h1 { margin: .1rem 0 0; font-size: clamp(1.35rem, 3vw, 2rem); line-height: 1.05;
 .controls { display: flex; gap: .5rem; align-items: center; }
 
 main { max-width: 1800px; margin: 0 auto; }
+.event-navigation { margin-top: .6rem; }
+.event-navigation a, .archive-list a { color: var(--gold); }
+.archive-page { max-width: 60rem; padding: 1rem clamp(1rem, 3vw, 2.5rem); }
+.archive-list { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.archive-list li { padding: 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); }
+.archive-list a { font-size: 1.2rem; font-weight: 700; overflow-wrap: anywhere; }
+.archive-list p { margin-bottom: 0; color: var(--muted); }
 .status { margin: .8rem clamp(1rem, 2vw, 1.5rem) 0; min-height: 1.5rem; color: var(--muted); }
 .status.error { color: var(--error); font-weight: 700; }
 .status.stale { color: #ffd58f; font-weight: 700; }

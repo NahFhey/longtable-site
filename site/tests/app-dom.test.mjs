@@ -439,6 +439,28 @@ test("live rewind stays paused through refresh, replays independently, and retur
   assert.equal(new URL(app.urlWrites.at(-1)).searchParams.has("at"), false);
 });
 
+test("staff scenery renders identically after seeking and reload without changing roster counts", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
+  data.events = [];
+  const staff = (app) => app.rectCalls.filter((call) => call.color === "#73afb5");
+  for (const slot of [1.4, 1.55, 4.2, 4.29]) {
+    const seek = await runApp([data], `staff-seek-${slot}`, { mobile: true });
+    const roster = allText(seek.nodes.get("tables"));
+    seek.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
+    seek.rectCalls.length = 0;
+    seek.frames.shift()?.(performance.now() + 100);
+    const expected = staff(seek);
+    assert.equal(expected.length, 2, "one staff cap and uniform for this table");
+    assert.match(allText(seek.nodes.get("tables")), /0\/5/);
+    assert.doesNotMatch(roster, /STAFF/);
+    const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
+    assert.deepEqual(staff(fresh), expected);
+    const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
+    assert.deepEqual(staff(reduced), []);
+  }
+});
+
 test("lifecycle scenery and accessible status match direct seek, fresh load and reduced motion", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
