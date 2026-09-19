@@ -173,7 +173,7 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  sample.schema = 7;
+  sample.schema = 8;
   const app = await runApp([sample], "bad-schema");
   assert.match(app.nodes.get("status").textContent, /unsupported schema/i);
   assert.equal(app.nodes.get("status").className, "status error");
@@ -190,7 +190,7 @@ test("a bad live refresh retains the last good rendered table list", async () =>
   sample.event.start = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}:00${sign}${hh}:${mm}`;
   sample.generated_at = new Date(Date.now() - 10_000).toISOString();
   const bad = structuredClone(sample);
-  bad.schema = 7;
+  bad.schema = 8;
   bad.generated_at = new Date().toISOString();
   const app = await runApp([sample, bad], "refresh-retention", { search: "" });
   const before = allText(app.nodes.get("tables"));

@@ -84,10 +84,11 @@ function event(id, kind, at, overrides = {}) {
   return { id, kind, at, duration, text, person: target, by: "admin", ...overrides };
 }
 
-test("schema 1–6 are accepted, unknown fields are ignored, and 0/7 are rejected", () => {
-  for (const schema of [1, 2, 3, 4, 5, 6]) {
+test("schema 1–7 are accepted, unknown fields are ignored, and 0/8 are rejected", () => {
+  for (const schema of [1, 2, 3, 4, 5, 6, 7]) {
     const input = timeline(schema);
-    if (schema === 6) input.visitors = { open: true, people: [] };
+    if (schema >= 7) input.people.forEach((person) => { person.movements = []; });
+    if (schema >= 6) input.visitors = { open: true, people: [] };
     input.unknown_top = "ignored";
     input.event.future_field = 42;
     input.people[0].future_field = true;
@@ -97,7 +98,7 @@ test("schema 1–6 are accepted, unknown fields are ignored, and 0/7 are rejecte
     assert.equal("future_field" in result.event, false);
     assert.equal("future_field" in result.people[0], false);
   }
-  for (const schema of [0, 7]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
+  for (const schema of [0, 8]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
 });
 
 test("custom appearances survive live reconciliation and defaults preserve old characters", () => {
@@ -539,7 +540,8 @@ test("fixed overflow area fits a large roster without moving landmarks or overla
 test("legacy schemas retain the original array-based grid and dynamic overflow area", () => {
   for (const schema of [1, 2, 3]) {
     const input = timeline(schema);
-    if (schema === 6) input.visitors = { open: true, people: [] };
+    if (schema >= 7) input.people.forEach((person) => { person.movements = []; });
+    if (schema >= 6) input.visitors = { open: true, people: [] };
     input.tables[0].pad = 19; // An unknown field cannot rewrite old archives.
     input.room_layout = { version: 1, pad_capacity: 100, overflow_capacity: 500 };
     const data = validateTimeline(input);

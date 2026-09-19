@@ -20,7 +20,7 @@ test("schema 5 enforces dice math, visibility and references without echoing pri
     const data = fixture(); Object.assign(data.events[0], patch);
     assert.throws(() => validateTimeline(data), (error) => !error.message.includes("PRIVATE SECRET"));
   }
-  for (const patch of [{ faces: [] }, { faces: [0, 7] }, { faces: [true] }, { total: 11 }, { total: true }, { modifier: 1001 }, { sides: 3 }, { expression: "2d6+4" }, { secret: "PRIVATE SECRET" }]) {
+  for (const patch of [{ faces: [] }, { faces: [0, 7] }, { faces: [true] }, { total: 11 }, { total: true }, { modifier: 1001 }, { sides: 1 }, { expression: "2d6+4" }, { secret: "PRIVATE SECRET" }]) {
     const data = fixture(); Object.assign(data.events[0].roll, patch);
     assert.throws(() => validateTimeline(data), (error) => !error.message.includes("PRIVATE SECRET"));
   }

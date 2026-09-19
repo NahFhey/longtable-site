@@ -100,7 +100,7 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (![1, 2, 3, 4, 5, 6].includes(schema)) fail("This timeline uses an unsupported schema version.");
+  if (![1, 2, 3, 4, 5, 6, 7].includes(schema)) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -144,6 +144,14 @@ export function validateTimeline(input) {
       hidden,
       variant,
       appearance,
+      movements: array(schema >= 7 ? required(person, "movements", label) : [], `${label}.movements`).map((rawMove) => {
+        const move = object(rawMove, `${label}.movements`);
+        const destination = string(move.destination, `${label}.movement.destination`);
+        if (!["table", "food", "lounge"].includes(destination)) fail("Unknown movement destination.");
+        const table = string(move.table, `${label}.movement.table`, { nullable: true, min: 1 });
+        if (destination === "table" && table === null) fail("A table destination requires a table.");
+        return { at: number(move.at, `${label}.movement.at`, { min: 0, max: event.slots }), table, destination };
+      }),
       presence: {
         planned: range(required(rawPresence, "planned", `${label}.presence`), `${label}.presence.planned`, event.slots, { nullable: true }),
         actual: {
@@ -214,6 +222,13 @@ export function validateTimeline(input) {
   });
 
   if (room_layout) validatePadAssignments(tables, room_layout);
+  for (const person of people) {
+    let previous = -1;
+    for (const move of person.movements) {
+      if (move.at < previous || (move.table !== null && !tables.some((table) => table.id === move.table))) fail("Invalid movement history.");
+      previous = move.at;
+    }
+  }
 
   const eventIds = new Set();
   const events = array(required(root, "events", "timeline"), "timeline.events").map((raw, index) => {
@@ -261,10 +276,10 @@ export function validateRoll(value) {
   const roll = object(value, "roll");
   if (Object.keys(roll).sort().join(",") !== "expression,faces,modifier,sides,total") fail("Invalid roll fields.");
   const sides = number(roll.sides, "roll.sides", { integer: true });
-  if (![4, 6, 8, 10, 12, 20, 100].includes(sides)) fail("Unsupported die size.");
+  if (sides < 2 || sides > 1000) fail("Unsupported die size.");
   const modifier = number(roll.modifier, "roll.modifier", { integer: true, min: -1000, max: 1000 });
   const faces = array(roll.faces, "roll.faces").map((face) => number(face, "roll.face", { integer: true, min: 1, max: sides }));
-  if (faces.length < 1 || faces.length > 20) fail("Invalid dice count.");
+  if (faces.length < 1 || faces.length > 100) fail("Invalid dice count.");
   const expression = `${faces.length}d${sides}${modifier ? `${modifier > 0 ? "+" : ""}${modifier}` : ""}`;
   const total = number(roll.total, "roll.total", { integer: true });
   if (roll.expression !== expression || total !== faces.reduce((sum, face) => sum + face, modifier)) fail("Recorded dice total or expression is inconsistent.");
@@ -696,10 +711,22 @@ export function ordinaryLocation(timeline, person, slot) {
   return { kind: "lounge", label: "the lounge" };
 }
 
-/** Movement priority: the spotlighted person, then break, then meal, then ordinary location. */
+/** Explicit choices override automatic activity while their table/visitor context still applies. */
 export function resolveLocation(timeline, person, slot, active = activeEvents(timeline, slot)) {
   const ordinary = ordinaryLocation(timeline, person, slot);
   if (ordinary.kind === "absent") return ordinary;
+  const moves = person.movements || [];
+  for (let index = moves.length - 1; index >= 0; index -= 1) {
+    const move = moves[index];
+    if (move.at > slot) continue;
+    if (ordinary.kind === "table" ? move.table !== ordinary.table.id
+      : move.table !== null || !timeline.visitors?.people.includes(person.id)) break;
+    // A visitor's choice before a game must not resume after that game ends.
+    if (move.table === null && timeline.tables.some((table) => table.start > move.at && table.start <= slot
+      && (table.dm === person.id || table.signups.some((signup) => signup.person === person.id)))) break;
+    return move.destination === "table" ? ordinary
+      : { kind: move.destination, label: move.destination === "food" ? "the food area" : "the lounge" };
+  }
   if (active.spotlight?.person === person.id) return { kind: "spotlight", label: "the stage", event: active.spotlight };
   if (active.break) return { kind: "lounge", label: "the lounge (break)", event: active.break };
   if (active.meal) return { kind: "food", label: "the food corner", event: active.meal };

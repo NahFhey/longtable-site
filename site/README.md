@@ -37,11 +37,11 @@ DOM through created nodes and `textContent`, never HTML injection sinks.
 
 The data contract is `data/TIMELINE.md`. `bot/longtable/publish.py` atomically
 writes the production `data/timeline.json`; do not edit that generated file by
-hand. The site fetches it with `cache: "no-store"`, validates schemas 1–6,
+hand. The site fetches it with `cache: "no-store"`, validates schemas 1–7,
 and retains its last good snapshot if a live refresh is unavailable or invalid.
 Schema 3 adds attendee-selected appearance; older records retain their original
 look. Schema 4 adds persisted pads and event room capacity. Deploy this reader
-before restarting a bot that publishes schema 6.
+before restarting a bot that publishes schema 7.
 
 Opaque identifiers are used only for in-memory joins. They are not displayed
 or used to choose a sprite. Hidden people are rendered and described as
@@ -179,7 +179,7 @@ not rendered. A hidden roller is someone. Result text does not assume a game sys
 or announce critical hits. The existing schema-4 sample remains a compatibility
 fixture; `dice.test.mjs`, DOM tests, and bot archive tests cover schema-5 outcomes.
 Deploy this reader before the updated bot. Existing archives keep their frozen
-renderer and schema. The schema-6 reader must be live before restarting the bot.
+renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
@@ -254,7 +254,7 @@ unseated visitors alternate between hall aisles, the lounge and food area on a
 four-minute event-time rhythm. The route is deterministic on seek and refresh.
 Social poses are decorative, carry no invented dialogue, and honor reduced motion.
 Archives freeze this visitor roster and renderer like the rest of the snapshot.
-Deploy the schema-6 reader before the writer; schemas 1–5 still render.
+Deploy the schema-7 reader before the writer; schemas 1–6 still render.
 
 ### Hall caretaker
 
@@ -284,3 +284,14 @@ Hidden speakers retain their anonymous figure and name. Reduced motion snaps
 figures to each destination while preserving message order and reading time.
 Seeking or returning to now clears the stage visit and waiting queue. Automatic
 framing includes the stage during messages; manual camera framing remains in use.
+
+## Player and visitor movement (schema 7)
+
+Discord player options and visitor room buttons publish per-person movement
+histories. The hall replays food, lounge, and table choices at their recorded
+times, with normal walking animation. Explicit choices override automatic
+spotlight/break/meal movement while the attendee is present and the matching
+game or visitor context applies. Game assignments supersede older visitor choices.
+A successful dice-form submission records a return to the game table, including
+when the outcome is private. The private outcome itself is never published.
+Dice support 1–100 dice with 2–1000 sides, including custom sizes.

@@ -762,7 +762,7 @@ function renderDetail(focus = false) {
   state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
-  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. Use Set Up My Table to host a game. While playing, use /roll in #signup; choose Public to save the result here.", "join-instructions");
+  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. In your game room, Player Options lets you get food, visit the lounge, return to your table, or roll dice. Public rolls appear here.", "join-instructions");
   append(panel, "h3", "Roster");
   const list = append(panel, "ul");
   if (view.roster.length === 0) append(list, "li", "No signups yet.", "muted");
@@ -785,7 +785,7 @@ function renderTableList() {
   if (state.data.schema >= 6) {
     const article = append(host, "article", undefined, "table-card visitors-card");
     append(article, "h3", "Visitors Table · Just visiting");
-    append(article, "p", "Hosted by the event coordinator. Visitors mingle in the lounge and food area between games. Movement and social gestures are illustrative.");
+    append(article, "p", "Hosted by the event coordinator. Use Get Food or Go to Lounge in the Discord Visitors Table room to move your character. Visitors also mingle between games.");
     append(article, "p", state.archive ? "Saved visitor roster." : "Choose Just visiting first in Discord’s Browse Games menu.");
     const roster = append(article, "ul", undefined, "roster");
     if (!state.data.visitors.people.length) append(roster, "li", "No visitors yet.");
