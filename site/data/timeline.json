@@ -112,6 +112,14 @@
    "actor": "p1",
    "table": null,
    "person": null
+  },
+  {
+   "id": "64e3bc84798a44f8ad5bea7e73ef8cb3",
+   "at": "2026-09-19T19:40:07.356890Z",
+   "action": "move_food",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -126,7 +134,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T19:32:15.841950Z",
+ "generated_at": "2026-09-19T19:40:10.086045Z",
  "event": {
   "name": "Tater testers",
   "start": "2026-09-19T10:30:00-04:00",
@@ -244,6 +252,11 @@
      "at": 6.446915616111111,
      "table": "t1",
      "destination": "table"
+    },
+    {
+     "at": 10.337420494444444,
+     "table": "t1",
+     "destination": "food"
     }
    ],
    "presence": {
