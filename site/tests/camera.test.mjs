@@ -59,3 +59,14 @@ test("framing includes large-roster overflow and uses the doorway for an empty h
   }
   assert.deepEqual(tableBounds(layout, []), { x: 0, y: 6, width: 10, height: 8 });
 });
+
+test('the taller back wall remains reachable without moving floor coordinates', () => {
+  const bounds = { x: 0, y: -6, width: 72, height: 36 };
+  const camera = fitBounds(bounds, viewport, bounds, 0);
+  const top = worldToScreen(camera, { x: 0, y: -6 });
+  assert.ok(top.y >= 0);
+  const bottom = worldToScreen(camera, { x: 72, y: 30 });
+  assert.ok(bottom.y <= viewport.height);
+  const zoomed = constrainCamera({ zoom: 96, x: 0, y: 99999 }, viewport, bounds);
+  near(worldToScreen(zoomed, { x: 0, y: -6 }).y, 0);
+});

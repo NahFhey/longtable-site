@@ -1,8 +1,8 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
-import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
-import { eventActions } from "./event-config.mjs?v=93654a4e7a47";
+import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
+import { eventActions, setupFundraising } from "./event-config.mjs?v=fd82af33dc85";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
   PALETTE_SIZE,
@@ -31,7 +31,7 @@ import {
   tableScenery,
   validateTimeline,
   visibleVariant,
-} from "./model.mjs";
+} from "./model.mjs?v=74551816ed07";
 
 const TILE = 16;
 const SCALE = 2;
@@ -154,8 +154,13 @@ function viewport() {
   return { width: rect.width || 960, height: rect.height || 480 };
 }
 
+function hallBounds() {
+  return { x: 0, y: state.layout.backWall.y, width: state.layout.width,
+    height: state.layout.height - state.layout.backWall.y };
+}
+
 function frameTables(indices, manual = false) {
-  state.camera = fitBounds(tableBounds(state.layout, indices), viewport(), state.layout);
+  state.camera = fitBounds(tableBounds(state.layout, indices), viewport(), hallBounds());
   state.manualCamera = manual;
   hideTooltip();
 }
@@ -164,7 +169,7 @@ function updateCamera() {
   const size = viewport();
   if (state.camera && state.viewport && (size.width !== state.viewport.width || size.height !== state.viewport.height)) {
     const center = screenToWorld(state.camera, { x: state.viewport.width / 2, y: state.viewport.height / 2 });
-    state.camera = constrainCamera({ ...state.camera, x: size.width / 2 - center.x * state.camera.zoom, y: size.height / 2 - center.y * state.camera.zoom }, size, state.layout);
+    state.camera = constrainCamera({ ...state.camera, x: size.width / 2 - center.x * state.camera.zoom, y: size.height / 2 - center.y * state.camera.zoom }, size, hallBounds());
     if (!state.manualCamera) state.frameKey = null;
   }
   state.viewport = size;
@@ -173,19 +178,26 @@ function updateCamera() {
   const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
   if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
+    if (state.data.event.host_name) {
+      const tables = tableBounds(state.layout, indices);
+      const banner = bannerBounds();
+      const x = Math.min(tables.x, banner.x - 2);
+      state.camera = fitBounds({ x, y: -6, width: Math.max(tables.x + tables.width, banner.x + banner.w + 2) - x,
+        height: tables.y + tables.height + 6 }, size, hallBounds());
+    }
     if (showStage) {
       const tables = tableBounds(state.layout, indices);
       const stage = state.layout.stage;
       const x = Math.min(tables.x, stage.x - 2);
       const y = Math.min(tables.y, stage.y);
       state.camera = fitBounds({ x, y, width: Math.max(tables.x + tables.width, stage.x + stage.w) - x,
-        height: Math.max(tables.y + tables.height, state.layout.height - 1) - y }, size, state.layout);
+        height: Math.max(tables.y + tables.height, state.layout.height - 1) - y }, size, hallBounds());
     }
     state.frameKey = key;
     state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
     renderDetail();
   }
-  state.camera = constrainCamera(state.camera, size, state.layout);
+  state.camera = constrainCamera(state.camera, size, hallBounds());
 }
 
 function renderActions() {
@@ -382,8 +394,80 @@ function drawLabel(value, x, y, options = {}) {
   ctx.fillText(value, options.align === "left" ? pixelX + 1.5 * SCALE : pixelX, pixelY + 0.5);
 }
 
+function bannerBounds() {
+  const w = Math.min(25, state.layout.width - 6);
+  // Hang over the entrance and first tables so it is visible in the opening view.
+  return { x: 3, y: -4.7, w, h: 3.5 };
+}
+
+function drawHostBanner() {
+  const name = state.data.event.host_name;
+  if (!name) return;
+  const { x, y, w, h } = bannerBounds();
+  ctx.save();
+  ctx.scale(TILE * SCALE, TILE * SCALE);
+  ctx.translate(x, y);
+  ctx.lineWidth = .05;
+  ctx.strokeStyle = "#b89b5c";
+  // Two cords suspend the folded parchment ribbon from brass wall pegs.
+  for (const anchor of [2, w - 2]) {
+    ctx.beginPath(); ctx.moveTo(anchor, -1); ctx.lineTo(anchor, .2); ctx.stroke();
+    ctx.fillStyle = "#d8b86d";
+    ctx.beginPath(); ctx.arc(anchor, -.9, .12, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const right of [false, true]) {
+    ctx.save();
+    if (right) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+    ctx.fillStyle = "#bca475";
+    ctx.beginPath(); ctx.moveTo(1, .6); ctx.lineTo(-1.7, .9);
+    ctx.lineTo(-.9, 1.8); ctx.lineTo(-1.7, 2.9); ctx.lineTo(1.1, 2.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#75613f";
+    ctx.beginPath(); ctx.moveTo(0, 2.8); ctx.lineTo(1.1, 2.6); ctx.lineTo(1.1, h); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = "#edddb5";
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(w / 2, .6, w, 0);
+  ctx.lineTo(w, h); ctx.quadraticCurveTo(w / 2, h - .6, 0, h); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "#b69a61";
+  ctx.beginPath(); ctx.moveTo(.3, .3); ctx.quadraticCurveTo(w / 2, .85, w - .3, .3);
+  ctx.moveTo(.3, h - .3); ctx.quadraticCurveTo(w / 2, h - .85, w - .3, h - .3); ctx.stroke();
+  const icon = state.hostIcon;
+  const iconSpace = icon ? 2.9 : 0;
+  if (icon) {
+    const ratio = Math.min(2.2 / icon.naturalWidth, 2.2 / icon.naturalHeight);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(icon, 1.1 + (2.2 - icon.naturalWidth * ratio) / 2,
+      (h - icon.naturalHeight * ratio) / 2, icon.naturalWidth * ratio, icon.naturalHeight * ratio);
+  }
+  const center = (w + iconSpace) / 2;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#695531"; ctx.font = ".45px Georgia, serif";
+  ctx.fillText("HOSTED BY", center, 1.05);
+  ctx.fillStyle = "#302c22";
+  let size = 1.05;
+  ctx.font = `${size}px Georgia, serif`;
+  const available = w - iconSpace - 2;
+  if (ctx.measureText(name).width > available) size *= available / ctx.measureText(name).width;
+  ctx.font = `${size}px Georgia, serif`;
+  ctx.fillText(name, center, 2.12);
+  ctx.restore();
+}
+
 function drawRoom() {
   const layout = state.layout;
+  const unit = TILE * SCALE;
+  ctx.fillStyle = "#28342f";
+  ctx.fillRect(0, -6 * unit, layout.width * unit, 6 * unit);
+  ctx.strokeStyle = "#3a4640";
+  ctx.lineWidth = 1;
+  for (let y = -6; y < 0; y++) {
+    for (let x = (y % 2 ? -2 : 0); x < layout.width; x += 4) {
+      ctx.strokeRect(x * unit, y * unit, 4 * unit, unit);
+    }
+  }
+  ctx.fillStyle = "#6f6145";
+  ctx.fillRect(0, -.18 * unit, layout.width * unit, .18 * unit);
+  drawHostBanner();
   for (let y = 0; y < layout.height; y += 1) for (let x = 0; x < layout.width; x += 1) {
     const wall = x === 0 || y === 0 || x === layout.width - 1 || y === layout.height - 1;
     if (!drawTile(state.images.rpg, wall ? RPG.floor.wall : RPG.floor.wood, x, y)) {
@@ -900,7 +984,8 @@ function updateHeader(active) {
   const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards. Food: ${state.diners.length} collecting, eating or clearing plates.`;
   const staffAction = active.break ? "Staff are announcing the break from the stage." : state.ambience?.action ?? "";
   const staffDescription = `${hallDescription} ${staffAction} ${loungeDescription}`.trim();
-  if ($("canvas-description").textContent !== staffDescription) $("canvas-description").textContent = staffDescription;
+  const description = staffDescription + (state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "");
+  if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   const clockText = formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
   const eventLabel = active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
@@ -1065,6 +1150,19 @@ function updateSyncStatus() {
 
 function installTimeline(data, initial = false) {
   state.data = data;
+  if (initial && !state.sample && !state.archive) setupFundraising($("fundraising-total"));
+  if (state.hostIconUrl !== data.event.host_icon_url) {
+    const url = data.event.host_icon_url;
+    state.hostIconUrl = url;
+    state.hostIcon = null;
+    if (url) {
+      const icon = new Image();
+      icon.referrerPolicy = "no-referrer";
+      icon.addEventListener("load", () => { if (state.hostIconUrl === url) state.hostIcon = icon; }, { once: true });
+      icon.addEventListener("error", () => {}, { once: true });
+      icon.src = url;
+    }
+  }
   document.title = `${data.event.name} — Great Hall`;
   $("event-name").textContent = data.event.name;
   $("record-note").hidden = !state.archive && data.phase !== "final";
@@ -1175,13 +1273,13 @@ function gesturePosition() {
 }
 function moveCamera(dx, dy) {
   if (!state.camera) return;
-  state.camera = panCamera(state.camera, dx, dy, viewport(), state.layout);
+  state.camera = panCamera(state.camera, dx, dy, viewport(), hallBounds());
   state.manualCamera = true;
   hideTooltip();
 }
 function zoomCamera(factor, point = { x: viewport().width / 2, y: viewport().height / 2 }) {
   if (!state.camera) return;
-  state.camera = zoomAt(state.camera, point, factor, viewport(), state.layout);
+  state.camera = zoomAt(state.camera, point, factor, viewport(), hallBounds());
   state.manualCamera = true;
   hideTooltip();
 }
@@ -1250,7 +1348,7 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 function recenter() {
   if (!state.layout) return;
-  state.camera = fitBounds({ x: 0, y: 0, width: state.layout.width, height: state.layout.height }, viewport(), state.layout, 0);
+  state.camera = fitBounds(hallBounds(), viewport(), hallBounds(), 0);
   state.manualCamera = true;
   hideTooltip();
 }

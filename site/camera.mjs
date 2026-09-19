@@ -6,8 +6,8 @@ export const screenToWorld = (camera, point) => ({ x: (point.x - camera.x) / cam
 export function constrainCamera(camera, viewport, world) {
   const minimum = Math.min(viewport.width / world.width, viewport.height / world.height);
   const zoom = clamp(camera.zoom, minimum, Math.max(96, minimum));
-  const axis = (offset, size, extent) => size * zoom <= extent ? (extent - size * zoom) / 2 : clamp(offset, extent - size * zoom, 0);
-  return { zoom, x: axis(camera.x, world.width, viewport.width), y: axis(camera.y, world.height, viewport.height) };
+  const axis = (offset, size, extent, origin = 0) => (size * zoom <= extent ? (extent - size * zoom) / 2 : clamp(offset + origin * zoom, extent - size * zoom, 0)) - origin * zoom;
+  return { zoom, x: axis(camera.x, world.width, viewport.width, world.x), y: axis(camera.y, world.height, viewport.height, world.y) };
 }
 
 export function fitBounds(bounds, viewport, world, padding = 40) {

@@ -22,7 +22,7 @@ const ACTIVITY_LABELS = Object.freeze({
   open_visitors: "opened visitor signups", close_visitors: "closed visitor signups",
   remove_visitor: "removed a visitor", remove: "removed a public message", finalize: "finalized the event",
   move_food: "went to get food", move_lounge: "went to the lounge", move_table: "returned to the table",
-  event_window: "updated the event name or dates",
+  event_window: "updated the event details",
 });
 
 const ADMIN_EVENT_CACHE = new WeakMap();
@@ -119,12 +119,21 @@ export function validateTimeline(input) {
 
   const rawEvent = object(required(root, "event", "timeline"), "timeline.event");
   const event = {
+    host_name: string(rawEvent.host_name === undefined ? "" : rawEvent.host_name, "timeline.event.host_name", { max: 100 }),
+    host_icon_url: string(rawEvent.host_icon_url === undefined ? "" : rawEvent.host_icon_url, "timeline.event.host_icon_url", { max: 2048 }),
     name: string(required(rawEvent, "name", "timeline.event"), "timeline.event.name", { min: 1 }),
     start: dateString(required(rawEvent, "start", "timeline.event"), "timeline.event.start", "numeric-offset"),
     tz: string(required(rawEvent, "tz", "timeline.event"), "timeline.event.tz", { min: 1 }),
     slot_minutes: number(required(rawEvent, "slot_minutes", "timeline.event"), "timeline.event.slot_minutes", { integer: true, min: 1 }),
     slots: number(required(rawEvent, "slots", "timeline.event"), "timeline.event.slots", { integer: true, min: 1 }),
   };
+
+  if (event.host_icon_url) {
+    let icon;
+    try { icon = new URL(event.host_icon_url); } catch { fail("Invalid host icon URL."); }
+    if (icon.protocol !== "https:" || !icon.hostname || icon.username || icon.password ||
+        /[\s\\]/.test(event.host_icon_url) || !event.host_name.trim()) fail("Invalid host icon URL or missing host name.");
+  }
   try { new Intl.DateTimeFormat("en", { timeZone: event.tz }).format(new Date(0)); }
   catch { fail("timeline.event.tz is not a valid time zone."); }
 
@@ -570,6 +579,7 @@ export function createRoomLayout(tables, room = null) {
   layout.width = layout.gridX + layout.columns * layout.cellWidth + 8;
   const overflowHeight = layout.overflowRows ? 2 + layout.overflowRows * 2 : 0;
   layout.height = layout.tableGridBottom + overflowHeight + 6;
+  layout.backWall = { x: 0, y: -6, w: layout.width, h: 6 };
   layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
   layout.food = { x: 1, y: 1, w: 16, h: 6 };
   layout.lounge = { x: 1, y: layout.height - 6, w: layout.width - 9, h: 5 };

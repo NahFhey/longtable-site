@@ -352,3 +352,9 @@ occurred, including before the event starts, independently of its planned time.
 Do not embed names, private outcomes, unapproved messages, or raw Discord IDs.
 The browser resolves names through the current privacy projection and combines
 these entries with retained public events and older movement history.
+
+Optional event metadata: `host_name` (string, at most 100 characters, default empty)
+and `host_icon_url` (string, at most 2048 characters, default empty). An icon requires
+a nonempty host name and an HTTPS URL without embedded credentials. The browser
+loads the icon directly; a failed image leaves the business name visible. The host
+ribbon appears on the taller back wall when a host name is configured.

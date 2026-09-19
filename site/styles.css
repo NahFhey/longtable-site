@@ -200,3 +200,5 @@ footer p { margin: .3rem 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+.fundraising-total { margin: -.4rem 0 1rem; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }

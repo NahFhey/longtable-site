@@ -374,3 +374,9 @@ blocks autoplay, **Play music** enables audio with a click. No track is fetched
 until playback is needed. Sources and licenses are in `assets/music/CREDITS.txt`.
 New archived renderers include the module, credits, and both MP3s; older archives
 retain their original renderer.
+
+The current header links to Discord and Extra Life team 74917. Its public team
+amount/goal refreshes quietly every minute while the tab is visible. Extra Life
+can cache its API response; the display is not a guarantee of instant donation
+updates. Failed refreshes retain and label the last available amount. Samples and
+archived replays do not fetch or show live fundraising totals.

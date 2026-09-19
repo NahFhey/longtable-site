@@ -337,7 +337,7 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  assert.equal(actions.children.length, 1);
+  assert.equal(actions.children.length, 2);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
   assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
@@ -951,4 +951,17 @@ test("attendee walking follows replay speed and freezes when the event clock is 
     assert.deepEqual(sprites(app), paused, `speed ${speed}: pause must stop walking`);
     assert.deepEqual(app.errors, []);
   }
+});
+
+test('host ribbon renders the business and remains accessible without an icon', async () => {
+  const sample = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
+  sample.event.host_name = 'Example Games';
+  const app = await runApp([sample], 'host-banner');
+  assert.equal(app.errors.length, 0);
+  assert.ok(app.contextCalls.includes('HOSTED BY'));
+  assert.ok(app.contextCalls.includes('Example Games'));
+  assert.match(app.nodes.get('canvas-description').textContent, /Hosted by Example Games/);
+  sample.event.host_icon_url = 'javascript:alert(1)';
+  const invalid = await runApp([sample], 'invalid-host');
+  assert.match(invalid.nodes.get('status').textContent, /host icon/i);
 });
