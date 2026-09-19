@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:13:45.509695Z",
+ "generated_at": "2026-09-19T15:16:00.263553Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -58,6 +58,11 @@
      "at": 1.447115698888889,
      "table": "t1",
      "destination": "food"
+    },
+    {
+     "at": 1.5219559516666665,
+     "table": "t1",
+     "destination": "table"
     }
    ],
    "presence": {
@@ -135,6 +140,27 @@
    "text": "have fun everyone",
    "person": "p1",
    "by": "p1"
+  },
+  {
+   "id": "e5",
+   "kind": "roll",
+   "at": 1.5219559516666665,
+   "duration": null,
+   "text": null,
+   "person": "p1",
+   "by": "p1",
+   "table": "t1",
+   "visibility": "public",
+   "roll": {
+    "expression": "2d20",
+    "sides": 20,
+    "faces": [
+     4,
+     11
+    ],
+    "modifier": 0,
+    "total": 15
+   }
   }
  ]
 }
