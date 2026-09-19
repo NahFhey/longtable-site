@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:02:44.482970Z",
+ "generated_at": "2026-09-19T15:06:39.046488Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -33,7 +33,18 @@
     "hair": 11,
     "hat": 1
    },
-   "movements": [],
+   "movements": [
+    {
+     "at": 1.20376733,
+     "table": "t1",
+     "destination": "food"
+    },
+    {
+     "at": 1.2101801483333332,
+     "table": "t1",
+     "destination": "lounge"
+    }
+   ],
    "presence": {
     "planned": [
      0,
