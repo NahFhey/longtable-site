@@ -1013,6 +1013,20 @@ test('one door opens before arrivals and departures and closes one second after 
   assert.equal(doorState(group), 'closed');
 });
 
+test('50-person demo uses its own data and never requests the live event', async () => {
+  const data = JSON.parse(await readFile(new URL('../data/timeline.demo-50.json', import.meta.url), 'utf8'));
+  const app = await runApp([data], 'demo-50', { search: '?sample=50&at=0', liveFeed: 'https://feed.example/timeline.json' });
+  assert.equal(app.fetchUrls.length, 1);
+  assert.equal(new URL(app.fetchUrls[0]).pathname, '/data/timeline.demo-50.json');
+  assert.match(app.nodes.get('attendees-heading').textContent, /50/);
+  assert.equal(app.nodes.get('record-note').hidden, false);
+  assert.match(app.nodes.get('record-note').textContent, /fictional/);
+  assert.equal(app.nodes.get('event-actions').children.length, 0);
+  assert.equal(app.nodes.get('sync-controls').hidden, true);
+  assert.equal(app.nodes.get('play').textContent, 'Play');
+  assert.deepEqual(app.errors, []);
+});
+
 test('host ribbon renders the business and remains accessible without an icon', async () => {
   const sample = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
   sample.event.host_name = 'Example Games';

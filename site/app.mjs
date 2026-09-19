@@ -127,7 +127,8 @@ const state = {
   diners: [],
   staleMessage: "",
   archive: document.documentElement?.dataset.source === "archive",
-  sample: document.documentElement?.dataset.source !== "archive" && new URLSearchParams(location.search).get("sample") === "1",
+  sample: document.documentElement?.dataset.source !== "archive" && (
+    new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50"),
 };
 
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
@@ -1157,6 +1158,7 @@ async function readTimeline(url) {
 
 async function fetchTimeline() {
   if (state.archive || state.sample) {
+    if (!state.archive && new URLSearchParams(location.search).get("sample") === "50") return readTimeline("./data/timeline.demo-50.json");
     return readTimeline(state.archive ? "./timeline.json" : "./data/timeline.sample.json");
   }
   const liveFeed = $("live-feed")?.getAttribute("content");
@@ -1214,8 +1216,9 @@ function installTimeline(data, initial = false) {
   }
   document.title = `${data.event.name} — Longtable`;
   $("event-name").textContent = data.event.name;
-  $("record-note").hidden = !state.archive && data.phase !== "final";
-  $("record-note").textContent = state.archive ? "Archived event replay. This shows the final saved schedule." : "This is the final event record.";
+  $("record-note").hidden = !state.sample && !state.archive && data.phase !== "final";
+  $("record-note").textContent = state.sample ? "Demo event — all attendees and activity are fictional. Use Play and the timeline to explore the full event."
+    : state.archive ? "Archived event replay. This shows the final saved schedule." : "This is the final event record.";
   $("updated").textContent = formatDate(Date.parse(data.generated_at), { dateStyle: "medium", timeStyle: "medium" });
   $("scrubber").max = String(data.event.slots);
   $("start-label").textContent = formatSlot(0, true);
