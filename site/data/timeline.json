@@ -64,6 +64,14 @@
    "actor": "p1",
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "fd078e46206e43f18e0fc0d460707e88",
+   "at": "2026-09-19T17:42:20.066372Z",
+   "action": "move_table",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -78,7 +86,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T17:41:38.514604Z",
+ "generated_at": "2026-09-19T17:42:22.796177Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -169,6 +177,11 @@
      "at": 6.386562937777778,
      "table": "t1",
      "destination": "lounge"
+    },
+    {
+     "at": 6.411147984444444,
+     "table": "t1",
+     "destination": "table"
     }
    ],
    "presence": {
