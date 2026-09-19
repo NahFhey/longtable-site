@@ -50,10 +50,6 @@
 
   <main id="hall-content">
     <div id="status" class="status" role="status" aria-live="polite">Loading the hall…</div>
-    <div id="sync-controls" class="sync-controls" hidden>
-      <span id="sync-status" role="status" aria-live="polite"></span>
-      <button id="refresh-now" type="button">Check for updates</button>
-    </div>
     <section id="table-list" class="table-list" aria-labelledby="table-list-heading">
       <h2 id="table-list-heading">Tables</h2>
       <details class="attendees-card">
@@ -119,6 +115,10 @@
     <p>Last updated <time id="updated">—</time>.</p>
     <p>Art: Kenney · CC0.</p>
     <p>Music: RandomMind · CC0 · <a href="./assets/music/CREDITS.txt">Credits</a>.</p>
+    <div id="sync-controls" class="sync-controls" hidden>
+      <span id="sync-status" role="status" aria-live="polite"></span>
+      <button id="refresh-now" type="button">Check for updates</button>
+    </div>
   </footer>
   <script type="module" src="./app.mjs"></script>
 </body>
