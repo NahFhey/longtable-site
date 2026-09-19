@@ -104,6 +104,14 @@
    "actor": "p1",
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "bc4a61077de8469ab4c3ca28fd437329",
+   "at": "2026-09-19T19:19:05.126717Z",
+   "action": "event_window",
+   "actor": "p1",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -118,15 +126,15 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T19:13:54.909097Z",
+ "generated_at": "2026-09-19T19:19:07.518659Z",
  "event": {
-  "name": "Longtable",
+  "name": "Tater testers",
   "start": "2026-09-19T10:30:00-04:00",
   "tz": "America/New_York",
   "slot_minutes": 30,
   "slots": 326,
-  "host_name": "",
-  "host_icon_url": ""
+  "host_name": "Testers testeroni Tasty Tators",
+  "host_icon_url": "https://www.seriouseats.com/thmb/ttmF3v64ELI7gNzX-36uzgcdgS0=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/__opt__aboutcom__coeus__resources__content_migration__serious_eats__seriouseats.com__images__20110325-food-lab-tater-tots-french-fry-tot-156479646ea345fcab9679d5ee260eab.jpg"
  },
  "people": [
   {
