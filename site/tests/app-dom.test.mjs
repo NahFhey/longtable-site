@@ -176,10 +176,12 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
     .map(({ args }) => args.slice(0, 2));
   const player = await runApp([sample], "custom-character");
   assert.equal(player.errors.length, 0);
-  assert.deepEqual(coordinates(player), [[0, 51], [238, 153], [323, 34]]);
+  assert.deepEqual(coordinates(player).slice(0, 3), [[0, 51], [238, 153], [323, 34]]);
+  assert.equal(coordinates(player).length, 6, "player and caretaker each draw three layers");
   sample.people[0].dm = true;
   const dm = await runApp([sample], "custom-dm");
-  assert.deepEqual(coordinates(dm), [[0, 51], [238, 153], [323, 34], [510, 136]]);
+  assert.deepEqual(coordinates(dm).slice(0, 4), [[0, 51], [238, 153], [323, 34], [510, 136]]);
+  assert.equal(coordinates(dm).length, 7, "only the DM adds a hat layer");
 });
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
@@ -463,22 +465,35 @@ test("staff scenery renders identically after seeking and reload without changin
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
   data.events = [];
-  const staff = (app) => app.rectCalls.filter((call) => call.color === "#73afb5");
+  data.people.forEach(person => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
+  const staff = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar"));
   for (const slot of [1.4, 1.55, 4.2, 4.29]) {
     const seek = await runApp([data], `staff-seek-${slot}`, { mobile: true });
     const roster = allText(seek.nodes.get("tables"));
     seek.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
     seek.rectCalls.length = 0;
+    seek.imageCalls.length = 0;
     seek.frames.shift()?.(performance.now() + 100);
     const expected = staff(seek);
-    assert.equal(expected.length, 4, "table staff and the hall caretaker each have a cap and uniform");
+    assert.equal(expected.length, 6, "table staff and caretaker each use three character layers");
     assert.match(allText(seek.nodes.get("tables")), /0\/5/);
     assert.doesNotMatch(roster, /STAFF/);
     const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
     assert.deepEqual(staff(fresh), expected);
     const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
-    assert.equal(staff(reduced).length, 2, "the stationary caretaker remains visible with reduced motion");
+    assert.equal(staff(reduced).length, 3, "the stationary caretaker remains visible with reduced motion");
   }
+});
+
+test("staff remain visible if character assets fail without adding attendees", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.tables = [];
+  data.people = [];
+  data.events = [];
+  const app = await runApp([data], "staff-fallback", { assetsFailed: true });
+  assert.equal(app.rectCalls.filter(call => call.color === "#73afb5").length, 2);
+  assert.equal(app.nodes.get("attendees-heading").textContent, "Attendees (0)");
+  assert.deepEqual(app.errors, []);
 });
 
 test("lifecycle scenery and accessible status match direct seek, fresh load and reduced motion", async () => {

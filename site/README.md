@@ -171,7 +171,9 @@ Navigation supports both domain-root and project-prefix hosting. Older frozen
 archives remain playable unchanged; newly preserved archives link back to the index.
 
 `tableScenery` derives furniture delivery, chair placement, map unfolding, stacking,
-and removal directly from the selected slot. Geometric staff follow authored aisle
+and removal directly from the selected slot. Staff use randomly selected character layers, seeded by event start and station
+so their appearance stays stable across refreshes and replays. They retain their
+STAFF labels and never appear in attendee lists. Staff follow authored aisle
 routes during preparation/cleanup and never enter participant state, rosters, or
 counts. Pause stops them; seek/reload reconstructs the same scene. Reduced motion
 omits moving staff and snaps map unfolding while retaining the same furniture stage.

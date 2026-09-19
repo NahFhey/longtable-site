@@ -17,3 +17,12 @@ export function characterAppearance(person) {
     hat: (person.variant >>> 10) % SPRITES.hats.length,
   };
 }
+
+// Seed decorative staff by event and station so replay and refresh retain their looks.
+export function staffAppearance(eventStart, station = "caretaker") {
+  let variant = 2166136261;
+  for (const char of `${eventStart}:${station}`) {
+    variant = Math.imul(variant ^ char.charCodeAt(0), 16777619) >>> 0;
+  }
+  return characterAppearance({ variant, hidden: false });
+}

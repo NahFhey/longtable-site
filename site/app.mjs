@@ -2,8 +2,8 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
-import { eventActions } from "./event-config.mjs";
-import { SPRITES, characterAppearance } from "./characters.mjs";
+import { eventActions } from "./event-config.mjs?v=93654a4e7a47";
+import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
   PALETTE_SIZE,
   activeEvents,
@@ -500,7 +500,7 @@ function drawTables() {
       ctx.fillStyle = "rgba(255,210,122,.25)";
       ctx.fillRect(cell.x * TILE * SCALE, cell.y * TILE * SCALE, state.layout.cellWidth * TILE * SCALE, state.layout.cellHeight * TILE * SCALE);
     }
-    if (scenery.staff) drawStaff(scenery.staff);
+    if (scenery.staff) drawStaff(scenery.staff, `table-${cell.x}-${cell.y}`);
     if (!scenery.furniture) return;
     for (let column = 0; column < 3; column += 1) {
       if (!drawTile(state.images.rpg, RPG.table[column], firstSeat.tableX + column, firstSeat.tableY, false, open ? 1 : 0.45)) {
@@ -547,14 +547,21 @@ function drawDice(index, view) {
     { size: 4, color: "#fff2cd" });
 }
 
-function drawStaff(staff) {
+function drawStaff(staff, station = "caretaker") {
   const unit = TILE * SCALE;
   const x = staff.x * unit, y = staff.y * unit;
-  // Geometric uniform and cap distinguish anonymous staff from participant sprites.
-  ctx.fillStyle = "#d8c7a6"; ctx.fillRect(x - 5, y - 20, 10, 9);
-  ctx.fillStyle = "#73afb5"; ctx.fillRect(x - 7, y - 25, 14, 5);
-  ctx.fillRect(x - 7, y - 11, 14, 14);
-  ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
+  const appearance = staffAppearance(state.data.event.start, station);
+  const spriteX = staff.x - .5, spriteY = staff.y - .6;
+  if (drawTile(state.images.characters, [0, SPRITES.skin[appearance.skin]], spriteX, spriteY)) {
+    drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], spriteX, spriteY);
+    drawTile(state.images.characters, SPRITES.hair[appearance.hair], spriteX, spriteY);
+  } else {
+    // Retain a visible staff figure when the character sheet cannot load.
+    ctx.fillStyle = "#d8c7a6"; ctx.fillRect(x - 5, y - 20, 10, 9);
+    ctx.fillStyle = "#73afb5"; ctx.fillRect(x - 7, y - 25, 14, 5);
+    ctx.fillRect(x - 7, y - 11, 14, 14);
+    ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
+  }
   if (staff.load) {
     ctx.fillStyle = staff.load === "map" ? "#d8c99f" : "#bd955c";
     ctx.fillRect(x + 7, y - 8, staff.load === "table" ? 22 : 10, staff.load === "chairs" ? 15 : 7);
