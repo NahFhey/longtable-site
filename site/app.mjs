@@ -39,11 +39,24 @@ const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
 
+// Display milliseconds keep the opening lead and one-second hold visible in replay.
+class HallDoor {
+  constructor() { this.reset(); }
+  reset() { this.readyAt = 0; this.closeAt = 0; }
+  isOpen(now) { return now < this.closeAt; }
+  request(now) {
+    if (!this.isOpen(now)) this.readyAt = now + 200;
+    this.crossed(now);
+    return now >= this.readyAt;
+  }
+  crossed(now) { this.closeAt = Math.max(this.closeAt, now + 1000); }
+}
+
 const RPG = {
   floor: { wood: [1,26], lounge: [15,28], stage: [12,28], food: [6,28], wall: [15,13] },
   table: [[23,4],[24,4],[25,4]],
   chairs: { top: [20,3], bottom: [19,3], left: [21,3], right: [22,3] },
-  door: [[36,0],[37,0]], banners: [[49,0],[50,0],[51,0]],
+  door: { closed: [36,0], open: [37,0] }, banners: [[49,0],[50,0],[51,0]],
   food: [[54,15],[55,16],[56,17],[54,13],[55,13],[56,13]],
   barrel: [23,0], shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
 };
@@ -91,6 +104,7 @@ const state = {
   hover: null,
   layout: null,
   people: new Map(),
+  door: new HallDoor(),
   images: { characters: null, rpg: null },
   assetsFailed: false,
   snap: true,
@@ -294,6 +308,7 @@ function syncPeople() {
 }
 
 function updatePeople(realSeconds, now, active) {
+  if (state.snap || reducedMotion.matches) state.door.reset();
   state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
   const onStage = new Set(state.stageQueue);
   if (state.speech?.event.kind === "donation") onStage.add(state.speech.event.person);
@@ -310,6 +325,7 @@ function updatePeople(realSeconds, now, active) {
     if (!runtime.visible && target.present) {
       runtime.position = { ...state.layout.doorPosition };
       runtime.visible = true;
+      runtime.entering = true;
       runtime.path = pathBetween(runtime.position, target.position);
     } else if (runtime.visible && targetChanged) {
       runtime.path = pathBetween(runtime.position, target.position);
@@ -321,6 +337,7 @@ function updatePeople(realSeconds, now, active) {
       runtime.path = [];
       runtime.visible = target.present;
       runtime.moving = false;
+      runtime.entering = false;
       continue;
     }
     if (!runtime.visible || !runtime.position) continue;
@@ -328,6 +345,30 @@ function updatePeople(realSeconds, now, active) {
     // Queued speeches can finish their stage visit while replay is paused for reading.
     const travelSeconds = target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
     let budget = WALK_TILES_PER_SECOND * travelSeconds;
+    if (runtime.entering) {
+      if (!target.present) {
+        runtime.entering = false;
+        runtime.visible = false;
+        runtime.path = [];
+        continue;
+      }
+      const ready = state.door.request(now);
+      if (!ready || budget === 0) { runtime.moving = false; continue; }
+      runtime.entering = false;
+      state.door.crossed(now);
+    }
+    // Open before an exiting person reaches the threshold, even in fast replay.
+    if (!target.present && budget > 0) {
+      let remaining = 0, from = runtime.position;
+      for (const point of runtime.path) {
+        remaining += Math.hypot(point.x - from.x, point.y - from.y);
+        from = point;
+      }
+      if (remaining <= budget + .8 && !state.door.request(now)) {
+        runtime.moving = false;
+        continue;
+      }
+    }
     while (budget > 0 && runtime.path.length) {
       const point = runtime.path[0];
       const dx = point.x - runtime.position.x;
@@ -345,7 +386,10 @@ function updatePeople(realSeconds, now, active) {
       }
     }
     runtime.moving = runtime.path.length > 0;
-    if (!target.present && !runtime.moving) runtime.visible = false;
+    if (!target.present && !runtime.moving) {
+      runtime.visible = false;
+      state.door.crossed(now);
+    }
   }
   state.snap = false;
 }
@@ -533,11 +577,11 @@ function drawRoom() {
     drawLabel("OVERFLOW SEATING", layout.width / 2, layout.tableGridBottom + 0.7, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.55)" });
   }
 
-  if (!drawTile(state.images.rpg, RPG.door[0], layout.door.x, layout.door.y)) {
-    ctx.fillStyle = "#bd8c55";
-    ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE * 2);
+  const doorOpen = state.door.isOpen(state.lastTime);
+  if (!drawTile(state.images.rpg, doorOpen ? RPG.door.open : RPG.door.closed, layout.door.x, layout.door.y)) {
+    ctx.fillStyle = doorOpen ? "#17131b" : "#bd8c55";
+    ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
   }
-  drawTile(state.images.rpg, RPG.door[1], layout.door.x, layout.door.y + 1);
   drawLabel("DOOR", 1.6, layout.door.y - 0.6, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 }
 
@@ -865,7 +909,7 @@ function render(now, active) {
   ctx.imageSmoothingEnabled = false;
   drawRoom();
   drawTables();
-  [...state.people.values()].filter((person) => person.visible).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
+  [...state.people.values()].filter((person) => person.visible && !person.entering).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
   state.data.tables.forEach((table, index) => {
     if (tableLifecycle(state.data, table, state.time).phase === "active") {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));

@@ -953,6 +953,66 @@ test("attendee walking follows replay speed and freezes when the event clock is 
   }
 });
 
+test('one door opens before arrivals and departures and closes one second after passage', async () => {
+  const data = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
+  const table = data.tables[0];
+  const person = data.people.find(person => person.id === table.dm);
+  data.tables = [{ ...table, start: 1, end: 2, signups: [] }];
+  data.people = [{ ...person, movements: [], presence: { planned: [1, 2], actual: { here: null, leaving: null } } }];
+  data.events = []; data.activity = []; data.visitors = { open: true, people: [] };
+  const layout = createRoomLayout(data.tables, data.room_layout);
+  const seat = seatPositionForPlan(layout, 0, 0);
+  const atSeat = app => app.imageCalls.some(call => call.src.includes('roguelikeChar')
+    && call.args[4] === Math.round((seat.x - .5) * 32)
+    && call.args[5] === Math.round((seat.y - .6) * 32));
+  const doorState = app => {
+    const doors = app.imageCalls.filter(call => call.src.includes('roguelikeSheet')
+      && call.args[1] === 0 && [36 * 17, 37 * 17].includes(call.args[0]));
+    assert.equal(doors.length, 1, 'only one door sprite is drawn');
+    assert.equal(doors[0].args[5], layout.door.y * 32);
+    return doors[0].args[0] === 37 * 17 ? 'open' : 'closed';
+  };
+  for (const [action, slot] of [['arrival', .99999], ['departure', 1.99999]]) {
+    const app = await runApp([data], `door-${action}`, { search: `?sample=1&at=${slot}` });
+    const step = stageStepper(app);
+    assert.equal(doorState(app), 'closed');
+    app.nodes.get('play').listeners.get('click')();
+    step(100);
+    assert.equal(doorState(app), 'open');
+    assert.equal(atSeat(app), action === 'departure', 'door opens before the person passes');
+    step(100);
+    assert.equal(atSeat(app), action === 'departure');
+    step(100);
+    assert.equal(atSeat(app), action === 'arrival');
+    assert.equal(doorState(app), 'open');
+    step(999);
+    assert.equal(doorState(app), 'open');
+    step(1);
+    assert.equal(doorState(app), 'closed');
+    const scrubber = app.nodes.get('scrubber');
+    scrubber.value = String(slot);
+    scrubber.listeners.get('input')({ target: scrubber });
+    step(100);
+    assert.equal(doorState(app), 'closed', 'seeking does not replay a stale passage');
+    assert.deepEqual(app.errors, []);
+  }
+  data.people.push({ ...structuredClone(data.people[0]), id: 'second-arrival',
+    presence: { planned: [1, 2], actual: { here: 1.1, leaving: null } } });
+  const group = await runApp([data], 'door-group', { search: '?sample=1&at=.99999' });
+  assert.deepEqual(group.errors, []);
+  assert.doesNotMatch(group.nodes.get('status').textContent, /could not be loaded/);
+  const step = stageStepper(group);
+  group.nodes.get('play').listeners.get('click')();
+  step(100); step(100); step(100); // First person enters after the opening lead.
+  step(100); // Second person enters through the already-open door.
+  step(900);
+  assert.equal(doorState(group), 'open', 'the first person\'s timer cannot close on the second');
+  step(99);
+  assert.equal(doorState(group), 'open');
+  step(1);
+  assert.equal(doorState(group), 'closed');
+});
+
 test('host ribbon renders the business and remains accessible without an icon', async () => {
   const sample = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
   sample.event.host_name = 'Example Games';
