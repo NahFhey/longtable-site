@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T14:29:34.640680Z",
+ "generated_at": "2026-09-19T14:31:36.243333Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -36,15 +36,30 @@
    "presence": {
     "planned": [
      0,
-     24
+     25
     ],
     "actual": {
-     "here": null,
+     "here": 0.04,
      "leaving": null
     }
    }
   }
  ],
- "tables": [],
+ "tables": [
+  {
+   "id": "t1",
+   "name": "Adventure is out there!!",
+   "system": "D&D 5e",
+   "pitch": "WHOOOOOOOOOO!",
+   "seats": 20,
+   "walk_ins": true,
+   "start": 1,
+   "end": 25,
+   "dm": "p1",
+   "created_at": "2026-09-19T10:30:55.516367-04:00",
+   "signups": [],
+   "pad": 0
+  }
+ ],
  "events": []
 }
