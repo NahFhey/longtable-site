@@ -816,7 +816,7 @@ function renderDetail(focus = false) {
   state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
-  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. In your game room, Player Options lets you get food, visit the lounge, return to your table, or roll dice. Public rolls appear here.", "join-instructions");
+  if (state.archive) append(panel, "p", "Saved roster for this event.", "muted");
   append(panel, "h3", "Roster");
   const list = append(panel, "ul");
   if (view.roster.length === 0) append(list, "li", "No signups yet.", "muted");
@@ -879,7 +879,7 @@ function renderTableList() {
     append(details, "dt", "DM"); append(details, "dd", view.dm);
     append(details, "dt", "Window"); append(details, "dd", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)}`);
     append(details, "dt", "Signups"); append(details, "dd", `${view.signupCount}/${view.seats}${view.walkIns ? "; walk-ins welcome" : ""}`);
-    append(article, "p", state.archive ? "Saved roster for this event." : "Sign up using Join on the Discord tables board.", "join-instructions");
+    if (state.archive) append(article, "p", "Saved roster for this event.", "muted");
     append(article, "p", "Roster", "muted");
     const roster = append(article, "ul", undefined, "roster");
     if (view.roster.length === 0) append(roster, "li", "No signups yet.");

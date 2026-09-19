@@ -195,22 +195,20 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
-Edit `event-config.mjs` for each event, matching both its published name and exact
-start string. Unmatched events and explicit sample mode show no configured links.
-Only absolute HTTPS destinations without embedded credentials are accepted; labels
-are rendered as text. The current Longtable test event has a Discord link only.
-Do not automatically attach a fundraiser action to every event.
+The header contains one **Discord** link. Update `DISCORD_INVITE` in
+`event-config.mjs` to change its destination; it is shared across current events
+without depending on their names or dates. Samples and archived replays suppress
+current community links. Table cards and details do not repeat signup instructions.
+The old Discord QR asset is retained for compatibility but is not displayed for
+the current invite.
 
-Both supplied QR images are copied byte-for-byte into `assets/events/`, within the
-Pages artifact. Decoding the originals on September 18 verified:
+Optional event actions in `EVENT_CONFIG` still match the event name and exact
+start string. Only absolute HTTPS URLs without credentials are accepted. Labels
+are rendered as text. The Extra Life action is documented but not enabled by
+default. Any supplied QR image must be verified against its configured destination;
+an image failure leaves the direct link usable.
 
-- `discord-k6GYjek53-qr.png`: `https://discord.gg/k6GYjek53`
-- `extra-life-team-74917-qr.png`: `https://dd.extra-life.org/teams/74917`
-
-The Extra Life action is documented in the configuration but not enabled for the
-current test event. Desktop exposes **Show QR**; mobile keeps the direct links.
-Re-decode any replacement image and compare it to the configured destination.
-QR image failure leaves the direct link usable. Static props are locally drawn
+Static props are locally drawn
 geometric maps, GM screens, dice trays, and close-view accessories; no additional
 art license or bot event is needed.
 

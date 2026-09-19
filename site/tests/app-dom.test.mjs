@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRoomLayout, seatPositionForPlan } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
+import { DISCORD_INVITE } from "../event-config.mjs";
 
 class FakeNode {
   constructor(tag = "div") {
@@ -328,14 +329,19 @@ test("a captured drag suppresses table clicks; a fresh tap selects with transfor
   assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[1].name);
 });
 
-test("production renders matching event actions and sample mode never displays real event links", async () => {
+test("production has one community link and no repeated Discord signup instructions", async () => {
   const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   production.event.name = "Longtable";
-  production.event.start = "2026-09-17T13:00:00-04:00";
+  production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  assert.equal(actions.children[0].href, "https://discord.gg/k6GYjek53");
-  assert.equal(actions.children[1].children[1].children[0].src, "./assets/events/discord-k6GYjek53-qr.png");
+  assert.equal(actions.children.length, 1);
+  assert.equal(actions.children[0].href, DISCORD_INVITE);
+  assert.equal(actions.children[0].textContent, "Discord");
+  assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
+  const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
+  button.listeners.get("click")();
+  assert.doesNotMatch(allText(app.nodes.get("detail")), /Discord|Sign up using Join/);
   const sample = await runApp([production], "sample-actions");
   assert.equal(sample.nodes.get("event-actions").children.length, 0);
 });

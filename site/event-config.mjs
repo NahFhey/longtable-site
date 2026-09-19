@@ -1,15 +1,9 @@
-// Transitional, trusted per-event configuration. Match both fields when the bot starts a new event.
-// QR destinations were decoded from the original event-assets PNGs before copying.
-export const EVENT_CONFIG = [{
-  name: "Longtable",
-  start: "2026-09-17T13:00:00-04:00",
-  links: [{ label: "Join us on Discord", url: "https://discord.gg/k6GYjek53", qr: "./assets/events/discord-k6GYjek53-qr.png" }],
-}, {
-  name: "Longtable",
-  start: "2026-09-17T15:00:00-04:00",
-  links: [{ label: "Join us on Discord", url: "https://discord.gg/k6GYjek53", qr: "./assets/events/discord-k6GYjek53-qr.png" }],
-}];
-// For the appropriate fundraiser event, add:
+// The current community invite is defined once and used by the header.
+export const DISCORD_INVITE = "https://discord.gg/tc9NqpjBrb";
+
+// Optional actions for a specific event must match its name and exact start.
+export const EVENT_CONFIG = [];
+// For the appropriate fundraiser event, configure this additional link:
 // { label: "Donate to Extra Life", url: "https://dd.extra-life.org/teams/74917", qr: "./assets/events/extra-life-team-74917-qr.png" }
 
 export function validatedActions(links) {
@@ -26,5 +20,9 @@ export function validatedActions(links) {
 }
 
 export function eventActions(event, configurations = EVENT_CONFIG) {
-  return validatedActions(configurations.find((config) => config.name === event.name && config.start === event.start)?.links);
+  const extra = configurations.find(config => config.name === event.name && config.start === event.start)?.links;
+  return [
+    ...validatedActions([{ label: "Discord", url: DISCORD_INVITE }]),
+    ...validatedActions(extra).filter(action => action.url !== DISCORD_INVITE),
+  ];
 }
