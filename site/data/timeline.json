@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:08:44.797981Z",
+ "generated_at": "2026-09-19T15:10:01.382557Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -114,6 +114,15 @@
    "at": 1.28,
    "duration": null,
    "text": "YEAH A 15!! WHOOOOOOOO!",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e4",
+   "kind": "donation",
+   "at": 1.32,
+   "duration": null,
+   "text": "have fun everyone",
    "person": "p1",
    "by": "p1"
   }
