@@ -60,7 +60,7 @@ function timeline(schema = 2) {
   ];
   return {
     schema,
-    ...(schema === 4 ? { room_layout: { version: 1, pad_capacity: 20, overflow_capacity: 120 } } : {}),
+    ...(schema >= 4 ? { room_layout: { version: 1, pad_capacity: 20, overflow_capacity: 120 } } : {}),
     phase: "live",
     generated_at: "2026-11-07T15:01:00Z",
     event: { name: "Test hall", start: "2026-11-07T10:00:00-05:00", tz: "America/New_York", slot_minutes: 30, slots: 8 },
@@ -84,8 +84,8 @@ function event(id, kind, at, overrides = {}) {
   return { id, kind, at, duration, text, person: target, by: "admin", ...overrides };
 }
 
-test("schema 1–4 are accepted, unknown fields are ignored, and 0/5 are rejected", () => {
-  for (const schema of [1, 2, 3, 4]) {
+test("schema 1–5 are accepted, unknown fields are ignored, and 0/6 are rejected", () => {
+  for (const schema of [1, 2, 3, 4, 5]) {
     const input = timeline(schema);
     input.unknown_top = "ignored";
     input.event.future_field = 42;
@@ -96,7 +96,7 @@ test("schema 1–4 are accepted, unknown fields are ignored, and 0/5 are rejecte
     assert.equal("future_field" in result.event, false);
     assert.equal("future_field" in result.people[0], false);
   }
-  for (const schema of [0, 5]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
+  for (const schema of [0, 6]) assert.throws(() => validateTimeline({ ...timeline(), schema }), TimelineError);
 });
 
 test("custom appearances survive live reconciliation and defaults preserve old characters", () => {

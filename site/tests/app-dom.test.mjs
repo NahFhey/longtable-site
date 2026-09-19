@@ -171,7 +171,7 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  sample.schema = 5;
+  sample.schema = 6;
   const app = await runApp([sample], "bad-schema");
   assert.match(app.nodes.get("status").textContent, /unsupported schema/i);
   assert.equal(app.nodes.get("status").className, "status error");
@@ -188,7 +188,7 @@ test("a bad live refresh retains the last good rendered table list", async () =>
   sample.event.start = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}:00${sign}${hh}:${mm}`;
   sample.generated_at = new Date(Date.now() - 10_000).toISOString();
   const bad = structuredClone(sample);
-  bad.schema = 5;
+  bad.schema = 6;
   bad.generated_at = new Date().toISOString();
   const app = await runApp([sample, bad], "refresh-retention", { search: "" });
   const before = allText(app.nodes.get("tables"));
@@ -512,7 +512,7 @@ test("sequential replay and reload at the resulting slot paint the same lifecycl
     app.imageCalls.length = 0;
     app.rectCalls.length = 0;
     app.frames.shift()?.(baseline + frame * 100);
-    seen.add(allText(app.nodes.get("detail")).match(/At selected time: ([A-Za-z ]+?) DM/)?.[1] || "");
+    seen.add(app.nodes.get("detail").children.find((node) => node.className === "table-phase")?.textContent.replace("At selected time: ", "") || "");
     const slot = Number(app.nodes.get("scrubber").value);
     if (slot > 2 && slot < 2.4) capture = { slot, map: app.rectCalls.filter((call) => call.color === "#eee0b9") };
   }
@@ -586,4 +586,32 @@ test("an unavailable archive fails visibly without falling back to live or sampl
   const app = await runApp([new Error("Missing archive")], "archive-missing", { archive: true, search: "?sample=1" });
   assert.match(app.nodes.get("status").textContent, /could not be loaded/);
   assert.deepEqual(app.fetchUrls, ["https://longtable.test/project/events/0123456789abcdef0123456789abcdef/timeline.json"]);
+});
+
+test("recorded dice stay accessible without canvas and reconstruct on seek/reload", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.schema = 5;
+  const table = data.tables[0];
+  data.events = [{ id: "roll-test", kind: "roll", at: table.start + .125, duration: null,
+    text: null, person: table.dm, by: table.dm, table: table.id, visibility: "public",
+    roll: { expression: "2d6+3", sides: 6, faces: [3, 4], modifier: 3, total: 10 } }];
+  const slot = data.events[0].at + 1.5 / (data.event.slot_minutes * 60);
+  const app = await runApp([data], "dice-seek", { search: `?sample=1&at=${slot}` });
+  assert.match(allText(app.nodes.get("tables")), /2d6\+3: \[3, 4\] \+3 = 10/);
+  const diceRects = (value) => value.rectCalls.filter((call) => call.color === "#f7efd8");
+  assert.equal(diceRects(app).length, 2);
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: String(table.start) } });
+  app.rectCalls.length = 0;
+  app.frames.shift()?.(performance.now() + 100);
+  assert.equal(diceRects(app).length, 0);
+  assert.doesNotMatch(allText(app.nodes.get("tables")), /2d6/);
+  const reload = await runApp([data], "dice-reload", { search: `?sample=1&at=${slot}`, noContext: true });
+  assert.match(allText(reload.nodes.get("tables")), /2d6\+3: \[3, 4\] \+3 = 10/);
+  assert.deepEqual(reload.errors, []);
+  const privateData = structuredClone(data);
+  privateData.events[0].visibility = "private";
+  privateData.events[0].roll.expression = "PRIVATE SECRET";
+  const rejected = await runApp([privateData], "private-dice-rejected");
+  assert.doesNotMatch(allText(rejected.nodes.get("tables")), /PRIVATE SECRET/);
+  assert.doesNotMatch(rejected.errors.join(" "), /PRIVATE SECRET/);
 });

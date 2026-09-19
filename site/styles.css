@@ -48,6 +48,7 @@ button:disabled, select:disabled, input:disabled { opacity: .55; cursor: not-all
 .eyebrow { margin: 0; color: var(--gold); font-size: .72rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
 h1 { margin: .1rem 0 0; font-size: clamp(1.35rem, 3vw, 2rem); line-height: 1.05; }
 .record-note { margin: .35rem 0 0; color: var(--gold); font-weight: 750; }
+.dice-result { color: var(--gold); overflow-wrap: anywhere; }
 .readout { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
 .readout time { color: var(--gold); font: 800 1.4rem/1 ui-monospace, monospace; }
 #scene-event { color: #ffbd63; font-weight: 800; }

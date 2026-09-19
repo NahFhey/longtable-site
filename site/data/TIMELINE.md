@@ -19,7 +19,11 @@ freeze table locations and room geometry. Appearance remains required. Deploy th
 schema-4 site reader before restarting the writer. Schemas 1–3 retain their
 original index-based layout; missing historical pad assignments are not recoverable.
 
-A full fake day that exercises every field is in `timeline.sample.json`
+Amended for Milestone G to **schema 5**: public recorded dice events. The reader
+accepts schemas 1–5 and must deploy before the schema-5 writer. Private state 4
+migrates to 5 while preserving event identity, window, pads, and existing records.
+
+A legacy schema-4 fake day is in `timeline.sample.json`
 (generated, deterministic; 8 DMs, 12 tables, 35 players, the organiser, 14 events).
 
 ## Conventions
@@ -43,17 +47,17 @@ A full fake day that exercises every field is in `timeline.sample.json`
   derives nothing from an id (not the sprite, not the name). The bot chooses
   them; they need not be Discord snowflakes.
 - **Order.** `people` is unordered. `tables` is in creation order (the site
-  uses saved pads for schema 4; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
+  uses saved pads for schemas 4–5; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
 
 ## Top level
 
 | field | type | notes |
 |---|---|---|
-| `schema` | int | `4` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads). Site refuses unknown majors. |
+| `schema` | int | `5` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads; schema 5 recorded dice). Site refuses unknown majors. |
 | `phase` | `"live"` \| `"final"` | `final` is the +14-day publish: names trimmed to first name + initial, bot retired. Site shows a "final record" note. |
 | `generated_at` | string | ISO 8601 UTC instant the bot wrote the file. Shown as "last updated". |
 | `event` | object | window config, below. |
-| `room_layout` | object | Required in schema 4. Version and capacities fixed for this event, below. |
+| `room_layout` | object | Required in schemas 4–5. Version and capacities fixed for this event, below. |
 | `people` | array | everyone who has ever signed up, created a table, or set presence. |
 | `tables` | array | current tables. Deleted tables are gone, not tombstoned. |
 | `events` | array | admin `/event` history plus attendee shouts and approved donations. |
@@ -98,14 +102,14 @@ not part of this contract. Creation or seat-count edits exceeding capacity are
 refused atomically; the reader rejects collisions and invalid capacities and keeps
 its last good live snapshot.
 
-Private state versions 1/2 migrate to version 4 once, assigning pads in the saved
+Private state versions 1/2 migrate to version 5 once, assigning pads in the saved
 array order and atomically saving before live use. Capacities come from setup
 configuration, enlarged only during migration if existing tables or seat counts
 require it. Subsequent restarts use the saved layout. Offline `--check` previews
 migration without writing. New events take configured capacities; the event window
 editor and clearing test records preserve the current room. Archive packages carry
 this layout version and capacities with their saved pads. Private version 3 keeps
-its pads when migrating to version 4, which also persists a random event identity
+its pads when migrating to version 5. Version 4 introduced a random event identity
 and authoritative event configuration. Neither enters the public live schema.
 
 ## `people[]`
@@ -117,7 +121,7 @@ and authoritative event configuration. Neither enters the public live schema.
 | `dm` | bool | holds the DM role at publish time. Rendered with the distinct DM look. |
 | `hidden` | bool | `/hide` was ever used. Honoured forever. `true` ⇒ `name`, `variant`, and `appearance` are `null`; site draws the generic unnamed sprite and no nametag, and never shows the id. |
 | `variant` | int \| null | unsigned 32-bit FNV-1a hash of the Discord user id string, computed once by the bot. Site maps it to a sprite (`variant % palette_size`), so the art can change without the file changing. `null` iff `hidden`. |
-| `appearance` | object \| null | Required in schemas 3 and 4. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
+| `appearance` | object \| null | Required in schemas 3–5. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
 | `presence.planned` | `[int, int]` \| null | event presence `[arrive, leave)`. `null` if the person never set it (e.g. a DM who only created a table — see DESIGN open item: creating a table leans toward auto-setting presence to cover it). |
 | `presence.actual.here` | number \| null | slot of `/here`, fractional. |
 | `presence.actual.leaving` | number \| null | slot of `/leaving`, fractional. |
@@ -146,9 +150,9 @@ latest of each and the site takes the effective range as given.
 | `walk_ins` | bool | walk-ins-welcome flag. Display only; does not change seat accounting. |
 | `start`, `end` | int | `[start, end)` slots, `end > start`. One DM's own tables never overlap; different DMs' tables may. |
 | `dm` | string | `people[].id` of the DM. Always present in `people`. |
-| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schema 4. |
+| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schemas 4–5. |
 | `signups` | array | seated players, ≤ `seats` entries. The DM is not in this list. |
-| `pad` | int | Required in schema 4. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
+| `pad` | int | Required in schemas 4–5. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
 
 ### `tables[].signups[]`
 
@@ -168,15 +172,41 @@ effective presence they are not drawn. Events (below) temporarily override this.
 | field | type | notes |
 |---|---|---|
 | `id` | string | opaque, stable. |
-| `kind` | `"break"` \| `"meal"` \| `"announce"` \| `"spotlight"` \| `"shout"` \| `"donation"` | closed set. New kinds are a schema bump because each needs its own scene reaction. `shout` and `donation` were added in schema 2. |
+| `kind` | `"break"` \| `"meal"` \| `"announce"` \| `"spotlight"` \| `"shout"` \| `"donation"` \| `"roll"` | closed set. New kinds are a schema bump because each needs its own scene reaction. `shout` and `donation` were added in schema 2. |
 | `at` | number | slot the event entered the timeline, fractional: when the admin issued it, when the person reacted, or when the table DM approved the custom message. |
-| `duration` | number \| null | slots, fractional (`0.5` = 15 min). Required for `break` and `meal`; `null` for `announce`, `spotlight`, `shout` and `donation` (the site uses a fixed reaction length). |
-| `text` | string \| null | `announce`: the message, ≤ 280 chars, required. `meal`: optional label ("Dinner"). `spotlight`: optional reason line. `shout`: the quick-reaction phrase chosen, ≤ 80 chars, required. `donation`: the DM-approved custom table message, ≤ 80 chars, required, verbatim after controls are stripped and whitespace is collapsed. `break`: `null`. |
-| `person` | string \| null | `spotlight`: the person spotlighted. `shout`: the quick reactor. `donation`: the player who submitted the custom message. All `people[].id`, required for those three kinds. `null` otherwise. |
-| `by` | string | `people[].id` of the person whose action put this event in the timeline: the admin for the four admin kinds; the table DM for `donation`; the reacting person for `shout` (so `by == person`). Never null. Informational. |
+| `duration` | number \| null | slots, fractional (`0.5` = 15 min). Required for `break` and `meal`; `null` for `announce`, `spotlight`, `shout`, `donation`, and `roll` (the site uses a fixed reaction length). |
+| `text` | string \| null | `announce`: the message, ≤ 280 chars, required. `meal`: optional label ("Dinner"). `spotlight`: optional reason line. `shout`: the quick-reaction phrase chosen, ≤ 80 chars, required. `donation`: the DM-approved custom table message, ≤ 80 chars, required, verbatim after controls are stripped and whitespace is collapsed. `break` and `roll`: `null`. |
+| `person` | string \| null | `spotlight`: the person spotlighted. `shout`: the quick reactor. `donation`: the player who submitted the custom message. All `people[].id`, required for those kinds. `roll`: the roller, required. `null` otherwise. |
+| `by` | string | `people[].id` of the person whose action put this event in the timeline: the admin for the four admin kinds; the table DM for `donation`; the reacting person for `shout` or `roll` (so `by == person`). Never null. Informational. |
 
 Scene reactions are the site's business and are listed in DESIGN.md; the file
 records only what was issued and when.
+
+### Dice (schema 5)
+
+A `roll` additionally requires `table` (an existing opaque table ID), `visibility`
+(`"public"`), and `roll` with exactly `expression`, `sides`, `faces`, `modifier`,
+and `total`. `person` and `by` identify the roller and must match. `duration` and
+`text` are null. Other event kinds do not carry dice fields.
+
+The command visibility enum is `public | private`. Private outcomes are ephemeral
+and are never stored, assigned event IDs, exported, or archived; no occurrence
+marker is published. A public payload with private visibility is invalid.
+
+Expressions normalize to `NdS`, optionally followed by a nonzero signed modifier.
+N is 1–20; S is one of 4, 6, 8, 10, 12, 20, 100. Modifier is an integer from −1000
+to +1000. `faces` contains N integers in `[1, S]`; `total` equals their sum plus
+the modifier. For example, `2d6+3`, faces `[3,4]`, modifier `3`, total `10`.
+The bot generates each face once with `secrets.randbelow`; the browser never rolls.
+
+The latest result at or before selected time is displayed per table. Equal-time
+rolls retain input order. A deterministic three-second 2D toss uses selected time
+and an event seed, then settles on the recorded faces. Up to six dice are drawn;
+the accessible result includes every face, modifier, and total. Reduced motion
+settles immediately. No system-specific critical/fumble claim is inferred.
+Hiding the roller applies through the opaque person reference; text contains no
+copied identity. Moderation can remove a public roll. Deleting a table also removes
+its rolls under the existing final-snapshot retention model.
 
 ### Shouts (schema 2)
 
@@ -235,7 +265,7 @@ records only what was issued and when.
 
 ## Archive package (Milestone E)
 
-The timeline remains schema 4. A separate archive envelope (`archive.json`, format
+New timelines use schema 5; older frozen packages retain their original schema. A separate archive envelope (`archive.json`, format
 1) records `event_id`, `preserved_at`, `fidelity: "final-schedule"`,
 `presentation_version: 1`, renderer SHA-256, timeline schema, and `room_layout`.
 It lives beside `index.html` and `timeline.json` at `events/<event-id>/`. Event

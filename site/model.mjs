@@ -2,8 +2,8 @@ import { CHOICE_COUNTS } from "./characters.mjs";
 
 const ADMIN_KINDS = new Set(["break", "meal", "announce", "spotlight"]);
 const SPEECH_KINDS = new Set(["shout", "donation"]);
-const ALL_KINDS = new Set([...ADMIN_KINDS, ...SPEECH_KINDS]);
-const POINT_KINDS = new Set(["announce", "spotlight", "shout", "donation"]);
+const ALL_KINDS = new Set([...ADMIN_KINDS, ...SPEECH_KINDS, "roll"]);
+const POINT_KINDS = new Set(["announce", "spotlight", "shout", "donation", "roll"]);
 
 export const PALETTE_SIZE = 15;
 export const ANNOUNCE_MINUTES = 8;
@@ -100,7 +100,7 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (schema !== 1 && schema !== 2 && schema !== 3 && schema !== 4) fail("This timeline uses an unsupported schema version.");
+  if (![1, 2, 3, 4, 5].includes(schema)) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -159,7 +159,7 @@ export function validateTimeline(input) {
     personById.set(person.id, person);
   }
 
-  const room_layout = schema === 4 ? validateRoomLayout(required(root, "room_layout", "timeline")) : null;
+  const room_layout = schema >= 4 ? validateRoomLayout(required(root, "room_layout", "timeline")) : null;
   const tableIds = new Set();
   const tables = array(required(root, "tables", "timeline"), "timeline.tables").map((raw, index) => {
     const label = `timeline.tables[${index}]`;
@@ -213,7 +213,7 @@ export function validateTimeline(input) {
     if (eventIds.has(id)) fail("timeline.events contains duplicate identifiers.");
     eventIds.add(id);
     const kind = string(required(item, "kind", label), `${label}.kind`);
-    if (!ALL_KINDS.has(kind) || (schema === 1 && !ADMIN_KINDS.has(kind))) fail(`${label}.kind is unsupported for this schema.`);
+    if (!ALL_KINDS.has(kind) || (schema === 1 && !ADMIN_KINDS.has(kind)) || (kind === "roll" && schema < 5)) fail(`${label}.kind is unsupported for this schema.`);
     const at = number(required(item, "at", label), `${label}.at`, { min: 0, max: event.slots });
     const duration = number(required(item, "duration", label), `${label}.duration`, { min: 0, max: event.slots, nullable: true });
     const textMax = kind === "announce" ? 280 : SPEECH_KINDS.has(kind) ? 80 : Infinity;
@@ -226,16 +226,75 @@ export function validateTimeline(input) {
     if ((kind === "break" || kind === "meal") && duration <= 0) fail(`${label}.duration must be positive.`);
     if (kind === "break" && text !== null) fail(`${label}.text is inconsistent with its kind.`);
     if ((kind === "announce" || kind === "shout" || kind === "donation") && (text === null || text.length === 0)) fail(`${label}.text is required for its kind.`);
-    if ((kind === "spotlight" || kind === "shout" || kind === "donation") !== (person !== null)) fail(`${label}.person is inconsistent with its kind.`);
+    if ((kind === "spotlight" || kind === "shout" || kind === "donation" || kind === "roll") !== (person !== null)) fail(`${label}.person is inconsistent with its kind.`);
     if ((kind === "break" || kind === "announce") && text !== null && kind !== "announce") fail(`${label}.text is inconsistent with its kind.`);
-    return { id, kind, at, duration, text, person, by, _inputOrder: index };
-  }).sort((a, b) => a.at - b.at || a._inputOrder - b._inputOrder).map((item) => knownKeys(item, ["id", "kind", "at", "duration", "text", "person", "by"]));
+    let dice = {};
+    if (kind === "roll") {
+      if (item.visibility !== "public" || text !== null || by !== person) fail(`${label} has invalid roll visibility or attribution.`);
+      const table = string(required(item, "table", label), `${label}.table`, { min: 1 });
+      if (!tables.some((candidate) => candidate.id === table)) fail(`${label}.table does not resolve.`);
+      dice = { table, visibility: "public", roll: validateRoll(item.roll) };
+    } else if (["roll", "visibility", "table"].some((key) => item[key] != null)) fail(`${label} has unexpected dice fields.`);
+    return { id, kind, at, duration, text, person, by, ...dice, _inputOrder: index };
+  }).sort((a, b) => a.at - b.at || a._inputOrder - b._inputOrder).map((item) => knownKeys(item, item.kind === "roll"
+    ? ["id", "kind", "at", "duration", "text", "person", "by", "table", "visibility", "roll"]
+    : ["id", "kind", "at", "duration", "text", "person", "by"]));
 
   return { schema, phase, generated_at, event, people, tables, events, room_layout };
 }
 
 export function slotToMs(timeline, slot) {
   return Date.parse(timeline.event.start) + slot * timeline.event.slot_minutes * 60_000;
+}
+
+export function validateRoll(value) {
+  const roll = object(value, "roll");
+  if (Object.keys(roll).sort().join(",") !== "expression,faces,modifier,sides,total") fail("Invalid roll fields.");
+  const sides = number(roll.sides, "roll.sides", { integer: true });
+  if (![4, 6, 8, 10, 12, 20, 100].includes(sides)) fail("Unsupported die size.");
+  const modifier = number(roll.modifier, "roll.modifier", { integer: true, min: -1000, max: 1000 });
+  const faces = array(roll.faces, "roll.faces").map((face) => number(face, "roll.face", { integer: true, min: 1, max: sides }));
+  if (faces.length < 1 || faces.length > 20) fail("Invalid dice count.");
+  const expression = `${faces.length}d${sides}${modifier ? `${modifier > 0 ? "+" : ""}${modifier}` : ""}`;
+  const total = number(roll.total, "roll.total", { integer: true });
+  if (roll.expression !== expression || total !== faces.reduce((sum, face) => sum + face, modifier)) fail("Recorded dice total or expression is inconsistent.");
+  return { expression, sides, faces, modifier, total };
+}
+
+const DICE_CACHE = new WeakMap();
+export function diceAt(timeline, tableId, slot, reducedMotion = false) {
+  let tables = DICE_CACHE.get(timeline);
+  if (!tables) {
+    tables = new Map();
+    for (const event of timeline.events) if (event.kind === "roll" && event.visibility === "public") {
+      if (!tables.has(event.table)) tables.set(event.table, []);
+      tables.get(event.table).push(event);
+    }
+    DICE_CACHE.set(timeline, tables);
+  }
+  const rolls = tables.get(tableId) || [];
+  let low = 0, high = rolls.length;
+  while (low < high) { const middle = (low + high) >>> 1; if (rolls[middle].at <= slot) low = middle + 1; else high = middle; }
+  if (!low) return null;
+  const event = rolls[low - 1];
+  const elapsed = Math.max(0, (slot - event.at) * timeline.event.slot_minutes * 60);
+  const progress = reducedMotion ? 1 : Math.min(1, elapsed / 3);
+  let seed = 2166136261;
+  for (const char of event.id) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619) >>> 0;
+  return { event, progress, dice: event.roll.faces.slice(0, 6).map((face, index) => {
+    const direction = (seed >>> (index * 4)) & 1 ? 1 : -1;
+    return { face, x: index % 3 + direction * (1 - progress) * 1.2,
+      y: Math.floor(index / 3) - Math.sin(progress * Math.PI) * .55,
+      angle: direction * (1 - progress) * Math.PI * (2 + index) };
+  }) };
+}
+
+export function diceText(timeline, event) {
+  if (!event || event.kind !== "roll" || event.visibility !== "public") return "No public roll at this time.";
+  const who = displayName(timeline.people.find((person) => person.id === event.person));
+  const roll = event.roll;
+  const modifier = roll.modifier ? ` ${roll.modifier > 0 ? "+" : ""}${roll.modifier}` : "";
+  return `${who} rolled ${roll.expression}: [${roll.faces.join(", ")}]${modifier} = ${roll.total}.`;
 }
 
 export function msToSlot(timeline, milliseconds) {

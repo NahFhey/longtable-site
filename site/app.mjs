@@ -10,6 +10,8 @@ import {
   createLiveState,
   crossedSpeechEvents,
   displayName,
+  diceAt,
+  diceText,
   indexAdminEvents,
   personTooltip,
   reconcileLiveSnapshot,
@@ -68,6 +70,8 @@ const state = {
   lastTime: 0,
   tablePhaseNodes: new Map(),
   detailPhaseNode: null,
+  tableDiceNodes: new Map(),
+  detailDiceNode: null,
   lastUrlWrite: 0,
   camera: null,
   manualCamera: false,
@@ -425,6 +429,23 @@ function drawTables() {
   });
 }
 
+function drawDice(index, view) {
+  if (!view || state.camera.zoom < 12) return;
+  const seat = seatPosition(index, 0);
+  const unit = TILE * SCALE;
+  for (const die of view.dice) {
+    ctx.save();
+    ctx.translate((seat.tableX + .55) * unit + die.x * 23, (seat.tableY + .45) * unit + die.y * 17);
+    ctx.rotate(die.angle);
+    ctx.fillStyle = "#f7efd8"; ctx.fillRect(-7, -7, 14, 14);
+    ctx.fillStyle = "#201c27"; ctx.font = "bold 9px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(die.face), 0, 0);
+    ctx.restore();
+  }
+  drawLabel(`${view.event.roll.expression} = ${view.event.roll.total}`, seat.tableX + 1.5, seat.tableY + 2.25,
+    { size: 4, color: "#fff2cd" });
+}
+
 function drawStaff(staff) {
   const unit = TILE * SCALE;
   const x = staff.x * unit, y = staff.y * unit;
@@ -625,6 +646,11 @@ function render(now, active) {
   drawRoom();
   drawTables();
   [...state.people.values()].filter((person) => person.visible).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
+  state.data.tables.forEach((table, index) => {
+    if (tableLifecycle(state.data, table, state.time).phase === "active") {
+      drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
+    }
+  });
   drawTableLabels();
   drawEvents(active, now);
 }
@@ -638,6 +664,7 @@ function renderDetail(focus = false) {
   const panel = $("detail");
   panel.replaceChildren();
   state.detailPhaseNode = null;
+  state.detailDiceNode = null;
   const table = state.data.tables.find((candidate) => candidate.id === state.selectedId);
   if (!table) {
     append(panel, "h2", "Table details");
@@ -650,9 +677,10 @@ function renderDetail(focus = false) {
   append(panel, "p", view.system, "system");
   append(panel, "p", view.pitch);
   state.detailPhaseNode = append(panel, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase");
+  state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
-  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. Use Set Up My Table to host a game.", "join-instructions");
+  append(panel, "p", state.archive ? "Saved roster for this event." : "In Discord, open the tables board and use Join. Use Set Up My Table to host a game. While playing, use /roll in #signup; choose Public to save the result here.", "join-instructions");
   append(panel, "h3", "Roster");
   const list = append(panel, "ul");
   if (view.roster.length === 0) append(list, "li", "No signups yet.", "muted");
@@ -671,6 +699,7 @@ function renderTableList() {
   const host = $("tables");
   host.replaceChildren();
   state.tablePhaseNodes.clear();
+  state.tableDiceNodes.clear();
   if (state.data.tables.length === 0) { append(host, "p", "No tables have been posted.", "muted"); return; }
   const grid = append(host, "div", undefined, "table-grid");
   for (const table of state.data.tables) {
@@ -683,6 +712,10 @@ function renderTableList() {
     button.addEventListener("click", () => selectTable(table.id, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
     state.tablePhaseNodes.set(table.id, append(article, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase"));
+    const diceNode = append(article, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
+    diceNode.setAttribute("aria-live", "polite");
+    diceNode.setAttribute("aria-atomic", "true");
+    state.tableDiceNodes.set(table.id, diceNode);
     const details = append(article, "dl");
     append(details, "dt", "DM"); append(details, "dd", view.dm);
     append(details, "dt", "Window"); append(details, "dd", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)}`);
@@ -717,6 +750,10 @@ function updateHeader(active) {
   badge.className = `badge${following ? " live" : ""}`;
   for (const table of state.data.tables) {
     const text = `At selected time: ${tableLifecycle(state.data, table, state.time).label}`;
+    const result = diceText(state.data, diceAt(state.data, table.id, state.time)?.event);
+    const diceNode = state.tableDiceNodes.get(table.id);
+    if (diceNode && diceNode.textContent !== result) diceNode.textContent = result;
+    if (state.selectedId === table.id && state.detailDiceNode && state.detailDiceNode.textContent !== result) state.detailDiceNode.textContent = result;
     const node = state.tablePhaseNodes.get(table.id);
     if (node && node.textContent !== text) node.textContent = text;
     if (state.selectedId === table.id && state.detailPhaseNode && state.detailPhaseNode.textContent !== text) state.detailPhaseNode.textContent = text;

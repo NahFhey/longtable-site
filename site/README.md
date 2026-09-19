@@ -37,11 +37,11 @@ DOM through created nodes and `textContent`, never HTML injection sinks.
 
 The data contract is `data/TIMELINE.md`. `bot/longtable/publish.py` atomically
 writes the production `data/timeline.json`; do not edit that generated file by
-hand. The site fetches it with `cache: "no-store"`, validates schemas 1–4,
+hand. The site fetches it with `cache: "no-store"`, validates schemas 1–5,
 and retains its last good snapshot if a live refresh is unavailable or invalid.
 Schema 3 adds attendee-selected appearance; older records retain their original
 look. Schema 4 adds persisted pads and event room capacity. Deploy this reader
-before restarting a bot that publishes schema 4.
+before restarting a bot that publishes schema 5.
 
 Opaque identifiers are used only for in-memory joins. They are not displayed
 or used to choose a sprite. Hidden people are rendered and described as
@@ -58,14 +58,14 @@ The page is intentionally marked `noindex`; access control is out of scope.
 
 ## Great Hall doorway and camera
 
-The September 18 upgrade implements milestones A/B/C/D/E/F and leaves the bot's
+The September 18 upgrade implements milestones A/B/C/D/E/F/G and leaves the bot's
 generated production timeline untouched. Schema 4 uses saved table pads and a
 versioned room layout: deleting a table never moves retained tables, and the
 entrance, stage, food, lounge, and overflow bounds stay fixed across refreshes.
 Legacy schemas 1–3 keep their index-based geometry. Layout and seating helpers in
 `model.mjs` reject collisions and exhausted capacity; camera transforms remain in
 `camera.mjs`. Past-event discovery and anonymous setup/cleanup staff are implemented;
-dice and audio are later milestones.
+recorded dice are implemented; audio is a later milestone.
 See `data/TIMELINE.md` for geometry, migration, and overflow reservation rules.
 
 On desktop the hall precedes the table list. At 650px and below, the actual DOM
@@ -164,6 +164,22 @@ counts. Pause stops them; seek/reload reconstructs the same scene. Reduced motio
 omits moving staff and snaps map unfolding while retaining the same furniture stage.
 No new recorded events or history claims are introduced.
 
+### Recorded dice (Milestone G)
+
+Schema 5 adds validated public dice outcomes. The latest result at selected time
+appears in each table card and its details, including all faces and the modifier.
+The canvas draws up to six dice on a deterministic three-second toss, seeded by
+event identity and driven entirely by selected time; it always settles on the
+saved faces. Pausing, seeking, reloading, and archives do not reroll. Reduced motion
+shows settled dice immediately. Text results work when canvas or assets fail.
+
+Private results are never sent to the site; a roll marked private is rejected,
+not rendered. A hidden roller is someone. Result text does not assume a game system
+or announce critical hits. The existing schema-4 sample remains a compatibility
+fixture; `dice.test.mjs`, DOM tests, and bot archive tests cover schema-5 outcomes.
+Deploy this reader before the updated bot. Existing archives keep their frozen
+renderer and schema. The schema-5 reader must be live before restarting the bot.
+
 ### Transitional event actions
 
 Edit `event-config.mjs` for each event, matching both its published name and exact
@@ -208,7 +224,7 @@ dedicated publishing checkout for manual promotion. Website deployment does not
 require restarting the testing bot.
 
 Verification: all site test files pass, the sample passes `check_timeline.py`, and
-all 260 bot tests pass using `bot/.venv/bin/python` (system Python lacks discord.py).
+all 268 bot tests pass using `bot/.venv/bin/python` (system Python lacks discord.py).
 Desktop and 390px mobile browser checks covered sparse framing, table details,
 mobile disclosure, labels, and the twelve-table sample without console errors.
 Touch pinch/drag, failed assets, unavailable canvas, and camera bounds are also
@@ -221,3 +237,9 @@ seek/reload. A local synthetic finalized archive was opened from the index in a
 browser; setup and cleanup rendered with unchanged rosters and no console errors.
 Deploy the updated site before restarting the bot, then run `--archives-index` to
 create or backfill the catalog. With no finalized archives, the index is empty.
+
+Milestone G verification: 268 bot tests and ten site test files pass, including
+private-result exclusion, public archive moderation, schema migration, command
+visibility defaults, failed saves, deterministic frames, and accessible results
+without canvas. A synthetic finalized archive was checked in a browser for hidden
+identity, settled faces, total, and seek/reload behavior. No live event was changed.
