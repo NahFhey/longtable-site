@@ -134,7 +134,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T19:40:10.086045Z",
+ "generated_at": "2026-09-19T20:26:21.742709Z",
  "event": {
   "name": "Tater testers",
   "start": "2026-09-19T10:30:00-04:00",
@@ -674,6 +674,15 @@
    "at": 10.07,
    "duration": null,
    "text": "Huzzah!",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e20",
+   "kind": "shout",
+   "at": 11.88,
+   "duration": null,
+   "text": "Roll for initiative!",
    "person": "p1",
    "by": "p1"
   }
