@@ -24,6 +24,14 @@
    "actor": "p1",
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "f8e5cfe3cd8a49ba9d4b02bce4ff77da",
+   "at": "2026-09-19T16:21:03.856767Z",
+   "action": "move_table",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -38,7 +46,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T16:20:44.981887Z",
+ "generated_at": "2026-09-19T16:21:06.536107Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -104,6 +112,11 @@
      "at": 3.6901685922222223,
      "table": "t1",
      "destination": "lounge"
+    },
+    {
+     "at": 3.7021426483333335,
+     "table": "t1",
+     "destination": "table"
     }
    ],
    "presence": {
@@ -261,6 +274,26 @@
    "text": "Roll for initiative!",
    "person": "p1",
    "by": "p1"
+  },
+  {
+   "id": "e11",
+   "kind": "roll",
+   "at": 3.7021426483333335,
+   "duration": null,
+   "text": null,
+   "person": "p1",
+   "by": "p1",
+   "table": "t1",
+   "visibility": "public",
+   "roll": {
+    "expression": "1d20",
+    "sides": 20,
+    "faces": [
+     16
+    ],
+    "modifier": 0,
+    "total": 16
+   }
   }
  ]
 }
