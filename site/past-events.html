@@ -9,15 +9,18 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#archives">Skip to past events</a>
+  <div class="site-bar">
+    <a class="wordmark" href="./" aria-label="Longtable home"><img src="./assets/favicon.svg" width="32" height="32" alt="">longtable<span class="wordmark-dot">.</span></a>
+    <nav class="site-nav" aria-label="Page navigation"><a href="./">Current event <span aria-hidden="true">↗</span></a></nav>
+  </div>
   <header class="masthead">
     <div class="identity">
-      <p class="eyebrow">The Great Hall</p>
       <h1>Past events</h1>
       <p>Replay the final saved schedule and attendance for an earlier event.</p>
-      <nav class="event-navigation" aria-label="Event navigation"><a href="./">Current event</a></nav>
     </div>
   </header>
-  <main class="archive-page">
+  <main id="archives" class="archive-page">
     <p>Archives appear after privacy finalization. Replays include retained records; deleted games and earlier edits are not reconstructed.</p>
     <p id="archive-status" role="status">Loading past events…</p>
     <button id="archive-retry" type="button" hidden>Try again</button>

@@ -37,8 +37,10 @@ function allText(node) {
 }
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
+  nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
+  nodes.get("activity-panel").append(nodes.get("activity-log"));
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
   if (options.backupFeed) nodes.get("backup-feed").setAttribute("content", options.backupFeed);
   const contextCalls = [];
@@ -291,7 +293,9 @@ test("mobile begins paused with a collapsed hall and visible details in the main
   const app = await runApp([sample], "mobile", { mobile: true });
   assert.equal(app.nodes.get("hall-explorer").open, false);
   assert.equal(app.nodes.get("play").textContent, "Play");
-  assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-content"));
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-content"));
+  assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));
+  assert.equal(app.nodes.get("activity-panel").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("table-list").parentElement, app.nodes.get("hall-content"));
 });
 
@@ -626,17 +630,31 @@ test("recorded dice stay accessible without canvas and reconstruct on seek/reloa
   assert.doesNotMatch(rejected.errors.join(" "), /PRIVATE SECRET/);
 });
 
-test('schema 6 visitor roster precedes games and week labels show dates without canvas', async () => {
+test('all attendees appear once with DM precedence and privacy preserved without canvas', async () => {
   const data = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
   data.schema = 6;
   data.event.slots = 336;
   const visitor = data.people.find(person => !person.dm);
   visitor.hidden = true; visitor.name = null; visitor.variant = null; visitor.appearance = null;
-  data.visitors = { open: true, people: [visitor.id] };
+  const dm = data.people.find(person => person.dm && !person.hidden);
+  const player = data.people.find(person => !person.dm && !person.hidden && data.tables.some(table => table.signups.some(signup => signup.person === person.id)));
+  const guest = { ...structuredClone(dm), id: 'guest-only', name: dm.name, dm: false };
+  data.people.push(guest);
+  data.visitors = { open: true, people: [visitor.id, dm.id, player.id, guest.id] };
   const app = await runApp([data], 'visitors-no-canvas', { noContext: true });
-  const text = allText(app.nodes.get('tables'));
-  assert.ok(text.indexOf('Visitors Table') < text.indexOf(data.tables[0].name));
-  assert.match(text, /someone/);
+  const attendees = app.nodes.get('attendees');
+  assert.equal(attendees.children.length, data.people.length);
+  assert.equal(app.nodes.get('attendees-heading').textContent, `Attendees (${data.people.length})`);
+  const sameNameRows = attendees.children.filter(row => row.children[0]?.textContent === dm.name);
+  assert.equal(sameNameRows.length, 2, 'distinct people sharing a display name remain distinct');
+  assert.deepEqual(new Set(sameNameRows.map(row => row.children[1].textContent)), new Set(['DM', 'Visitor']));
+  const playerRow = attendees.children.find(row => row.children[0]?.textContent === player.name);
+  assert.equal(playerRow.children[1].textContent, 'Player');
+  const anonymousRows = attendees.children.filter(row => row.children[0]?.textContent === 'someone');
+  assert.ok(anonymousRows.length > 0);
+  assert.ok(anonymousRows.every(row => row.children.length === 1), 'anonymous attendees do not expose roles');
+  assert.doesNotMatch(allText(attendees), new RegExp(visitor.id));
+  assert.doesNotMatch(allText(app.nodes.get('tables')), /Visitors Table/);
   assert.match(app.nodes.get('start-label').textContent, /Nov/);
   assert.notEqual(app.nodes.get('start-label').textContent, app.nodes.get('end-label').textContent);
 });
@@ -807,6 +825,13 @@ test("the timestamped activity log follows replay and paginates older public cha
   data.tables[0].name = "<script>literal text</script>";
   const app = await runApp([data], "activity-log", { search: "" });
   const log = app.nodes.get("activity-log");
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-layout"));
+  assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));
+  assert.equal(app.nodes.get("activity-panel").parentElement, app.nodes.get("hall-sidebar"));
+  const firstEntry = log.children[0];
+  const tableButton = app.nodes.get("tables").children[0].children[0].children[0].children[0];
+  tableButton.listeners.get("click")();
+  assert.equal(log.children[0], firstEntry, "selecting a table preserves the event log");
   assert.equal(log.children.length, 100);
   assert.equal(log.children[0].children[0].dateTime, data.activity[104].at);
   assert.match(allText(log), /<script>literal text<\/script>/);

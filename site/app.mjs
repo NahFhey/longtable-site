@@ -58,12 +58,13 @@ $("hall-explorer").open = !mobile.matches;
 function arrangeHall() {
   const main = $("hall-content");
   const explorer = $("hall-explorer");
+  const sidebar = $("hall-sidebar") ?? $("detail");
   if (mobile.matches) {
     main.insertBefore($("table-list"), explorer);
-    main.insertBefore($("detail"), explorer);
+    main.insertBefore(sidebar, explorer);
   } else {
-    main.append($("table-list"));
-    $("hall-layout").append($("detail"));
+    main.insertBefore($("table-list"), explorer.nextSibling);
+    $("hall-layout").append(sidebar);
   }
 }
 arrangeHall();
@@ -830,21 +831,34 @@ function selectTable(id, focus = false) {
   renderDetail(focus && state.selectedId !== null);
 }
 
+function renderAttendees() {
+  const list = $("attendees");
+  if (!list) return;
+  list.replaceChildren();
+  const dms = new Set(state.data.tables.map(table => table.dm));
+  const players = new Set(state.data.tables.flatMap(table => table.signups.map(signup => signup.person)));
+  const visitors = new Set(state.data.visitors.people);
+  // The validated people collection has one record per person, even across roles.
+  const people = [...state.data.people].sort((a, b) => displayName(a).localeCompare(displayName(b)));
+  $("attendees-heading").textContent = `Attendees (${people.length})`;
+  for (const person of people) {
+    const row = append(list, "li");
+    append(row, "span", displayName(person));
+    if (person.hidden) continue;
+    const role = person.dm || dms.has(person.id) ? "DM"
+      : players.has(person.id) ? "Player"
+      : visitors.has(person.id) ? "Visitor" : "Attendee";
+    append(row, "span", role, "attendee-role");
+  }
+  if (!people.length) append(list, "li", "No attendees yet.", "muted");
+}
+
 function renderTableList() {
   const host = $("tables");
   host.replaceChildren();
   state.tablePhaseNodes.clear();
   state.tableDiceNodes.clear();
-  if (state.data.schema >= 6) {
-    const article = append(host, "article", undefined, "table-card visitors-card");
-    append(article, "h3", "Visitors Table · Just visiting");
-    append(article, "p", "Hosted by the event coordinator. Use Get Food or Go to Lounge in the Discord Visitors Table room to move your character. Visitors also mingle between games.");
-    append(article, "p", state.archive ? "Saved visitor roster." : "Choose Just visiting first in Discord’s Browse Games menu.");
-    const roster = append(article, "ul", undefined, "roster");
-    if (!state.data.visitors.people.length) append(roster, "li", "No visitors yet.");
-    const byId = new Map(state.data.people.map((person) => [person.id, person]));
-    for (const id of state.data.visitors.people) append(roster, "li", displayName(byId.get(id)));
-  }
+  renderAttendees();
   if (state.data.tables.length === 0) { append(host, "p", "No tables have been posted.", "muted"); return; }
   const grid = append(host, "div", undefined, "table-grid");
   for (const table of state.data.tables) {
@@ -1112,7 +1126,7 @@ function renderActivity() {
   const visible = state.activity.filter((entry) => entry.at <= cutoff);
   const entries = visible.slice(0, state.activityLimit);
   const key = `${state.activityLimit}:${entries.map((entry) => entry.id).join(",")}:${visible.length}`;
-  $("activity-note").textContent = `Newest first · Times in ${state.data.event.tz} · ${state.clock.mode === "follow-now" ? "Live actions" : "Actions up to the selected time"}. Private rolls are not shown. Earlier signup and edit history may be unavailable.`;
+  $("activity-note").textContent = `Newest first · ${state.clock.mode === "follow-now" ? "Live" : "Selected time"} · ${state.data.event.tz}`;
   if (key === state.activityKey) return;
   state.activityKey = key;
   const list = $("activity-log");

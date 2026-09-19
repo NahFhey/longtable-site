@@ -72,9 +72,17 @@ Legacy schemas 1–3 keep their index-based geometry. Layout and seating helpers
 recorded dice are implemented; audio is a later milestone.
 See `data/TIMELINE.md` for geometry, migration, and overflow reservation rules.
 
-On desktop the hall precedes the table list. At 650px and below, the actual DOM
-order becomes list, details, then an initially collapsed **Explore the Great
-Hall**. Mobile replay starts paused. Selecting a card leaves its full details
+On desktop the hall precedes the table list. Table details and a compact,
+scrollable event activity log share the sidebar beside the hall (stacked below
+it at 800px and below). At 650px and below, the actual DOM order becomes list,
+sidebar, then an initially collapsed **The Great Hall**.
+
+The collapsible attendee list shows every published person once; DM takes
+precedence over Player and Visitor when roles overlap. Hidden attendees remain
+`someone` without a role label. This list represents event registration, not
+current presence in the hall.
+
+Mobile replay starts paused. Selecting a card leaves its full details
 available even while the hall is collapsed. Null or throwing canvas contexts do
 not prevent loading, selecting, or reading tables.
 
