@@ -22,7 +22,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T16:12:14.681334Z",
+ "generated_at": "2026-09-19T16:13:33.378286Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -224,6 +224,15 @@
    "at": 3.41,
    "duration": null,
    "text": "test",
+   "person": "p1",
+   "by": "p1"
+  },
+  {
+   "id": "e10",
+   "kind": "shout",
+   "at": 3.45,
+   "duration": null,
+   "text": "Roll for initiative!",
    "person": "p1",
    "by": "p1"
   }
