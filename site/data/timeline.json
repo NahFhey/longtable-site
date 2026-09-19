@@ -8,6 +8,14 @@
    "actor": "p1",
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "370e3f2857c848e480b28fd64a55a068",
+   "at": "2026-09-19T16:20:09.024710Z",
+   "action": "move_food",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -22,7 +30,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T16:17:00.032211Z",
+ "generated_at": "2026-09-19T16:20:11.719242Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -78,6 +86,11 @@
      "at": 2.683818216666667,
      "table": "t1",
      "destination": "table"
+    },
+    {
+     "at": 3.671680394444444,
+     "table": "t1",
+     "destination": "food"
     }
    ],
    "presence": {
