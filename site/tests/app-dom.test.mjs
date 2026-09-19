@@ -956,10 +956,15 @@ test("attendee walking follows replay speed and freezes when the event clock is 
 test('host ribbon renders the business and remains accessible without an icon', async () => {
   const sample = JSON.parse(await readFile(new URL('../data/timeline.sample.json', import.meta.url), 'utf8'));
   sample.event.host_name = 'Example Games';
+  sample.event.name = 'Autumn Games';
   const app = await runApp([sample], 'host-banner');
   assert.equal(app.errors.length, 0);
   assert.ok(app.contextCalls.includes('HOSTED BY'));
   assert.ok(app.contextCalls.includes('Example Games'));
+  assert.equal(app.nodes.get('event-name').textContent, 'Autumn Games');
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /<h1[^>]*><a href="\.\/">Longtable<span/);
+  assert.match(html, /<p id="event-name"/);
   assert.match(app.nodes.get('canvas-description').textContent, /Hosted by Example Games/);
   sample.event.host_icon_url = 'javascript:alert(1)';
   const invalid = await runApp([sample], 'invalid-host');

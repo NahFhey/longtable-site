@@ -456,6 +456,10 @@ function drawHostBanner() {
 function drawRoom() {
   const layout = state.layout;
   const unit = TILE * SCALE;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, layout.backWall.y * unit, layout.width * unit, layout.backWall.h * unit);
+  ctx.clip();
   ctx.fillStyle = "#28342f";
   ctx.fillRect(0, -6 * unit, layout.width * unit, 6 * unit);
   ctx.strokeStyle = "#3a4640";
@@ -467,6 +471,7 @@ function drawRoom() {
   }
   ctx.fillStyle = "#6f6145";
   ctx.fillRect(0, -.18 * unit, layout.width * unit, .18 * unit);
+  ctx.restore();
   drawHostBanner();
   for (let y = 0; y < layout.height; y += 1) for (let x = 0; x < layout.width; x += 1) {
     const wall = x === 0 || y === 0 || x === layout.width - 1 || y === layout.height - 1;
@@ -1163,7 +1168,7 @@ function installTimeline(data, initial = false) {
       icon.src = url;
     }
   }
-  document.title = `${data.event.name} — Great Hall`;
+  document.title = `${data.event.name} — Longtable`;
   $("event-name").textContent = data.event.name;
   $("record-note").hidden = !state.archive && data.phase !== "final";
   $("record-note").textContent = state.archive ? "Archived event replay. This shows the final saved schedule." : "This is the final event record.";
