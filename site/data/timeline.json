@@ -2,7 +2,9 @@
  "schema": 6,
  "visitors": {
   "open": true,
-  "people": []
+  "people": [
+   "p1"
+  ]
  },
  "room_layout": {
   "version": 1,
@@ -10,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T14:28:01.093332Z",
+ "generated_at": "2026-09-19T14:29:01.471978Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -18,7 +20,26 @@
   "slot_minutes": 30,
   "slots": 326
  },
- "people": [],
+ "people": [
+  {
+   "id": "p1",
+   "name": "Nah Fhey",
+   "dm": true,
+   "hidden": false,
+   "variant": 4082956081,
+   "appearance": null,
+   "presence": {
+    "planned": [
+     0,
+     24
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  }
+ ],
  "tables": [],
  "events": []
 }
