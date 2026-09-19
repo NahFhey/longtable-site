@@ -327,6 +327,90 @@ export function isPresent(person, slot, totalSlots) {
   return inHalfOpen(effectivePresence(person, totalSlots), slot);
 }
 
+const HALL_OCCUPANCY = new WeakMap();
+
+/** Decorative caretaker: event-time motion, without adding attendance or events. */
+export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
+  let intervals = HALL_OCCUPANCY.get(timeline);
+  const secondsPerSlot = timeline.event.slot_minutes * 60;
+  if (!intervals) {
+    const ranges = timeline.people.map(person => effectivePresence(person, timeline.event.slots))
+      .filter(range => range && range[0] < range[1])
+      .map(([start, end]) => [Math.max(0, start) * secondsPerSlot, Math.min(timeline.event.slots, end) * secondsPerSlot])
+      .sort((a, b) => a[0] - b[0]);
+    intervals = [];
+    for (const range of ranges) {
+      const last = intervals.at(-1);
+      if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+      else intervals.push(range);
+    }
+    HALL_OCCUPANCY.set(timeline, intervals);
+  }
+  // A seek to the exact event end shows completed closing, even with a clamped clock.
+  let seconds = Math.max(0, slot * secondsPerSlot);
+  if (slot === timeline.event.slots) seconds += 12;
+  const opening = Math.max(0, (intervals[0]?.[0] ?? 0) - 60);
+  const sinceOpen = seconds - opening;
+  const occupied = intervals.find(([start, end]) => seconds >= start && seconds < end);
+  const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
+  const corridor = { x: layout.trunkX, y: layout.aisles[0] };
+  const food = { x: layout.food.x + 6, y: layout.food.y + layout.food.h - 1.2 };
+  const lounge = { x: layout.trunkX, y: layout.lounge.y + 2 };
+  const route = [lightSwitch, corridor, food, corridor, lounge, corridor, lightSwitch];
+  const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
+  const length = lengths.reduce((sum, value) => sum + value, 0);
+  const roam = elapsed => {
+    if (reducedMotion) return lightSwitch;
+    let distance = Math.max(0, elapsed) * 1.2 % length;
+    for (let i = 0; i < lengths.length; i += 1) {
+      if (distance <= lengths[i]) {
+        const progress = lengths[i] ? distance / lengths[i] : 0;
+        return { x: route[i].x + (route[i + 1].x - route[i].x) * progress,
+          y: route[i].y + (route[i + 1].y - route[i].y) * progress };
+      }
+      distance -= lengths[i];
+    }
+    return lightSwitch;
+  };
+  const clamp = value => Math.max(0, Math.min(1, value));
+  const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
+  let staff = roam(seconds), lights = occupied ? 1 : 0, action = 'Staff are on duty; the empty hall’s lights are off.';
+  let foodCount = Math.floor(clamp((sinceOpen - 20) / 30) * 6);
+  if (sinceOpen >= 0 && sinceOpen < 60) {
+    lights = reducedMotion ? 1 : clamp((sinceOpen - 4) / 2);
+    if (sinceOpen < 8) {
+      staff = move(layout.doorPosition, lightSwitch, sinceOpen / 4);
+      action = 'Staff are turning on the lights.';
+    } else if (sinceOpen < 20) {
+      staff = sinceOpen < 14 ? move(lightSwitch, corridor, (sinceOpen - 8) / 6) : move(corridor, food, (sinceOpen - 14) / 6);
+      action = 'Staff are bringing food to the food table.';
+    } else {
+      staff = food;
+      action = 'Staff are setting out food.';
+    }
+    if (reducedMotion) { staff = food; foodCount = 6; }
+  } else if (occupied) {
+    staff = roam(seconds - opening - 60);
+    action = 'Lights are on. Staff are circulating through the hall.';
+    if (occupied !== intervals[0] && seconds - occupied[0] < 12) {
+      const elapsed = seconds - occupied[0];
+      staff = reducedMotion ? lightSwitch : move(roam(occupied[0]), lightSwitch, elapsed / 8);
+      lights = reducedMotion ? 1 : clamp((elapsed - 8) / 4);
+      action = 'Staff are turning the lights back on.';
+    }
+  } else if (sinceOpen >= 60) {
+    const departure = intervals.filter(([, end]) => end <= seconds).at(-1)?.[1] ?? opening + 60;
+    const elapsed = seconds - departure;
+    if (elapsed < 12) {
+      staff = reducedMotion ? lightSwitch : move(roam(Math.max(0, departure - opening - 60)), lightSwitch, elapsed / 8);
+      lights = reducedMotion ? 0 : 1 - clamp((elapsed - 8) / 4);
+      action = 'The hall is empty. Staff are switching off the lights.';
+    } else staff = roam(elapsed - 12);
+  }
+  return { staff: { ...staff, load: sinceOpen >= 8 && sinceOpen < 50 ? 'food' : null },
+    lights, foodCount, lightSwitch, action, occupied: Boolean(occupied) };
+}
+
 export function effectiveSignupRange(signup) {
   if (signup.actual === null) return [...signup.planned];
   return [signup.actual[0] ?? signup.planned[0], signup.actual[1] ?? signup.planned[1]];

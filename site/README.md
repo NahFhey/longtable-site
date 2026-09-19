@@ -256,6 +256,21 @@ Social poses are decorative, carry no invented dialogue, and honor reduced motio
 Archives freeze this visitor roster and renderer like the rest of the snapshot.
 Deploy the schema-6 reader before the writer; schemas 1–5 still render.
 
+### Hall caretaker
+
+A caretaker turns on the lights and sets out food during the opening minute,
+then circulates between the entrance, food area and lounge. When the last
+attendee leaves, the caretaker walks to the switch and dims the room; a later
+arrival turns the lights back on. Staff stay on duty in an empty hall and never
+count as attendees. Occupancy uses effective attendance, including recorded
+arrival/departure overrides. The room remains faintly visible when dark, and
+controls and table information stay readable.
+
+This scenery follows event time, so seeking and reloading reproduce it. Reduced
+motion uses stationary staff and immediate lighting changes. The canvas description
+also reports the caretaker's current activity. Frozen archives keep their own
+renderer; this change does not rewrite older archives or add attendance records.
+
 ### Custom messages on stage
 
 Approved custom table messages (`donation` in the data contract) bring their

@@ -453,13 +453,13 @@ test("staff scenery renders identically after seeking and reload without changin
     seek.rectCalls.length = 0;
     seek.frames.shift()?.(performance.now() + 100);
     const expected = staff(seek);
-    assert.equal(expected.length, 2, "one staff cap and uniform for this table");
+    assert.equal(expected.length, 4, "table staff and the hall caretaker each have a cap and uniform");
     assert.match(allText(seek.nodes.get("tables")), /0\/5/);
     assert.doesNotMatch(roster, /STAFF/);
     const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
     assert.deepEqual(staff(fresh), expected);
     const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
-    assert.deepEqual(staff(reduced), []);
+    assert.equal(staff(reduced).length, 2, "the stationary caretaker remains visible with reduced motion");
   }
 });
 

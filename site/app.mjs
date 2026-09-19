@@ -11,6 +11,7 @@ import {
   createLiveState,
   crossedSpeechEvents,
   displayName,
+  hallAmbience,
   diceAt,
   diceText,
   indexAdminEvents,
@@ -45,6 +46,7 @@ const RPG = {
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
+const hallDescription = $("canvas-description").textContent;
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 const mobile = matchMedia("(max-width: 650px)");
@@ -92,6 +94,7 @@ const state = {
   speechQueue: [],
   speech: null,
   stageQueue: [],
+  ambience: null,
   staleMessage: "",
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && new URLSearchParams(location.search).get("sample") === "1",
@@ -390,7 +393,7 @@ function drawRoom() {
   const foodY = layout.food.y + 1;
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + index, foodY);
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + 4, foodY + index);
-  RPG.food.forEach((item, index) => drawTile(state.images.rpg, item, index < 3 ? foodX + index : foodX + 4, index < 3 ? foodY : foodY + index - 3));
+  RPG.food.slice(0, state.ambience?.foodCount ?? 6).forEach((item, index) => drawTile(state.images.rpg, item, index < 3 ? foodX + index : foodX + 4, index < 3 ? foodY : foodY + index - 3));
   drawLabel("FOOD", layout.food.x + layout.food.w / 2, layout.food.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 
   drawTile(state.images.rpg, RPG.shelf[0], layout.lounge.x, layout.lounge.y);
@@ -698,6 +701,9 @@ function drawEvents(active, now) {
 }
 
 function render(now, active) {
+  const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
+    (Date.now() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
+  state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
   updateCamera();
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
@@ -718,6 +724,15 @@ function render(now, active) {
     }
   });
   drawMicrophone();
+  // Dim only the room artwork; controls, table details and speech remain readable.
+  const lights = [...state.people.values()].some(person => person.visible) && state.ambience.foodCount === 6
+    ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
+  ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
+  ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
+  drawStaff(state.ambience.staff);
+  const lightSwitch = state.ambience.lightSwitch;
+  ctx.fillStyle = lights > .5 ? "#fff3ac" : "#697a9d";
+  ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
   drawEvents(active, now);
 }
@@ -806,6 +821,8 @@ function renderTableList() {
 }
 
 function updateHeader(active) {
+  const staffDescription = `${hallDescription} ${state.ambience?.action ?? ""}`.trim();
+  if ($("canvas-description").textContent !== staffDescription) $("canvas-description").textContent = staffDescription;
   const clockText = formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
   const eventLabel = active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
