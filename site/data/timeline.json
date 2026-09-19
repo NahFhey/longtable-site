@@ -1,12 +1,16 @@
 {
- "schema": 5,
+ "schema": 6,
+ "visitors": {
+  "open": true,
+  "people": []
+ },
  "room_layout": {
   "version": 1,
   "pad_capacity": 20,
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T13:14:22.704998Z",
+ "generated_at": "2026-09-19T13:59:02.209965Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-17T15:00:00-04:00",
