@@ -26,6 +26,7 @@ class FakeNode {
   insertBefore(node) { this.append(node); }
   replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
   addEventListener(kind, listener) { this.listeners.set(kind, listener); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
   focus() { this.focused = true; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 960, height: 480 }; }
@@ -36,8 +37,9 @@ function allText(node) {
 }
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
+  const ids = ["activity-note", "activity-log", "activity-empty", "activity-more", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
+  if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
   const contextCalls = [];
   const imageCalls = [];
   const rectCalls = [];
@@ -734,4 +736,103 @@ test("new live custom messages use the stage queue without teleporting on refres
   assert.match(text, /walking to the stage microphone/);
   assert.match(text, /1 waiting to speak/);
   assert.doesNotMatch(text, /Stage message 0/);
+});
+
+
+test("live data bypasses deployment, refreshes after five seconds, and reports the check", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  const next = structuredClone(data);
+  next.generated_at = new Date().toISOString();
+  next.tables[0].name = "Just changed in Discord";
+  const app = await runApp([data, next], "direct-live-feed", { search: "", liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
+  assert.equal(new URL(app.fetchUrls[0]).hostname, "raw.githubusercontent.com");
+  assert.ok(new URL(app.fetchUrls[0]).searchParams.has("check"));
+  assert.equal(app.fetchUrls.length, 1);
+  app.frames.shift()(performance.now() + 5_100);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.fetchUrls.length, 2);
+  assert.notEqual(app.fetchUrls[0], app.fetchUrls[1]);
+  assert.match(allText(app.nodes.get("tables")), /Just changed in Discord/);
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at.*every 5 seconds/);
+});
+
+test("feed failure falls back visibly without replacing a newer view, then recovers manually", async () => {
+  const old = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  old.generated_at = new Date(Date.now() - 10_000).toISOString();
+  const newer = structuredClone(old);
+  newer.generated_at = new Date().toISOString();
+  newer.tables[0].name = "Latest table";
+  const app = await runApp([newer, new Error("offline"), old, newer], "feed-fallback", { search: "", liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
+  app.nodes.get("refresh-now").listeners.get("click")();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.match(app.nodes.get("sync-status").textContent, /Live updates delayed/);
+  assert.equal(app.fetchUrls[2], "https://longtable.test/data/timeline.json");
+  assert.match(allText(app.nodes.get("tables")), /Latest table/);
+  app.nodes.get("refresh-now").listeners.get("click")();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at/);
+});
+
+test("archive and sample never contact the configured live feed", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  for (const archive of [false, true]) {
+    const app = await runApp([data], `isolated-feed-${archive}`, { archive, liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
+    app.nodes.get("refresh-now").listeners.get("click")();
+    app.frames.shift()(performance.now() + 61_000);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(app.fetchUrls.length, 1);
+    assert.equal(new URL(app.fetchUrls[0]).hostname, "longtable.test");
+    assert.equal(app.nodes.get("sync-controls").hidden, true);
+  }
+});
+
+
+test("the timestamped activity log follows replay and paginates older public changes", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 4 * 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date().toISOString();
+  data.events = [];
+  data.activity = Array.from({ length: 105 }, (_, index) => ({
+    id: index.toString(16).padStart(32, "0"), action: "edit_table", actor: data.people[0].id,
+    table: data.tables[0].id, person: null,
+    at: new Date(Date.parse(data.event.start) + 30 * 60_000 + index * 1000).toISOString(),
+  }));
+  data.tables[0].name = "<script>literal text</script>";
+  const app = await runApp([data], "activity-log", { search: "" });
+  const log = app.nodes.get("activity-log");
+  assert.equal(log.children.length, 100);
+  assert.equal(log.children[0].children[0].dateTime, data.activity[104].at);
+  assert.match(allText(log), /<script>literal text<\/script>/);
+  assert.equal(log.children[0].children[1].tagName, "SPAN");
+  app.nodes.get("activity-more").listeners.get("click")();
+  assert.equal(log.children.length, 105);
+  assert.equal(app.nodes.get("activity-more").hidden, true);
+  app.nodes.get("scrubber").value = "0.5";
+  app.nodes.get("scrubber").listeners.get("input")({ target: app.nodes.get("scrubber") });
+  app.frames.shift()(performance.now() + 30);
+  assert.equal(log.children.length, 0);
+  assert.equal(app.nodes.get("activity-empty").hidden, false);
+  app.nodes.get("return-now").listeners.get("click")();
+  app.frames.shift()(performance.now() + 40);
+  assert.equal(log.children.length, 105);
+});
+
+test("manual and automatic checks share one bounded request", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "one-refresh", { search: "" });
+  let calls = 0, resolveFetch, signal;
+  globalThis.fetch = (_url, options) => {
+    calls += 1; signal = options.signal;
+    return new Promise(resolve => { resolveFetch = resolve; });
+  };
+  app.nodes.get("refresh-now").listeners.get("click")();
+  app.nodes.get("refresh-now").listeners.get("click")();
+  app.frames.shift()(performance.now() + 6_000);
+  assert.equal(calls, 1);
+  assert.ok(signal instanceof AbortSignal);
+  assert.equal(app.nodes.get("refresh-now").disabled, true);
+  resolveFetch({ ok: true, json: async () => structuredClone(data) });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(app.nodes.get("refresh-now").disabled, false);
 });

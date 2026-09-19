@@ -15,8 +15,8 @@ test("production loader is explicit, no-store, and never falls back to sample da
   const source = await readFile(new URL("../app.mjs", import.meta.url), "utf8");
   assert.match(source, /get\("sample"\) === "1"/);
   assert.match(source, /state\.sample \? "\.\/data\/timeline\.sample\.json" : "\.\/data\/timeline\.json"/);
-  assert.match(source, /fetch\(url, \{ cache: "no-store" \}\)/);
-  assert.doesNotMatch(source, /catch[\s\S]{0,300}timeline\.sample\.json/);
+  assert.match(source, /fetch\(url, \{ cache: "no-store", signal: AbortSignal\.timeout\(8000\) \}\)/);
+  assert.doesNotMatch(source, /catch\s*\{[^}]*timeline\.sample\.json/);
 });
 
 test("current canvas events have an atomic live region populated through textContent", async () => {

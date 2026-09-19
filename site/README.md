@@ -37,7 +37,11 @@ DOM through created nodes and `textContent`, never HTML injection sinks.
 
 The data contract is `data/TIMELINE.md`. `bot/longtable/publish.py` atomically
 writes the production `data/timeline.json`; do not edit that generated file by
-hand. The site fetches it with `cache: "no-store"`, validates schemas 1–7,
+hand. The live page reads the public repository copy directly through the `live-feed`
+meta setting in `index.html`, without waiting for Pages deployment. Each request
+uses a fresh query key to bypass the raw-file CDN cache. It falls back to
+`data/timeline.json` with a visible delay warning when the feed is unavailable.
+The site fetches with `cache: "no-store"` and an eight-second timeout, validates schemas 1–7,
 and retains its last good snapshot if a live refresh is unavailable or invalid.
 Schema 3 adds attendee-selected appearance; older records retain their original
 look. Schema 4 adds persisted pads and event room capacity. Deploy this reader
@@ -99,7 +103,7 @@ These are schedule-derived states, not claims about cancellation or actual staff
 publication privacy phase, and viewer modes (`follow-now`, `paused`, `replay`).
 During a live event, Pause or scrubbing leaves follow-now; Play replays from the
 chosen time and **Return to Now** resumes wall-clock tracking. Live-source data
-continues refreshing every 60 seconds while rewound, before doors, and after event
+continues refreshing every 5 seconds while rewound, before doors, and after event
 end, until the package becomes final. Refreshes retain the viewer's time and camera.
 A final snapshot stops follow-now without resetting the selected time. Samples
 never follow the wall clock or poll live data.
@@ -295,3 +299,22 @@ game or visitor context applies. Game assignments supersede older visitor choice
 A successful dice-form submission records a return to the game table, including
 when the outcome is private. The private outcome itself is never published.
 Dice support 1–100 dice with 2–1000 sides, including custom sizes.
+
+
+### Live updates and activity log
+
+The bot batches changes for two seconds (five seconds maximum), and the browser
+checks every five seconds. The visible update status reports the last successful
+check, fallback/failure, and whether the viewer is rewound. **Check for updates**
+requests an immediate refresh without changing the selected time. Final records,
+samples, and archives never automatically poll the live feed.
+
+The timestamped activity log lists newest public actions first, in the event's
+timezone. Rewinding limits the log to the selected moment. The first 100 entries
+are shown; **Show older actions** reveals more. Movement and approved/public event
+history are available from existing records. Attendance, seat changes, table edits,
+visitor controls, appearance changes, and event-window changes are recorded from
+this release onward. Private dice results and pending/rejected messages are excluded.
+Actor names come from current public people records, so hiding someone anonymizes
+their earlier entries too. Deleted games appear as “removed game”; raw Discord
+identifiers, copied names, and arbitrary result messages are never stored in activity.

@@ -332,3 +332,21 @@ Entries are unique and ordered by start descending, then identity descending.
 Only complete privacy-finalized packages are indexed. Counts describe retained
 tables, not lifetime games, visitors, or donations. The catalog and new archive
 are committed together; index-only backfill never publishes pending private copies.
+
+
+### Optional public activity history (schema 7)
+
+`activity` defaults to `[]` when absent. Each entry has exactly `id` (32 lowercase
+hex characters, unique), `at` (UTC ISO instant), `action` (the allowed action name),
+`actor` (person ID or null for automatic event actions), `person` (target person ID
+or null), and `table` (opaque table ID or null). Person references must resolve;
+tables may have been deleted. Allowed actions are attendance (`set_presence`,
+`here`, `leaving`), games (`create_table`, `edit_table`, `delete_table`, `end_table`,
+`join`, `leave_table`, `unseat`), character (`set_appearance`, `hide`), visitors
+(`join_visitors`, `leave_visitors`, `open_visitors`, `close_visitors`,
+`remove_visitor`), movement (`move_food`, `move_lounge`, `move_table`), and event
+changes (`event_window`, `remove`, `finalize`). Timestamps record when the action
+occurred, including before the event starts, independently of its planned time.
+Do not embed names, private outcomes, unapproved messages, or raw Discord IDs.
+The browser resolves names through the current privacy projection and combines
+these entries with retained public events and older movement history.

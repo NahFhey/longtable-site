@@ -65,6 +65,9 @@ main { max-width: 1800px; margin: 0 auto; }
 .archive-list a { font-size: 1.2rem; font-weight: 700; overflow-wrap: anywhere; }
 .archive-list p { margin-bottom: 0; color: var(--muted); }
 .status { margin: .8rem clamp(1rem, 2vw, 1.5rem) 0; min-height: 1.5rem; color: var(--muted); }
+.sync-controls { margin: .5rem clamp(1rem, 2vw, 1.5rem) 0; display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; color: var(--muted); font-size: .85rem; }
+.sync-controls[hidden] { display: none; }
+.sync-controls.delayed { color: #ffd58f; }
 .status.error { color: var(--error); font-weight: 700; }
 .status.stale { color: #ffd58f; font-weight: 700; }
 
@@ -185,3 +188,10 @@ canvas:active { cursor: grabbing; }
   #hall-content > .detail { margin: 0 1rem 1rem; }
   .camera-controls button { min-height: 44px; }
 }
+
+.activity-panel { margin: 1rem clamp(1rem, 2vw, 1.5rem) 1.5rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.activity-panel h2 { margin: 0 0 .4rem; }
+.activity-log { list-style: none; padding: 0; max-height: 24rem; overflow-y: auto; overflow-wrap: anywhere; }
+.activity-log li { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: .5rem 1rem; padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.activity-log time { color: var(--muted); font-size: .85rem; }
+@media (max-width: 650px) { .activity-log li { grid-template-columns: 1fr; gap: .15rem; } }

@@ -13,6 +13,18 @@ export const TABLE_COLUMNS = 10;
 export const LOCAL_SEAT_COUNT = 10;
 export const OVERFLOW_COLUMNS = 30;
 
+const ACTIVITY_LABELS = Object.freeze({
+  set_presence: "updated their event attendance", here: "checked in", leaving: "checked out",
+  create_table: "created a game", edit_table: "edited a game", delete_table: "deleted a game",
+  end_table: "ended a game", join: "joined or updated their game seat", leave_table: "left a game",
+  set_appearance: "changed their character", hide: "hid their identity", unseat: "removed a player from a game",
+  join_visitors: "joined the Visitors Table", leave_visitors: "left the Visitors Table",
+  open_visitors: "opened visitor signups", close_visitors: "closed visitor signups",
+  remove_visitor: "removed a visitor", remove: "removed a public message", finalize: "finalized the event",
+  move_food: "went to get food", move_lounge: "went to the lounge", move_table: "returned to the table",
+  event_window: "updated the event name or dates",
+});
+
 const ADMIN_EVENT_CACHE = new WeakMap();
 
 export class TimelineError extends Error {
@@ -265,7 +277,26 @@ export function validateTimeline(input) {
     ? ["id", "kind", "at", "duration", "text", "person", "by", "table", "visibility", "roll"]
     : ["id", "kind", "at", "duration", "text", "person", "by"]));
 
-  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout };
+  const activityIds = new Set();
+  const activity = array(root.activity ?? [], "activity").map((raw) => {
+    const entry = object(raw, "activity entry");
+    if (Object.keys(entry).sort().join(",") !== "action,actor,at,id,person,table") fail("Invalid activity fields.");
+    const id = string(entry.id, "activity.id");
+    if (!/^[0-9a-f]{32}$/.test(id) || activityIds.has(id)) fail("Invalid activity id.");
+    activityIds.add(id);
+    const action = string(entry.action, "activity.action");
+    if (!Object.hasOwn(ACTIVITY_LABELS, action)) fail("Unknown activity action.");
+    const at = dateString(entry.at, "activity.at", "zero-offset");
+    const actor = string(entry.actor, "activity.actor", { nullable: true });
+    const person = string(entry.person, "activity.person", { nullable: true });
+    for (const reference of [actor, person]) {
+      if (reference !== null && !people.some((candidate) => candidate.id === reference)) fail("Unknown activity person.");
+    }
+    const table = string(entry.table, "activity.table", { nullable: true });
+    if (table !== null && !/^t[0-9]+$/.test(table)) fail("Invalid activity table.");
+    return { id, at, action, actor, person, table };
+  });
+  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity };
 }
 
 export function slotToMs(timeline, slot) {
@@ -847,4 +878,40 @@ export function tableView(timeline, table) {
       actual: signup.actual && [...signup.actual],
     })),
   };
+}
+
+
+/** Public actions only; resolve names from the current privacy projection. */
+export function publicActivity(timeline) {
+  const people = new Map(timeline.people.map((person) => [person.id, person]));
+  const tables = new Map(timeline.tables.map((table) => [table.id, table]));
+  const who = (id) => id === null ? "Event coordinator" : displayName(people.get(id));
+  const tableName = (id) => id ? ` — ${tables.get(id)?.name || "removed game"}` : "";
+  const entries = (timeline.activity || []).map((entry) => ({
+    id: `activity-${entry.id}`, at: Date.parse(entry.at),
+    text: `${who(entry.actor)} ${ACTIVITY_LABELS[entry.action]}${entry.person ? ` (${who(entry.person)})` : ""}${tableName(entry.table)}.`,
+  }));
+  for (const person of timeline.people) {
+    for (const [index, move] of (person.movements || []).entries()) {
+      const at = slotToMs(timeline, move.at);
+      const action = `move_${move.destination}`;
+      // Older movement history predates the durable activity log.
+      if ((timeline.activity || []).some((entry) => entry.action === action && entry.actor === person.id
+        && entry.table === move.table && Math.abs(Date.parse(entry.at) - at) < 2)) continue;
+      entries.push({ id: `movement-${person.id}-${index}`, at,
+        text: `${who(person.id)} ${ACTIVITY_LABELS[action]}${tableName(move.table)}.` });
+    }
+  }
+  for (const event of timeline.events) {
+    let text;
+    if (event.kind === "roll") {
+      if (event.visibility !== "public") continue;
+      text = diceText(timeline, event) + tableName(event.table);
+    } else if (["shout", "donation"].includes(event.kind)) text = `${who(event.person)}: ${event.text || ""}`;
+    else if (event.kind === "spotlight") text = `${who(event.by)} spotlighted ${who(event.person)}${event.text ? `: ${event.text}` : "."}`;
+    else if (event.kind === "announce") text = `${who(event.by)} announced: ${event.text || ""}`;
+    else text = `${who(event.by)} started ${event.kind === "meal" ? "a meal" : "a break"}${event.text ? `: ${event.text}` : "."}`;
+    entries.push({ id: `event-${event.id}`, at: slotToMs(timeline, event.at), text });
+  }
+  return entries.sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
 }

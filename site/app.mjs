@@ -16,6 +16,7 @@ import {
   diceText,
   indexAdminEvents,
   personTooltip,
+  publicActivity,
   reconcileLiveSnapshot,
   resolveLocation,
   seatPositionForPlan,
@@ -89,8 +90,15 @@ const state = {
   assetsFailed: false,
   snap: true,
   lastRefresh: 0,
+  refreshing: false,
+  lastChecked: null,
+  feedDelayed: false,
   live: null,
   adminEvents: [],
+  activity: [],
+  activityLimit: 100,
+  activityKey: null,
+  activitySecond: null,
   speechQueue: [],
   speech: null,
   stageQueue: [],
@@ -934,14 +942,46 @@ function settleStageSpeech(now) {
   }
 }
 
-async function fetchTimeline() {
-  const url = state.archive ? "./timeline.json" : state.sample ? "./data/timeline.sample.json" : "./data/timeline.json";
-  const response = await fetch(url, { cache: "no-store" });
+async function readTimeline(url) {
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error("fetch");
   let input;
   try { input = await response.json(); }
   catch { throw new Error("json"); }
   return validateTimeline(input);
+}
+
+async function fetchTimeline() {
+  const liveFeed = !state.archive && !state.sample && $("live-feed")?.getAttribute("content");
+  state.feedDelayed = false;
+  if (liveFeed) {
+    // Each check needs a fresh CDN key; no-store alone does not bypass its five-minute cache.
+    const url = new URL(liveFeed);
+    url.searchParams.set("check", String(Date.now()));
+    try { return await readTimeline(url.href); }
+    catch { state.feedDelayed = true; }
+  }
+  const url = state.archive ? "./timeline.json" : state.sample ? "./data/timeline.sample.json" : "./data/timeline.json";
+  return readTimeline(url);
+}
+
+function updateSyncStatus() {
+  const controls = $("sync-controls");
+  if (!controls) return;
+  controls.hidden = state.archive || state.sample;
+  if (controls.hidden) return;
+  const final = state.data?.phase === "final";
+  $("refresh-now").disabled = state.refreshing;
+  $("refresh-now").textContent = state.refreshing ? "Checking…" : "Check for updates";
+  controls.className = `sync-controls${state.staleMessage || state.feedDelayed ? " delayed" : ""}`;
+  const checked = state.lastChecked ? formatDate(state.lastChecked, { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "";
+  let message = state.refreshing ? "Checking for updates…"
+    : state.staleMessage ? "Updates unavailable. Your last loaded view is still shown; we’ll retry."
+    : state.feedDelayed ? "Live updates delayed. Using the saved website copy; we’ll retry."
+    : final ? "Final event record. Automatic updates have stopped."
+    : `Checked at ${checked}. Checking every 5 seconds.`;
+  if (!final && state.clock && state.clock.mode !== "follow-now") message += " Viewing an earlier time — choose Return to Now to see current actions.";
+  if ($("sync-status").textContent !== message) $("sync-status").textContent = message;
 }
 
 function installTimeline(data, initial = false) {
@@ -950,7 +990,7 @@ function installTimeline(data, initial = false) {
   $("event-name").textContent = data.event.name;
   $("record-note").hidden = !state.archive && data.phase !== "final";
   $("record-note").textContent = state.archive ? "Archived event replay. This shows the final saved schedule." : "This is the final event record.";
-  $("updated").textContent = formatDate(Date.parse(data.generated_at), { dateStyle: "medium", timeStyle: "short" });
+  $("updated").textContent = formatDate(Date.parse(data.generated_at), { dateStyle: "medium", timeStyle: "medium" });
   $("scrubber").max = String(data.event.slots);
   $("start-label").textContent = formatSlot(0, true);
   $("end-label").textContent = formatSlot(data.event.slots, true);
@@ -959,6 +999,9 @@ function installTimeline(data, initial = false) {
   renderActions();
   state.adminEvents = indexAdminEvents(data);
   syncPeople();
+  state.activity = publicActivity(data);
+  state.activityKey = null;
+  state.activitySecond = null;
   if (state.selectedId && !data.tables.some((table) => table.id === state.selectedId)) state.selectedId = null;
   renderTableList();
   renderDetail();
@@ -967,6 +1010,10 @@ function installTimeline(data, initial = false) {
 }
 
 async function refresh() {
+  if (state.refreshing || state.archive || state.sample) return;
+  state.refreshing = true;
+  state.lastRefresh = performance.now();
+  updateSyncStatus();
   try {
     const next = await fetchTimeline();
     if (!state.live) state.live = createLiveState(state.data);
@@ -976,11 +1023,53 @@ async function refresh() {
       installTimeline(result.snapshot);
     }
     state.staleMessage = "";
+    state.lastChecked = Date.now();
   } catch (error) {
     state.staleMessage = error?.name === "TimelineError" ? `Update rejected: ${error.message} Showing the last good snapshot.` : "Update failed. Showing the last good snapshot.";
     setStatus(state.staleMessage, "stale");
+  } finally {
+    state.refreshing = false;
+    state.lastRefresh = performance.now();
+    updateSyncStatus();
   }
 }
+
+$("refresh-now")?.addEventListener("click", () => { void refresh(); });
+
+function renderActivity() {
+  if (!state.data || !state.clock) return;
+  const cutoff = state.clock.mode === "follow-now" ? Date.now() : slotToMs(state.data, state.time);
+  const second = Math.floor(cutoff / 1000);
+  if (second === state.activitySecond) return;
+  state.activitySecond = second;
+  const visible = state.activity.filter((entry) => entry.at <= cutoff);
+  const entries = visible.slice(0, state.activityLimit);
+  const key = `${state.activityLimit}:${entries.map((entry) => entry.id).join(",")}:${visible.length}`;
+  $("activity-note").textContent = `Newest first · Times in ${state.data.event.tz} · ${state.clock.mode === "follow-now" ? "Live actions" : "Actions up to the selected time"}. Private rolls are not shown. Earlier signup and edit history may be unavailable.`;
+  if (key === state.activityKey) return;
+  state.activityKey = key;
+  const list = $("activity-log");
+  const scrollTop = list.scrollTop;
+  list.replaceChildren();
+  for (const entry of entries) {
+    const row = document.createElement("li");
+    const time = document.createElement("time");
+    time.dateTime = new Date(entry.at).toISOString();
+    time.textContent = formatDate(entry.at, { dateStyle: "medium", timeStyle: "medium" });
+    row.append(time);
+    append(row, "span", entry.text);
+    list.append(row);
+  }
+  list.scrollTop = scrollTop;
+  $("activity-empty").hidden = entries.length !== 0;
+  $("activity-more").hidden = visible.length <= state.activityLimit;
+}
+
+$("activity-more").addEventListener("click", () => {
+  state.activityLimit += 100;
+  state.activitySecond = null;
+  renderActivity();
+});
 
 function pointerPoint(event) {
   const rect = canvas.getBoundingClientRect();
@@ -1149,7 +1238,7 @@ function loop(now) {
   if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
   if (previous.mode !== state.clock.mode && (previous.mode === "follow-now" || state.clock.mode === "follow-now")) { clearSpeech(); state.snap = true; }
   const active = activeEvents(state.data, state.time, state.adminEvents);
-  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 60_000) {
+  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 5_000) {
     state.lastRefresh = now;
     void refresh();
   }
@@ -1159,6 +1248,8 @@ function loop(now) {
   settleStageSpeech(now);
   render(now, active);
   updateHeader(active);
+  updateSyncStatus();
+  renderActivity();
   requestAnimationFrame(loop);
 }
 
@@ -1166,6 +1257,8 @@ async function boot() {
   try {
     const [data] = await Promise.all([fetchTimeline(), loadAssets()]);
     installTimeline(data, true);
+    state.lastChecked = Date.now();
+    state.lastRefresh = performance.now();
     state.clock = createViewerClock(data, Date.now(), { source: state.archive ? "archive" : state.sample ? "sample" : "live", mobile: mobile.matches, reducedMotion: reducedMotion.matches });
     const at = new URLSearchParams(location.search).get("at");
     if (at !== null && at.trim() !== "" && Number.isFinite(Number(at))) state.clock = seekViewerClock(state.clock, data, Number(at));
