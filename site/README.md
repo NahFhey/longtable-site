@@ -103,7 +103,7 @@ These are schedule-derived states, not claims about cancellation or actual staff
 publication privacy phase, and viewer modes (`follow-now`, `paused`, `replay`).
 During a live event, Pause or scrubbing leaves follow-now; Play replays from the
 chosen time and **Return to Now** resumes wall-clock tracking. Live-source data
-continues refreshing every 5 seconds while rewound, before doors, and after event
+continues refreshing every 2 seconds while rewound, before doors, and after event
 end, until the package becomes final. Refreshes retain the viewer's time and camera.
 A final snapshot stops follow-now without resetting the selected time. Samples
 never follow the wall clock or poll live data.
@@ -303,9 +303,13 @@ Dice support 1–100 dice with 2–1000 sides, including custom sizes.
 
 ### Live updates and activity log
 
-The bot batches changes for two seconds (five seconds maximum), and the browser
-checks every five seconds. The visible update status reports the last successful
-check, fallback/failure, and whether the viewer is rewound. **Check for updates**
+The bot publishes public changes to the live-data service after a 250 ms debounce
+(one second maximum), independently of Git pushes. The browser checks that service
+every two seconds. Reads come from the primary database with caching disabled.
+If the service fails, the browser chooses the newest available GitHub/Pages backup
+and visibly reports the delay; those backups can be several minutes behind.
+The visible update status separately reports the last successful check and when
+the data was published, plus fallback/failure and whether the viewer is rewound. **Check for updates**
 requests an immediate refresh without changing the selected time. Final records,
 samples, and archives never automatically poll the live feed.
 

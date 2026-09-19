@@ -14,7 +14,8 @@ test("runtime rendering does not use HTML-string injection sinks", async () => {
 test("production loader is explicit, no-store, and never falls back to sample data", async () => {
   const source = await readFile(new URL("../app.mjs", import.meta.url), "utf8");
   assert.match(source, /get\("sample"\) === "1"/);
-  assert.match(source, /state\.sample \? "\.\/data\/timeline\.sample\.json" : "\.\/data\/timeline\.json"/);
+  assert.match(source, /state\.archive \|\| state\.sample/);
+  assert.match(source, /state\.archive \? "\.\/timeline\.json" : "\.\/data\/timeline\.sample\.json"/);
   assert.match(source, /fetch\(url, \{ cache: "no-store", signal: AbortSignal\.timeout\(8000\) \}\)/);
   assert.doesNotMatch(source, /catch\s*\{[^}]*timeline\.sample\.json/);
 });

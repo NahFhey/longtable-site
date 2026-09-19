@@ -37,9 +37,10 @@ function allText(node) {
 }
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["activity-note", "activity-log", "activity-empty", "activity-more", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
+  const ids = ["activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
+  if (options.backupFeed) nodes.get("backup-feed").setAttribute("content", options.backupFeed);
   const contextCalls = [];
   const imageCalls = [];
   const rectCalls = [];
@@ -58,7 +59,10 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   nodes.get("hall").getContext = () => { if (options.contextThrows) throw new Error("Canvas disabled"); return options.noContext ? null : context; };
   nodes.get("hall").setPointerCapture = () => {};
 
+  const documentListeners = new Map();
   globalThis.document = {
+    visibilityState: "visible",
+    addEventListener(kind, listener) { documentListeners.set(kind, listener); },
     documentElement: { dataset: { source: options.archive ? "archive" : "live" } },
     title: "",
     getElementById(id) { return nodes.get(id); },
@@ -68,6 +72,8 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
   globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
   globalThis.matchMedia = (query) => ({ matches: query.includes("650") ? !!options.mobile : !!options.reducedMotion, addEventListener() {} });
+  const intervals = [];
+  globalThis.setInterval = callback => { intervals.push(callback); return intervals.length; };
   const frames = [];
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
   globalThis.Image = class {
@@ -82,7 +88,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls };
+  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -739,22 +745,22 @@ test("new live custom messages use the stage queue without teleporting on refres
 });
 
 
-test("live data bypasses deployment, refreshes after five seconds, and reports the check", async () => {
+test("live data bypasses deployment, refreshes after two seconds, and reports the check", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   data.generated_at = new Date(Date.now() - 10_000).toISOString();
   const next = structuredClone(data);
   next.generated_at = new Date().toISOString();
   next.tables[0].name = "Just changed in Discord";
-  const app = await runApp([data, next], "direct-live-feed", { search: "", liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
-  assert.equal(new URL(app.fetchUrls[0]).hostname, "raw.githubusercontent.com");
+  const app = await runApp([data, next], "direct-live-feed", { search: "", liveFeed: "https://feed.example/timeline.json" });
+  assert.equal(new URL(app.fetchUrls[0]).hostname, "feed.example");
   assert.ok(new URL(app.fetchUrls[0]).searchParams.has("check"));
   assert.equal(app.fetchUrls.length, 1);
-  app.frames.shift()(performance.now() + 5_100);
+  app.frames.shift()(performance.now() + 2_100);
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(app.fetchUrls.length, 2);
   assert.notEqual(app.fetchUrls[0], app.fetchUrls[1]);
   assert.match(allText(app.nodes.get("tables")), /Just changed in Discord/);
-  assert.match(app.nodes.get("sync-status").textContent, /Checked at.*every 5 seconds/);
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at.*every 2 seconds/);
 });
 
 test("feed failure falls back visibly without replacing a newer view, then recovers manually", async () => {
@@ -763,11 +769,11 @@ test("feed failure falls back visibly without replacing a newer view, then recov
   const newer = structuredClone(old);
   newer.generated_at = new Date().toISOString();
   newer.tables[0].name = "Latest table";
-  const app = await runApp([newer, new Error("offline"), old, newer], "feed-fallback", { search: "", liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
+  const app = await runApp([newer, new Error("offline"), old, newer], "feed-fallback", { search: "", liveFeed: "https://feed.example/timeline.json" });
   app.nodes.get("refresh-now").listeners.get("click")();
   await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.match(app.nodes.get("sync-status").textContent, /Live updates delayed/);
-  assert.equal(app.fetchUrls[2], "https://longtable.test/data/timeline.json");
+  assert.match(app.nodes.get("sync-status").textContent, /Live feed delayed/);
+  assert.equal(new URL(app.fetchUrls[2]).pathname, "/data/timeline.json");
   assert.match(allText(app.nodes.get("tables")), /Latest table/);
   app.nodes.get("refresh-now").listeners.get("click")();
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -777,7 +783,7 @@ test("feed failure falls back visibly without replacing a newer view, then recov
 test("archive and sample never contact the configured live feed", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   for (const archive of [false, true]) {
-    const app = await runApp([data], `isolated-feed-${archive}`, { archive, liveFeed: "https://raw.githubusercontent.com/example/site/main/site/data/timeline.json" });
+    const app = await runApp([data], `isolated-feed-${archive}`, { archive, liveFeed: "https://feed.example/timeline.json" });
     app.nodes.get("refresh-now").listeners.get("click")();
     app.frames.shift()(performance.now() + 61_000);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -835,4 +841,39 @@ test("manual and automatic checks share one bounded request", async () => {
   resolveFetch({ ok: true, json: async () => structuredClone(data) });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(app.nodes.get("refresh-now").disabled, false);
+});
+
+
+test("failed live service compares backup snapshots instead of trusting a stale raw response", async () => {
+  const old = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  old.generated_at = new Date(Date.now() - 180_000).toISOString();
+  const current = structuredClone(old);
+  current.generated_at = new Date().toISOString();
+  current.tables[0].name = "Action from seconds ago";
+  const app = await runApp([old, new Error("offline"), current, old], "valid-stale-feed", {
+    search: "", liveFeed: "https://feed.example/timeline.json", backupFeed: "https://feed.example/timeline.json",
+  });
+  app.nodes.get("refresh-now").listeners.get("click")();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(allText(app.nodes.get("tables")), /Action from seconds ago/);
+  assert.match(app.nodes.get("sync-status").textContent, /Live feed delayed.*Data published at/);
+});
+
+
+test("returning to a visible page catches up without animation frames", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.generated_at = new Date(Date.now() - 10000).toISOString();
+  const next = structuredClone(data);
+  next.generated_at = new Date().toISOString();
+  next.tables[0].name = "Updated while hidden";
+  const app = await runApp([data, next], "visible-live-catchup", { search: "", liveFeed: "https://feed.example/timeline.json" });
+  assert.ok(app.intervals.length >= 1);
+  document.hidden = true;
+  app.documentListeners.get("visibilitychange")();
+  assert.equal(app.fetchUrls.length, 1);
+  document.hidden = false;
+  app.documentListeners.get("visibilitychange")();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(app.fetchUrls.length, 2);
+  assert.match(allText(app.nodes.get("tables")), /Updated while hidden/);
 });

@@ -952,17 +952,25 @@ async function readTimeline(url) {
 }
 
 async function fetchTimeline() {
-  const liveFeed = !state.archive && !state.sample && $("live-feed")?.getAttribute("content");
-  state.feedDelayed = false;
-  if (liveFeed) {
-    // Each check needs a fresh CDN key; no-store alone does not bypass its five-minute cache.
-    const url = new URL(liveFeed);
-    url.searchParams.set("check", String(Date.now()));
-    try { return await readTimeline(url.href); }
-    catch { state.feedDelayed = true; }
+  if (state.archive || state.sample) {
+    return readTimeline(state.archive ? "./timeline.json" : "./data/timeline.sample.json");
   }
-  const url = state.archive ? "./timeline.json" : state.sample ? "./data/timeline.sample.json" : "./data/timeline.json";
-  return readTimeline(url);
+  const liveFeed = $("live-feed")?.getAttribute("content");
+  state.feedDelayed = false;
+  if (!liveFeed) return readTimeline("./data/timeline.json");
+  const freshUrl = (value) => {
+    const url = new URL(value, location.href);
+    url.searchParams.set("check", String(Date.now()));
+    return url.href;
+  };
+  // The live service reads the primary database and forbids intermediary caching.
+  try { return await readTimeline(freshUrl(liveFeed)); }
+  catch { state.feedDelayed = true; }
+  const backups = ["./data/timeline.json", $("backup-feed")?.getAttribute("content")].filter(Boolean);
+  const results = await Promise.allSettled(backups.map(url => readTimeline(freshUrl(url))));
+  const snapshots = results.filter(result => result.status === "fulfilled").map(result => result.value);
+  if (!snapshots.length) throw results[0].reason;
+  return snapshots.sort((a, b) => Date.parse(b.generated_at) - Date.parse(a.generated_at))[0];
 }
 
 function updateSyncStatus() {
@@ -977,9 +985,10 @@ function updateSyncStatus() {
   const checked = state.lastChecked ? formatDate(state.lastChecked, { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "";
   let message = state.refreshing ? "Checking for updates…"
     : state.staleMessage ? "Updates unavailable. Your last loaded view is still shown; we’ll retry."
-    : state.feedDelayed ? "Live updates delayed. Using the saved website copy; we’ll retry."
+    : state.feedDelayed ? "Live feed delayed. Showing the newest backup; retrying the live connection."
     : final ? "Final event record. Automatic updates have stopped."
-    : `Checked at ${checked}. Checking every 5 seconds.`;
+    : `Checked at ${checked}. Checking every 2 seconds.`;
+  if (state.data) message += ` Data published at ${formatDate(Date.parse(state.data.generated_at), { hour: "numeric", minute: "2-digit", second: "2-digit" })}.`;
   if (!final && state.clock && state.clock.mode !== "follow-now") message += " Viewing an earlier time — choose Return to Now to see current actions.";
   if ($("sync-status").textContent !== message) $("sync-status").textContent = message;
 }
@@ -1029,12 +1038,21 @@ async function refresh() {
     setStatus(state.staleMessage, "stale");
   } finally {
     state.refreshing = false;
-    state.lastRefresh = performance.now();
     updateSyncStatus();
+    renderActivity();
   }
 }
 
 $("refresh-now")?.addEventListener("click", () => { void refresh(); });
+function checkLiveUpdates() {
+  if (state.data?.phase === "live" && state.clock?.source === "live"
+      && performance.now() - state.lastRefresh >= 2_000) void refresh();
+}
+// Polling must survive suspended animation frames and catch up on returning from Discord.
+setInterval(checkLiveUpdates, 2_000);
+document.addEventListener?.("visibilitychange", () => {
+  if (!document.hidden && state.data?.phase === "live") void refresh();
+});
 
 function renderActivity() {
   if (!state.data || !state.clock) return;
@@ -1238,7 +1256,7 @@ function loop(now) {
   if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
   if (previous.mode !== state.clock.mode && (previous.mode === "follow-now" || state.clock.mode === "follow-now")) { clearSpeech(); state.snap = true; }
   const active = activeEvents(state.data, state.time, state.adminEvents);
-  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 5_000) {
+  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 2_000) {
     state.lastRefresh = now;
     void refresh();
   }
