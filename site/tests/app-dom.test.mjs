@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout } from "../model.mjs";
+import { createRoomLayout, seatPositionForPlan } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 
 class FakeNode {
@@ -876,4 +876,33 @@ test("returning to a visible page catches up without animation frames", async ()
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(app.fetchUrls.length, 2);
   assert.match(allText(app.nodes.get("tables")), /Updated while hidden/);
+});
+
+
+test("attendee walking follows replay speed and freezes when the event clock is paused", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const table = data.tables[0];
+  const person = data.people.find(person => person.id === table.dm);
+  data.tables = [{ ...table, start: 1, end: 4, signups: [] }];
+  data.people = [{ ...person, movements: [], presence: { planned: [0, data.event.slots], actual: { here: null, leaving: null } } }];
+  data.events = [];
+  data.visitors = { open: true, people: [] };
+  const seat = seatPositionForPlan(createRoomLayout(data.tables, data.room_layout), 0, 0);
+  const sprites = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar")).map(call => call.args.slice(4));
+  for (const speed of [1, 30, 600]) {
+    const app = await runApp([data], `walking-speed-${speed}`, { search: "?sample=1&at=0.99999" });
+    const step = stageStepper(app);
+    app.nodes.get("speed").listeners.get("change")({ target: { value: String(speed) } });
+    app.nodes.get("play").listeners.get("click")();
+    step(100);
+    const atSeat = sprites(app).some(args => args[0] === Math.round((seat.x - .5) * 32)
+      && args[1] === Math.round((seat.y - .6) * 32));
+    if (speed !== 30) assert.equal(atSeat, speed === 600, `speed ${speed}: fast replay must move the attendee all the way to the table`);
+    app.nodes.get("play").listeners.get("click")();
+    step(100);
+    const paused = sprites(app);
+    step(1000);
+    assert.deepEqual(sprites(app), paused, `speed ${speed}: pause must stop walking`);
+    assert.deepEqual(app.errors, []);
+  }
 });

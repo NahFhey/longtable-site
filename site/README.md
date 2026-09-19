@@ -294,7 +294,7 @@ framing includes the stage during messages; manual camera framing remains in use
 Discord player options and visitor room buttons publish per-person movement
 histories. The hall replays food, lounge, and table choices at their recorded
 times, with normal walking animation. Explicit choices override automatic
-spotlight/break/meal movement while the attendee is present and the matching
+spotlight/meal movement while the attendee is present and the matching
 game or visitor context applies. Game assignments supersede older visitor choices.
 A successful dice-form submission records a return to the game table, including
 when the outcome is private. The private outcome itself is never published.
@@ -322,3 +322,33 @@ this release onward. Private dice results and pending/rejected messages are excl
 Actor names come from current public people records, so hiding someone anonymizes
 their earlier entries too. Deleted games appear as “removed game”; raw Discord
 identifiers, copied names, and arbitrary result messages are never stored in activity.
+
+## Meals, lounge activities, and scheduled breaks
+
+Food visits are derived from event time: 20 seconds at each of the two serving
+tables, 30 seconds to reach a food-area chair, five minutes eating, then 30 seconds
+to take the plate to the labelled trash bin. The plate empties while eating and
+disappears at the bin. Afterward, the attendee resumes their last lounge/table
+choice, or their current scheduled activity. A new movement, departure, or game
+assignment supersedes the visit. Automatic visitor meals continue across their
+four-minute wandering beats; an event meal starts one visit per attendee rather
+than keeping them at the buffet for the whole event meal window.
+
+A lone lounge attendee reads, two chat, and three to six play cards. Larger crowds
+split into groups of up to four alternating cards and conversation. Speakers and
+food diners are excluded from the lounge population. Activity labels, props, and
+hover descriptions reflect these activities; the canvas description includes
+population counts. Food stages and lounge groups reconstruct from the selected
+time and roster on refresh or rewind. Reduced motion shows the same activities
+without walking or eating animation.
+
+Scheduled breaks appear in the existing timeline break events. During a break,
+an anonymous staff member announces the return time from the stage, and the
+announcement also appears in the accessible current-event text. Present attendees
+move to the lounge, including those with explicit food/table choices; stage
+speakers and spotlights retain their temporary priority. At the end, attendees
+resume their current location rules. Breaks do not extend game end times.
+
+Attendee walking uses the same event-time delta as staff, so replay speed changes
+apply to both and pausing freezes ordinary travel. Stage speech remains readable
+for its full display time; its temporary visit may finish while replay is paused.

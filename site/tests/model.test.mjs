@@ -367,7 +367,8 @@ test("movement overlap priority is spotlighted person, break, meal, ordinary", (
   active.spotlight.person = "hidden-key";
   assert.equal(resolveLocation(data, player, 2, active).label, "the lounge (break)");
   active.break = null;
-  assert.equal(resolveLocation(data, player, 2, active).kind, "food");
+  assert.equal(resolveLocation(data, player, 1 + 1 / data.event.slot_minutes, active).kind, "food");
+  assert.equal(resolveLocation(data, player, 2, active).kind, "table");
   active.meal = null;
   assert.equal(resolveLocation(data, player, 2, active).kind, "table");
   assert.equal(playbackSpeed(1800, { announce: {}, spotlight: null, break: null, meal: null }), 30);

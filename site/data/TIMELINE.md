@@ -137,8 +137,10 @@ in time order; equal-time entries use insertion order. At the selected time, the
 latest eligible entry controls location while the person is present. A table
 entry applies only to that person's current game assignment. A visitor entry
 applies only between games while in the visitor group and stops at the next game.
-Explicit movement takes priority over automatic spotlight, break, and meal
-movement. It never changes seat reservations or attendance. Deleting a table
+Explicit movement takes priority over automatic spotlight and meal
+movement. Event breaks temporarily send attendees to the lounge. Food choices
+last for serving, five minutes of eating, and clearing the plate, then resume
+the previous eligible movement or current scheduled activity. It never changes seat reservations or attendance. Deleting a table
 removes its movement references.
 
 Dice-form submissions record a return to the active table. Private outcomes

@@ -742,11 +742,31 @@ export function ordinaryLocation(timeline, person, slot) {
   return { kind: "lounge", label: "the lounge" };
 }
 
+/** A food visit uses event seconds, so refresh, pause and rewind preserve the meal. */
+export function foodVisit(timeline, slot, startedAt) {
+  const elapsed = Math.max(0, (slot - startedAt) * timeline.event.slot_minutes * 60);
+  // Allow for floating-point conversion at the half-open phase boundaries.
+  const seconds = Math.round(elapsed * 1e6) / 1e6;
+  if (seconds >= 400) return null;
+  const phase = seconds < 20 ? "serving-first" : seconds < 40 ? "serving-second"
+    : seconds < 70 ? "seating" : seconds < 370 ? "eating" : "trash";
+  const labels = { "serving-first": "the first food table, filling a plate",
+    "serving-second": "the second food table, filling a plate", seating: "the food seating with a plate",
+    eating: "the food seating, eating", trash: "the trash bin, clearing a plate" };
+  return { kind: "food", label: labels[phase], foodPhase: phase,
+    plate: seconds < 390, foodRemaining: Math.max(0, Math.min(1, (370 - seconds) / 300)) };
+}
+
 /** Explicit choices override automatic activity while their table/visitor context still applies. */
 export function resolveLocation(timeline, person, slot, active = activeEvents(timeline, slot)) {
   const ordinary = ordinaryLocation(timeline, person, slot);
   if (ordinary.kind === "absent") return ordinary;
+  if (active.break) {
+    if (active.spotlight?.person === person.id) return { kind: "spotlight", label: "the stage", event: active.spotlight };
+    return { kind: "lounge", label: "the lounge (break)", event: active.break };
+  }
   const moves = person.movements || [];
+  let finishedFood = false;
   for (let index = moves.length - 1; index >= 0; index -= 1) {
     const move = moves[index];
     if (move.at > slot) continue;
@@ -755,13 +775,70 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
     // A visitor's choice before a game must not resume after that game ends.
     if (move.table === null && timeline.tables.some((table) => table.start > move.at && table.start <= slot
       && (table.dm === person.id || table.signups.some((signup) => signup.person === person.id)))) break;
-    return move.destination === "table" ? ordinary
-      : { kind: move.destination, label: move.destination === "food" ? "the food area" : "the lounge" };
+    if (move.destination === "food") {
+      if (finishedFood) continue;
+      const visit = foodVisit(timeline, slot, move.at);
+      if (visit) return visit;
+      finishedFood = true;
+      continue; // Resume the last lounge/table choice, without replaying older meals.
+    }
+    return move.destination === "table" ? ordinary : { kind: "lounge", label: "the lounge" };
   }
   if (active.spotlight?.person === person.id) return { kind: "spotlight", label: "the stage", event: active.spotlight };
-  if (active.break) return { kind: "lounge", label: "the lounge (break)", event: active.break };
-  if (active.meal) return { kind: "food", label: "the food corner", event: active.meal };
-  return ordinary;
+  if (active.meal && !finishedFood) {
+    const visit = foodVisit(timeline, slot, active.meal.at ?? slot);
+    if (visit) return { ...visit, event: active.meal };
+  }
+  // Visitors can finish a meal across a four-minute wandering beat.
+  if (ordinary.visitorBeat !== undefined && !finishedFood) {
+    for (const beat of [ordinary.visitorBeat, ordinary.visitorBeat - 1]) {
+      const start = beat * 4 / timeline.event.slot_minutes;
+      if (start < 0 || ordinaryLocation(timeline, person, start).kind !== "food") continue;
+      const visit = foodVisit(timeline, slot, start);
+      if (visit) return visit;
+    }
+  }
+  return ordinary.kind === "food" ? { kind: "lounge", label: "the lounge" } : ordinary;
+}
+
+/** Food tables, seats and bin share geometry with the rendered furniture. */
+export function foodGeometry(layout, index = 0, count = 1) {
+  const { x, y } = layout.food;
+  const columns = Math.min(6, Math.max(1, count));
+  const rows = Math.ceil(count / columns);
+  return {
+    first: { x: x + 2, y: y + 2.3 },
+    second: { x: x + 5.8, y: y + 2.5 },
+    seat: { x: x + 8 + (index % columns) * 1.15,
+      y: y + 2.1 + Math.floor(index / columns) * Math.min(1.4, 3 / Math.max(1, rows - 1)) },
+    bin: { x: x + 15, y: y + 4.8 },
+  };
+}
+
+/** Allocate activities once for the people actually in the lounge, excluding speakers and diners. */
+export function loungeActivities(layout, people) {
+  const result = new Map();
+  const ordered = [...people].sort((a, b) => a.id.localeCompare(b.id));
+  const count = ordered.length;
+  const groups = count <= 6 ? 1 : Math.ceil(count / 4);
+  const columns = Math.max(1, Math.min(groups, Math.floor((layout.lounge.w - 6) / 5)));
+  const rows = Math.ceil(groups / columns);
+  let index = 0;
+  for (let group = 0; group < groups; group += 1) {
+    const size = Math.floor(count / groups) + (group < count % groups ? 1 : 0);
+    const activity = count === 1 ? "reading" : count === 2 ? "chatting"
+      : count <= 6 || group % 2 === 0 ? "cards" : "chatting";
+    const center = { x: layout.lounge.x + 5 + (group % columns) * (layout.lounge.w - 8) / columns,
+      y: layout.lounge.y + 2.5 + (Math.floor(group / columns) - (rows - 1) / 2) * 2 / rows };
+    for (let member = 0; member < size; member += 1) {
+      const angle = member * Math.PI * 2 / size;
+      result.set(ordered[index++].id, { activity, group, center,
+        label: `the lounge, ${activity === "cards" ? "playing cards" : activity}`,
+        position: { x: center.x + (size === 1 ? 0 : Math.cos(angle) * 1.2),
+          y: center.y + (size === 1 ? 0 : Math.sin(angle) * .65) } });
+    }
+  }
+  return result;
 }
 
 export function playbackSpeed(requested, active) {
@@ -847,6 +924,7 @@ export function speechView(timeline, speechEvent, slot, active = activeEvents(ti
 /** Plain-text equivalent of every canvas-only event reaction. */
 export function accessibleEventText(timeline, active, speechEvent = null) {
   const parts = [];
+  if (active.break) parts.push(`Staff announcement: Break time! Take a ${active.break.duration * timeline.event.slot_minutes}-minute break in the lounge, then return to your game.`);
   if (active.announce) parts.push(`Announcement: ${active.announce.text}`);
   if (active.spotlight) {
     const person = timeline.people.find((candidate) => candidate.id === active.spotlight.person);

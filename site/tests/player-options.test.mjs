@@ -38,12 +38,13 @@ test('player movement replays at chosen time, keeps the seat, and ends with the 
   assert.equal(place(at + .4).kind, 'absent');
 });
 
-test('visitor choices persist between automatic wandering beats and yield to a game', () => {
+test('visitor meals finish automatically and choices yield to a game', () => {
   const { data, table, person } = fixture();
   person.movements = [{ at: 0, table: null, destination: 'food' }];
   const timeline = validateTimeline(data), visitor = timeline.people.find(p => p.id === person.id);
   if (table.start > 0) {
-    assert.equal(resolveLocation(timeline, visitor, table.start / 2).kind, 'food');
+    assert.equal(resolveLocation(timeline, visitor, 1 / data.event.slot_minutes).kind, 'food');
+    assert.notEqual(resolveLocation(timeline, visitor, table.start / 2).kind, 'food');
   }
   assert.equal(resolveLocation(timeline, visitor, table.start).kind, 'table');
   visitor.movements = [{ at: table.end, table: null, destination: 'lounge' }];

@@ -12,6 +12,8 @@ import {
   crossedSpeechEvents,
   displayName,
   hallAmbience,
+  foodGeometry,
+  loungeActivities,
   diceAt,
   diceText,
   indexAdminEvents,
@@ -103,21 +105,15 @@ const state = {
   speech: null,
   stageQueue: [],
   ambience: null,
+  leisure: new Map(),
+  locations: new Map(),
+  diners: [],
   staleMessage: "",
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && new URLSearchParams(location.search).get("sample") === "1",
 };
 
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
-function hashNumber(value) {
-  let n = value >>> 0;
-  n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
-  return n >>> 0;
-}
-function random(seed) {
-  let n = hashNumber(seed || 1);
-  return () => { n = (Math.imul(n, 1664525) + 1013904223) >>> 0; return n / 4294967296; };
-}
 
 function setStatus(message, className = "") {
   const status = $("status");
@@ -212,14 +208,6 @@ function seatPosition(tableIndex, seat) {
   return seatPositionForPlan(state.layout, tableIndex, seat);
 }
 
-function spotIn(rect, seed, pad = 0.8) {
-  const next = random(seed);
-  return {
-    x: rect.x + pad + next() * Math.max(0.1, rect.w - pad * 2),
-    y: rect.y + pad + 0.5 + next() * Math.max(0.1, rect.h - pad * 2 - 0.5),
-  };
-}
-
 function destination(runtime, now, active) {
   const custom = state.speech?.event.kind === "donation" && state.speech.event.person === runtime.person.id;
   if (custom) {
@@ -229,24 +217,24 @@ function destination(runtime, now, active) {
   }
   const queueIndex = state.stageQueue.indexOf(runtime.person.id);
   if (queueIndex >= 0) return { kind: "stage-queue", label: "the stage queue", position: stageQueuePosition(state.layout, queueIndex, state.stageQueue.length), present: true };
-  const place = resolveLocation(state.data, runtime.person, state.time, active);
+  const place = state.locations.get(runtime.person.id);
   if (place.kind === "absent") return { ...place, label: "the door", position: state.layout.doorPosition, present: false };
   if (place.kind === "spotlight") return { ...place, position: state.layout.stageFront, present: true };
   const wander = place.visitorBeat ?? Math.floor(now / 9000 + runtime.ordinal * 0.37);
-  const seed = hashNumber((runtime.person.variant ?? runtime.ordinal + 104729) + wander * 7919);
   if (place.kind === "visiting") return { ...place, position: {
     x: state.layout.trunkX,
     y: state.layout.aisles[(wander + runtime.ordinal) % state.layout.aisles.length],
   }, present: true };
   if (place.kind === "lounge") {
-    const socialSeed = place.visitorBeat === undefined ? seed : hashNumber(Math.floor(runtime.ordinal / 3) + wander * 7919);
-    const position = spotIn(state.layout.lounge, socialSeed, 1);
-    if (place.visitorBeat !== undefined) position.x += (runtime.ordinal % 3 - 1) * .5;
-    return { ...place, position, present: true };
+    const activity = state.leisure.get(runtime.person.id);
+    return { ...place, ...activity, present: true };
   }
   if (place.kind === "food") {
-    const queue = { x: state.layout.food.x, y: state.layout.food.y + 2.7, w: state.layout.food.w, h: state.layout.food.h + 1 };
-    return { ...place, position: spotIn(queue, seed, 0.6), present: true };
+    const geometry = foodGeometry(state.layout, state.diners.indexOf(runtime.person.id), Math.max(4, state.diners.length));
+    const position = place.foodPhase === "serving-first" ? geometry.first
+      : place.foodPhase === "serving-second" ? geometry.second
+      : place.foodPhase === "trash" ? { x: geometry.bin.x - .7, y: geometry.bin.y } : geometry.seat;
+    return { ...place, position, present: true };
   }
   return { ...place, position: seatPosition(place.tableIndex, place.seat), present: true };
 }
@@ -291,8 +279,17 @@ function syncPeople() {
 }
 
 function updatePeople(realSeconds, now, active) {
+  state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
+  const onStage = new Set(state.stageQueue);
+  if (state.speech?.event.kind === "donation") onStage.add(state.speech.event.person);
+  state.leisure = loungeActivities(state.layout, state.data.people.filter(person =>
+    state.locations.get(person.id).kind === "lounge" && !onStage.has(person.id)));
+  state.diners = state.data.people.filter(person => state.locations.get(person.id).kind === "food" && !onStage.has(person.id))
+    .map(person => person.id).sort();
   for (const runtime of state.people.values()) {
     const target = destination(runtime, now, active);
+    const elapsed = Math.max(0, (state.time - (runtime.lastSlot ?? state.time)) * state.data.event.slot_minutes * 60);
+    runtime.lastSlot = state.time;
     runtime.place = target;
     const targetChanged = !runtime.target || !samePoint(runtime.target.position, target.position) || runtime.target.kind !== target.kind;
     if (!runtime.visible && target.present) {
@@ -312,7 +309,10 @@ function updatePeople(realSeconds, now, active) {
       continue;
     }
     if (!runtime.visible || !runtime.position) continue;
-    let budget = WALK_TILES_PER_SECOND * realSeconds;
+    // Use the same event-time delta as staff, including accelerated replay and pause.
+    // Queued speeches can finish their stage visit while replay is paused for reading.
+    const travelSeconds = target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
+    let budget = WALK_TILES_PER_SECOND * travelSeconds;
     while (budget > 0 && runtime.path.length) {
       const point = runtime.path[0];
       const dx = point.x - runtime.position.x;
@@ -402,6 +402,18 @@ function drawRoom() {
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + index, foodY);
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + 4, foodY + index);
   RPG.food.slice(0, state.ambience?.foodCount ?? 6).forEach((item, index) => drawTile(state.images.rpg, item, index < 3 ? foodX + index : foodX + 4, index < 3 ? foodY : foodY + index - 3));
+  const foodScene = foodGeometry(layout);
+  // A visible seat for each diner, with a few ready seats when the area is empty.
+  for (let index = 0; index < Math.max(4, state.diners.length); index += 1) {
+    const { seat } = foodGeometry(layout, index, Math.max(4, state.diners.length));
+    if (!drawTile(state.images.rpg, RPG.chairs.bottom, seat.x - .5, seat.y - .3)) {
+      ctx.fillStyle = "#99734d";
+      ctx.fillRect((seat.x - .4) * TILE * SCALE, (seat.y - .1) * TILE * SCALE, .8 * TILE * SCALE, .4 * TILE * SCALE);
+    }
+  }
+  ctx.fillStyle = "#303e43";
+  ctx.fillRect((foodScene.bin.x - .35) * TILE * SCALE, (foodScene.bin.y - .7) * TILE * SCALE, .7 * TILE * SCALE, .9 * TILE * SCALE);
+  drawLabel("TRASH", foodScene.bin.x, foodScene.bin.y - 1, { size: 2.5, color: "#fff", background: false });
   drawLabel("FOOD", layout.food.x + layout.food.w / 2, layout.food.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 
   drawTile(state.images.rpg, RPG.shelf[0], layout.lounge.x, layout.lounge.y);
@@ -411,6 +423,19 @@ function drawRoom() {
   drawTile(state.images.rpg, RPG.couch[0], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 2);
   drawTile(state.images.rpg, RPG.couch[1], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 1);
   drawLabel("LOUNGE", layout.lounge.x + layout.lounge.w / 2, layout.lounge.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
+
+  const drawnGroups = new Set();
+  for (const activity of state.leisure.values()) {
+    if (drawnGroups.has(activity.group)) continue;
+    drawnGroups.add(activity.group);
+    if (activity.activity === "cards") {
+      ctx.fillStyle = "#326b54";
+      ctx.fillRect((activity.center.x - .6) * TILE * SCALE, (activity.center.y - .35) * TILE * SCALE, 1.2 * TILE * SCALE, .7 * TILE * SCALE);
+      drawLabel("♠ ♥", activity.center.x, activity.center.y, { size: 3, color: "#fff4da", background: false });
+    }
+    drawLabel(activity.activity === "cards" ? "CARDS" : activity.activity === "reading" ? "READING" : "CONVERSATION",
+      activity.center.x, activity.center.y - 1.15, { size: 2.8, color: "#fff4da", background: "#302b3d" });
+  }
 
   if (layout.overflowSeats.length) {
     drawLabel("OVERFLOW SEATING", layout.width / 2, layout.tableGridBottom + 0.7, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.55)" });
@@ -593,10 +618,10 @@ function drawPerson(runtime, now, active) {
   const person = runtime.person;
   const place = runtime.place;
   let x = runtime.position.x - 0.5;
-  let y = runtime.position.y - 0.6;
-  const movingBob = runtime.moving && !reducedMotion.matches && Math.floor(now / 140) % 2 ? 0.07 : 0;
+  let y = runtime.position.y - 0.6 + (place.foodPhase === "eating" && !runtime.moving ? .15 : 0);
+  const movingBob = runtime.moving && !reducedMotion.matches && Math.floor(state.time * state.data.event.slot_minutes * 60 / .14) % 2 ? 0.07 : 0;
   const cheering = active.spotlight && place.kind !== "spotlight" && !place.kind.startsWith("stage-") && !reducedMotion.matches;
-  const social = place.kind === "lounge" && place.visitorBeat !== undefined;
+  const social = place.activity === "chatting" || place.activity === "cards";
   const talkTime = social ? state.time * state.data.event.slot_minutes * 60 : now / 1000;
   const talk = (place.kind === "table" || social) && !runtime.moving && !reducedMotion.matches && ((talkTime + runtime.phase * 6) % 6) < 0.5;
   y -= movingBob + (cheering ? Math.abs(Math.sin(now / 160 + runtime.phase * 8)) * 0.25 : 0);
@@ -621,6 +646,22 @@ function drawPerson(runtime, now, active) {
     drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], x, y, flip);
     drawTile(state.images.characters, SPRITES.hair[appearance.hair], x, y, flip);
     if (person.dm) drawTile(state.images.characters, SPRITES.hats[appearance.hat], x, y - 0.15, flip);
+  }
+  if (place.plate) {
+    const eating = place.foodPhase === "eating" && !runtime.moving;
+    const bite = eating && !reducedMotion.matches && (state.time * state.data.event.slot_minutes * 60 % 5) < 1;
+    const unit = TILE * SCALE;
+    const plateX = x + .7, plateY = y + (bite ? .37 : .68);
+    ctx.fillStyle = "#fff2dc";
+    ctx.beginPath(); ctx.ellipse(plateX * unit, plateY * unit, .25 * unit, .10 * unit, 0, 0, Math.PI * 2); ctx.fill();
+    if (place.foodRemaining > 0 && place.foodPhase !== "trash") {
+      ctx.fillStyle = "#d28a42";
+      ctx.fillRect((plateX - .16) * unit, (plateY - .06) * unit, .32 * unit * place.foodRemaining, .07 * unit);
+    }
+  }
+  if (place.activity === "reading" && !runtime.moving) {
+    ctx.fillStyle = "#e9d5aa";
+    ctx.fillRect((x + .35) * TILE * SCALE, (y + .55) * TILE * SCALE, .5 * TILE * SCALE, .3 * TILE * SCALE);
   }
   if (place.kind === "spotlight" && !runtime.moving) drawLabel("★", x + 0.5, y - 0.55, { size: 6, color: "#ffd84a", background: false });
   if (cheering && ((now / 400 + runtime.phase * 3) % 3) < 1) drawLabel("♥", x + 0.5 + runtime.phase * 0.4, y - 0.6, { size: 4, color: "#ff7a9a", background: false });
@@ -737,7 +778,9 @@ function render(now, active) {
     ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
-  drawStaff(state.ambience.staff);
+  drawStaff(active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff);
+  if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
+    state.layout.stageFront.x + 2, state.layout.stageFront.y - 1.3, "#b6e0df", "Staff");
   const lightSwitch = state.ambience.lightSwitch;
   ctx.fillStyle = lights > .5 ? "#fff3ac" : "#697a9d";
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
@@ -829,7 +872,11 @@ function renderTableList() {
 }
 
 function updateHeader(active) {
-  const staffDescription = `${hallDescription} ${state.ambience?.action ?? ""}`.trim();
+  const activityCounts = { reading: 0, chatting: 0, cards: 0 };
+  for (const person of state.leisure.values()) activityCounts[person.activity] += 1;
+  const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards. Food: ${state.diners.length} collecting, eating or clearing plates.`;
+  const staffAction = active.break ? "Staff are announcing the break from the stage." : state.ambience?.action ?? "";
+  const staffDescription = `${hallDescription} ${staffAction} ${loungeDescription}`.trim();
   if ($("canvas-description").textContent !== staffDescription) $("canvas-description").textContent = staffDescription;
   const clockText = formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
@@ -880,10 +927,10 @@ function clearSpeech() {
   if (state.live) state.live = { ...state.live, speechQueue: [] };
 }
 
-function setClock(clock, persistNow = true) {
+function setClock(clock, persistNow = true, snap = true) {
   state.clock = clock;
   state.time = clock.slot;
-  state.snap = true;
+  state.snap = snap;
   clearSpeech();
   persistClockSelection(performance.now(), persistNow);
 }
@@ -1199,7 +1246,8 @@ canvas.addEventListener("keydown", (event) => {
 
 $("play").addEventListener("click", () => {
   if (!state.data) return;
-  setClock(toggleViewerPlayback(state.clock, state.data));
+  const next = toggleViewerPlayback(state.clock, state.data);
+  setClock(next, true, next.slot !== state.clock.slot);
   state.lastTime = performance.now();
 });
 $("return-now").addEventListener("click", () => {
