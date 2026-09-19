@@ -22,7 +22,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:50:33.577823Z",
+ "generated_at": "2026-09-19T16:12:14.681334Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -217,6 +217,15 @@
     "modifier": 0,
     "total": 7
    }
+  },
+  {
+   "id": "e9",
+   "kind": "donation",
+   "at": 3.41,
+   "duration": null,
+   "text": "test",
+   "person": "p1",
+   "by": "p1"
   }
  ]
 }
