@@ -1,6 +1,15 @@
 {
  "schema": 7,
- "activity": [],
+ "activity": [
+  {
+   "id": "740b8d7e2ecb4ae3925fb678e8ddb5f1",
+   "at": "2026-09-19T15:50:30.872790Z",
+   "action": "move_table",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
+  }
+ ],
  "visitors": {
   "open": true,
   "people": [
@@ -13,7 +22,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:48:32.086306Z",
+ "generated_at": "2026-09-19T15:50:33.577823Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -62,6 +71,11 @@
     },
     {
      "at": 1.5219559516666665,
+     "table": "t1",
+     "destination": "table"
+    },
+    {
+     "at": 2.683818216666667,
      "table": "t1",
      "destination": "table"
     }
@@ -180,6 +194,29 @@
    "text": "this is a test",
    "person": "p1",
    "by": "p1"
+  },
+  {
+   "id": "e8",
+   "kind": "roll",
+   "at": 2.683818216666667,
+   "duration": null,
+   "text": null,
+   "person": "p1",
+   "by": "p1",
+   "table": "t1",
+   "visibility": "public",
+   "roll": {
+    "expression": "4d6",
+    "sides": 6,
+    "faces": [
+     2,
+     2,
+     2,
+     1
+    ],
+    "modifier": 0,
+    "total": 7
+   }
   }
  ]
 }
