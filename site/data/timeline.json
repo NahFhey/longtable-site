@@ -10,114 +10,15 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T13:59:02.209965Z",
+ "generated_at": "2026-09-19T14:28:01.093332Z",
  "event": {
   "name": "Longtable",
-  "start": "2026-09-17T15:00:00-04:00",
+  "start": "2026-09-19T10:30:00-04:00",
   "tz": "America/New_York",
   "slot_minutes": 30,
-  "slots": 38
+  "slots": 326
  },
- "people": [
-  {
-   "id": "p1",
-   "name": "Nah Fhey",
-   "dm": true,
-   "hidden": false,
-   "variant": 4082956081,
-   "appearance": {
-    "skin": 3,
-    "shirt": 12,
-    "hair": 0,
-    "hat": 3
-   },
-   "presence": {
-    "planned": [
-     36,
-     38
-    ],
-    "actual": {
-     "here": 35.54,
-     "leaving": null
-    }
-   }
-  }
- ],
- "tables": [
-  {
-   "id": "t1",
-   "name": "Adventure is out there",
-   "system": "D&D 5e",
-   "pitch": "WHOOOOOOOOOOOOO!!!!",
-   "seats": 5,
-   "walk_ins": true,
-   "start": 2,
-   "end": 26,
-   "dm": "p1",
-   "created_at": "2026-09-17T15:47:31.670228-04:00",
-   "signups": [],
-   "pad": 0
-  },
-  {
-   "id": "t2",
-   "name": "Test",
-   "system": "D&D 5e",
-   "pitch": "",
-   "seats": 5,
-   "walk_ins": true,
-   "start": 35,
-   "end": 38,
-   "dm": "p1",
-   "created_at": "2026-09-18T08:22:49.455196-04:00",
-   "signups": [],
-   "pad": 1
-  }
- ],
- "events": [
-  {
-   "id": "e1",
-   "kind": "shout",
-   "at": 35.2,
-   "duration": null,
-   "text": "Natural 20!",
-   "person": "p1",
-   "by": "p1"
-  },
-  {
-   "id": "e2",
-   "kind": "donation",
-   "at": 35.22,
-   "duration": null,
-   "text": "This is a test",
-   "person": "p1",
-   "by": "p1"
-  },
-  {
-   "id": "e3",
-   "kind": "donation",
-   "at": 35.25,
-   "duration": null,
-   "text": "huzzah!",
-   "person": "p1",
-   "by": "p1"
-  },
-  {
-   "id": "e4",
-   "kind": "shout",
-   "at": 35.63,
-   "duration": null,
-   "text": "More snacks!",
-   "person": "p1",
-   "by": "p1"
-  },
-  {
-   "id": "e5",
-   "kind": "donation",
-   "at": 35.65,
-   "duration": null,
-   "text": "i love you kate",
-   "person": "p1",
-   "by": "p1"
-  }
- ]
+ "people": [],
+ "tables": [],
+ "events": []
 }
