@@ -12,7 +12,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-19T15:07:00.965769Z",
+ "generated_at": "2026-09-19T15:08:17.919035Z",
  "event": {
   "name": "Longtable",
   "start": "2026-09-19T10:30:00-04:00",
@@ -43,6 +43,11 @@
      "at": 1.2101801483333332,
      "table": "t1",
      "destination": "lounge"
+    },
+    {
+     "at": 1.2650856105555555,
+     "table": "t1",
+     "destination": "table"
     }
    ],
    "presence": {
@@ -82,6 +87,26 @@
    "text": "More snacks!",
    "person": "p1",
    "by": "p1"
+  },
+  {
+   "id": "e2",
+   "kind": "roll",
+   "at": 1.2650856105555555,
+   "duration": null,
+   "text": null,
+   "person": "p1",
+   "by": "p1",
+   "table": "t1",
+   "visibility": "public",
+   "roll": {
+    "expression": "1d20",
+    "sides": 20,
+    "faces": [
+     15
+    ],
+    "modifier": 0,
+    "total": 15
+   }
   }
  ]
 }
