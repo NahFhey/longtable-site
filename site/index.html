@@ -62,6 +62,16 @@
           <button id="fit-active" type="button">Fit active tables</button>
         </div>
         <p id="camera-help" class="camera-help">Drag to pan; scroll or pinch to zoom. With the hall focused, use arrow keys and +/−. Home shows the whole room.</p>
+        <div id="music-controls" class="music-controls" role="group" aria-label="Hall music" hidden>
+          <audio id="hall-music" preload="none"></audio>
+          <button id="music-toggle" type="button">Play music</button>
+          <button id="music-next" type="button">Next track</button>
+          <label for="music-volume">Music volume</label>
+          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
+          <output id="music-volume-value" for="music-volume">50%</output>
+          <span id="music-track"></span>
+          <span id="music-status" role="status" aria-live="polite"></span>
+        </div>
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
         <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
@@ -94,6 +104,7 @@
   <footer>
     <p>Last updated <time id="updated">—</time>.</p>
     <p>Art from Kenney’s Roguelike Characters and Roguelike/RPG packs, released under CC0.</p>
+    <p>Music by RandomMind, released under CC0. <a href="./assets/music/CREDITS.txt">Music credits</a>.</p>
   </footer>
   <script type="module" src="./app.mjs"></script>
 </body>

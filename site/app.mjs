@@ -1,4 +1,5 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
+import { setupHallMusic } from "./music.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs";
 import { eventActions } from "./event-config.mjs";
@@ -67,6 +68,7 @@ function arrangeHall() {
 }
 arrangeHall();
 mobile.addEventListener?.("change", arrangeHall);
+setupHallMusic();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {

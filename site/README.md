@@ -352,3 +352,17 @@ resume their current location rules. Breaks do not extend game end times.
 Attendee walking uses the same event-time delta as staff, so replay speed changes
 apply to both and pausing freezes ordinary travel. Stage speech remains readable
 for its full display time; its temporary visit may finish while replay is paused.
+
+## Hall music
+
+Expanding the Great Hall plays RandomMind’s CC0 recordings “The Old Tower Inn”
+and “The Bard’s Tale” in rotation. Collapsing the hall pauses the current track;
+reopening resumes it. Music stays at normal speed during replay, including when
+the event clock is paused. The controls offer mute, next track, and volume.
+Volume starts at 50%; volume and mute preferences are saved in this browser’s
+local storage (`longtable.music.v1`), shared by live pages and event archives.
+If storage is unavailable, preferences last for the page session. If the browser
+blocks autoplay, **Play music** enables audio with a click. No track is fetched
+until playback is needed. Sources and licenses are in `assets/music/CREDITS.txt`.
+New archived renderers include the module, credits, and both MP3s; older archives
+retain their original renderer.

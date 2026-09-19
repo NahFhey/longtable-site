@@ -180,6 +180,13 @@ footer p { margin: .2rem 0; }
 .qr-panel p { max-width: 220px; overflow-wrap: anywhere; font-size: .8rem; }
 .hall-explorer > summary { cursor: pointer; margin: 0 1.5rem; padding: .75rem 0; font-weight: 750; color: var(--gold); }
 .camera-help { color: var(--muted); font-size: .8rem; margin: .5rem 0; }
+.music-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; font-size: .85rem; }
+.music-controls[hidden] { display: none; }
+.music-controls button { min-height: 44px; }
+.music-controls input { width: 8rem; min-height: 44px; accent-color: var(--gold); }
+#music-volume-value { min-width: 3ch; }
+#music-track { flex-basis: 100%; }
+#music-status { color: var(--muted); }
 .table-list { padding-bottom: 1rem; }
 .join-instructions { color: var(--gold); }
 canvas:active { cursor: grabbing; }
