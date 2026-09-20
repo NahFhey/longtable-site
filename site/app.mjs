@@ -1,18 +1,23 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { eventActions, setupFundraising } from "./event-config.mjs?v=fd82af33dc85";
+import { DISCORD_INVITE, eventActions, setupFundraising } from "./event-config.mjs?v=fd82af33dc85";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
+  EVE_MS,
   PALETTE_SIZE,
   activeEvents,
   accessibleEventText,
+  countdownText,
   createRoomLayout,
   createLiveState,
   crossedSpeechEvents,
   displayName,
+  gatheringAmbience,
+  gatheringLocations,
   hallAmbience,
+  hallStage,
   foodGeometry,
   loungeActivities,
   diceAt,
@@ -32,7 +37,7 @@ import {
   tableScenery,
   validateTimeline,
   visibleVariant,
-} from "./model.mjs?v=74551816ed07";
+} from "./model.mjs?v=ed050064360e";
 
 const TILE = 16;
 const SCALE = 2;
@@ -40,6 +45,9 @@ const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
 const MIN_SPEECH_REAL_SECONDS = 1;   // readable even at 1800×
+const EVE_EXODUS_SECONDS = 45;       // departures at T−24 h spread over this many real seconds
+const NO_ACTIVE = Object.freeze({ break: null, meal: null, announce: null, spotlight: null });
+const ABSENT_PLACE = Object.freeze({ kind: "absent", label: "outside the hall" });
 
 // Display milliseconds keep the opening lead and one-second hold visible in replay.
 class HallDoor {
@@ -128,17 +136,59 @@ const state = {
   locations: new Map(),
   diners: [],
   staleMessage: "",
+  statusKey: null,
+  stage: null,          // "gathering" | "eve" | "day" | "after" | null (not a live-source, live-phase package)
+  pollSeconds: 2,
+  gatheringPlaces: new Map(),
+  gatheredCount: 0,
+  nowOffset: 0,
+  nowOverride: false,
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && (
     new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50"),
 };
 
+// `?now=` (ISO-8601 or epoch milliseconds) shifts the wall clock for review and tests; time keeps flowing from it.
+function parseNowOverride(value) {
+  if (value === null || value.trim() === "") return null;
+  const trimmed = value.trim();
+  const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+{
+  const override = parseNowOverride(new URLSearchParams(location.search).get("now"));
+  state.nowOverride = override !== null;
+  state.nowOffset = override === null ? 0 : override - Date.now();
+}
+function wallNow() { return Date.now() + state.nowOffset; }
+const upcoming = () => state.clock?.mode === "upcoming";
+const beforeDoors = () => state.stage === "gathering" || state.stage === "eve";
+// The gathering scene: watching the hall as it is now, before doors (the preview keeps the event-day path).
+const gatheringScene = () => upcoming() && beforeDoors();
+
+function updateStage(now) {
+  const liveSource = state.clock?.source === "live" && state.data?.phase === "live";
+  state.stage = liveSource ? hallStage(state.data, now) : null;
+  state.pollSeconds = beforeDoors() && Date.parse(state.data.event.start) - now > 60 * 60_000 ? 30 : 2;
+}
+
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
 
-function setStatus(message, className = "") {
+function setStatus(message, className = "", link = null) {
   const status = $("status");
   const nextClass = `status${className ? ` ${className}` : ""}`;
-  if (status.textContent !== message) status.textContent = message;
+  const key = `${message}\u0000${link?.text ?? ""}\u0000${link?.href ?? ""}`;
+  if (state.statusKey !== key) {
+    state.statusKey = key;
+    status.replaceChildren();
+    status.textContent = message;
+    if (link) {
+      const anchor = document.createElement("a");
+      anchor.textContent = link.text;
+      anchor.href = link.href;
+      status.append(anchor);
+    }
+  }
   if (status.className !== nextClass) status.className = nextClass;
 }
 
@@ -157,7 +207,7 @@ function formatDate(milliseconds, options) {
 
 function formatSlot(slot, withDay = false) {
   return formatDate(slotToMs(state.data, slot), {
-    ...(state.data.event.slots * state.data.event.slot_minutes > 1440 ? { month: "short", day: "numeric" } : {}),
+    ...(state.data.event.slots * state.data.event.slot_minutes >= 1440 ? { month: "short", day: "numeric" } : {}),
     ...(withDay ? { weekday: "short" } : {}), hour: "numeric", minute: "2-digit",
   });
 }
@@ -190,7 +240,8 @@ function updateCamera() {
     if (!state.manualCamera) state.frameKey = null;
   }
   state.viewport = size;
-  const indices = relevantTableIndices(state.data.tables, state.time);
+  // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
+  const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
   const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
   const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
   if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
@@ -312,7 +363,18 @@ function syncPeople() {
 
 function updatePeople(realSeconds, now, active) {
   if (state.snap || reducedMotion.matches) state.door.reset();
-  state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
+  const gathering = gatheringScene();
+  if (gathering) {
+    // Planned placement, not the per-slot resolver. In the eve everyone leaves, staggered by runtime.phase
+    // from the moment the eve began, so an open tab and a tab loaded mid-exodus see the same schedule.
+    const eveElapsed = state.stage === "eve" ? (wallNow() - (Date.parse(state.data.event.start) - EVE_MS)) / 1000 : -1;
+    state.locations = new Map(state.data.people.map(person => {
+      const leaving = state.stage === "eve" && eveElapsed >= (state.people.get(person.id)?.phase ?? 0) * EVE_EXODUS_SECONDS;
+      return [person.id, leaving ? ABSENT_PLACE : state.gatheringPlaces.get(person.id) ?? ABSENT_PLACE];
+    }));
+  } else {
+    state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
+  }
   const onStage = new Set(state.stageQueue);
   if (state.speech?.event.kind === "donation") onStage.add(state.speech.event.person);
   state.leisure = loungeActivities(state.layout, state.data.people.filter(person =>
@@ -346,7 +408,8 @@ function updatePeople(realSeconds, now, active) {
     if (!runtime.visible || !runtime.position) continue;
     // Use the same event-time delta as staff, including accelerated replay and pause.
     // Queued speeches can finish their stage visit while replay is paused for reading.
-    const travelSeconds = target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
+    // The gathering has no event-time delta; walk-ins and walk-outs there run at wall-clock pace.
+    const travelSeconds = gathering ? realSeconds : target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
     let budget = WALK_TILES_PER_SECOND * travelSeconds;
     if (runtime.entering) {
       if (!target.present) {
@@ -625,12 +688,15 @@ function chairFor(offset) {
 
 function truncate(value, length) { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
 
+// Before doors every table is shown ready for its game (furniture and props, no porter): people wait at them.
+function scenerySlot(table) { return upcoming() ? table.start : state.time; }
+
 function drawTables() {
   state.data.tables.forEach((table, index) => {
     const cell = state.layout.cells[index];
     const firstSeat = seatPosition(index, 0);
-    const lifecycle = tableLifecycle(state.data, table, state.time);
-    const scenery = tableScenery(state.data, table, state.time, state.layout, index, reducedMotion.matches);
+    const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
+    const scenery = tableScenery(state.data, table, scenerySlot(table), state.layout, index, reducedMotion.matches);
     const open = lifecycle.phase === "active";
     if (state.selectedId === table.id) {
       ctx.fillStyle = "rgba(255,210,122,.25)";
@@ -738,7 +804,7 @@ function drawTableLabels() {
     const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
     ctx.font = "700 13px system-ui, sans-serif";
-    const lifecycle = tableLifecycle(state.data, table, state.time);
+    const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
     const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
     const text = `${truncate(table.name, 26)} · ${status}`;
     const width = Math.min(state.viewport.width - 8, ctx.measureText(text).width + 16);
@@ -896,9 +962,14 @@ function drawEvents(active, now) {
 }
 
 function render(now, active) {
-  const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
-    (Date.now() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
-  state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
+  const gathering = gatheringScene();
+  if (gathering) {
+    state.ambience = gatheringAmbience(state.data, state.layout, wallNow(), reducedMotion.matches);
+  } else {
+    const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
+      (wallNow() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
+    state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
+  }
   updateCamera();
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
@@ -913,7 +984,7 @@ function render(now, active) {
   drawRoom();
   drawTables();
   [...state.people.values()].filter((person) => person.visible && !person.entering).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
-  state.data.tables.forEach((table, index) => {
+  if (!gathering) state.data.tables.forEach((table, index) => {
     if (tableLifecycle(state.data, table, state.time).phase === "active") {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
     }
@@ -1036,32 +1107,44 @@ function updateHeader(active) {
   for (const person of state.leisure.values()) activityCounts[person.activity] += 1;
   const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards. Food: ${state.diners.length} collecting, eating or clearing plates.`;
   const staffAction = active.break ? "Staff are announcing the break from the stage." : state.ambience?.action ?? "";
-  const staffDescription = `${hallDescription} ${staffAction} ${loungeDescription}`.trim();
-  const description = staffDescription + (state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "");
+  const hostSuffix = state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "";
+  const upcomingNow = upcoming();
+  const start = Date.parse(state.data.event.start);
+  const gathered = state.gatheredCount;
+  const gatheredSentence = gathered === 0 ? "Nobody has arrived yet." : `${gathered} ${gathered === 1 ? "person has" : "people have"} gathered so far.`;
+  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + hostSuffix;
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
-  const clockText = formatSlot(state.time, true);
+  // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
+  const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
+  const clockText = upcomingNow ? doorsText : formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
-  const eventLabel = active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
+  const clockStamp = upcomingNow ? state.data.event.start : "";
+  if ($("clock").dateTime !== clockStamp) $("clock").dateTime = clockStamp;
+  const countdown = upcomingNow ? countdownText(start - wallNow()) : "";
+  const eventLabel = upcomingNow ? countdown : active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
   if ($("scene-event").textContent !== eventLabel) $("scene-event").textContent = eventLabel;
   let eventText = accessibleEventText(state.data, active, state.speech?.phase === "speaking" ? state.speech.event : null);
   if (state.speech?.event.kind === "donation" && state.speech.phase === "approaching") {
     eventText += ` ${displayName(state.people.get(state.speech.event.person)?.person)} is walking to the stage microphone.`;
   }
   if (state.stageQueue.length) eventText += ` ${state.stageQueue.length} waiting to speak at the stage.`;
+  if (upcomingNow) eventText = `Doors open ${doorsText}. ${countdown}.`;
   eventText = eventText.trim();
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
   const following = state.clock.mode === "follow-now";
-  $("play").textContent = state.clock.mode === "paused" ? "Play" : "Pause";
+  $("play").textContent = state.clock.mode === "paused" || upcomingNow ? "Play" : "Pause";
   $("play").disabled = false;
   $("scrubber").disabled = false;
   $("speed").disabled = following;
   const canFollow = state.clock.source === "live" && state.data.phase === "live";
-  $("return-now").hidden = !canFollow || following;
-  $("now-marker").hidden = !canFollow;
-  if (canFollow) $("now-marker").textContent = `Now: ${formatDate(Date.now(), { hour: "numeric", minute: "2-digit" })}`;
+  $("return-now").hidden = !canFollow || following || upcomingNow;
+  // Before doors, now lies outside the scrubber's range, so the marker would mislead.
+  const nowInRange = canFollow && !upcomingNow && !beforeDoors();
+  $("now-marker").hidden = !nowInRange;
+  if (nowInRange) $("now-marker").textContent = `Now: ${formatDate(wallNow(), { hour: "numeric", minute: "2-digit" })}`;
   const badge = $("mode-badge");
-  badge.textContent = following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : Date.now() < Date.parse(state.data.event.start) ? "UPCOMING" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
+  badge.textContent = upcomingNow ? "UPCOMING" : following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
   badge.className = `badge${following ? " live" : ""}`;
   for (const table of state.data.tables) {
     const text = `At selected time: ${tableLifecycle(state.data, table, state.time).label}`;
@@ -1073,12 +1156,22 @@ function updateHeader(active) {
     if (node && node.textContent !== text) node.textContent = text;
     if (state.selectedId === table.id && state.detailPhaseNode && state.detailPhaseNode.textContent !== text) state.detailPhaseNode.textContent = text;
   }
-  const beforeEvent = Date.now() < Date.parse(state.data.event.start);
+  const beforeEvent = wallNow() < start;
   const available = state.data.tables.filter((table) => table.signups.length < table.seats && (beforeEvent || state.time < table.end)).length;
   const count = state.data.tables.length;
-  const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
   const note = !ctx ? " · Hall graphics unavailable; use the table list." : state.assetsFailed ? " · Sprite art unavailable; simplified graphics are in use." : "";
-  if (!state.staleMessage) setStatus(base + note, !ctx || state.assetsFailed ? "stale" : "");
+  const statusClass = !ctx || state.assetsFailed ? "stale" : "";
+  if (state.staleMessage) return;
+  if (beforeDoors()) {
+    // The sign-up window: who has gathered, what has space, and the invitation (a link outside sample/archive views).
+    const games = count ? ` · ${available} ${available === 1 ? "game" : "games"} with signup space` : "";
+    const lead = gathered === 0 ? "Nobody has arrived yet" : `${gathered} gathered so far`;
+    const invite = state.sample || state.archive ? null : { text: "Sign up on Discord", href: DISCORD_INVITE };
+    setStatus(`${lead}${games}${note} · ${invite ? "" : "Sign up on Discord"}`, statusClass, invite);
+    return;
+  }
+  const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
+  setStatus(base + note, statusClass);
 }
 
 function clearSpeech() {
@@ -1099,7 +1192,8 @@ function setClock(clock, persistNow = true, snap = true) {
 function persistClockSelection(now, force = false) {
   if (!globalThis.history?.replaceState || !location.href || (!force && now - state.lastUrlWrite < 1000)) return;
   const url = new URL(location.href);
-  if (state.clock.mode === "follow-now") url.searchParams.delete("at");
+  // Following now and waiting for doors are not time choices; `now` is never written here.
+  if (state.clock.mode === "follow-now" || state.clock.mode === "upcoming") url.searchParams.delete("at");
   else url.searchParams.set("at", String(state.time));
   if (url.href !== location.href) {
     try { history.replaceState(null, "", url.href); }
@@ -1202,9 +1296,17 @@ function updateSyncStatus() {
     : state.staleMessage ? "Updates unavailable. Your last loaded view is still shown; we’ll retry."
     : state.feedDelayed ? "Live feed delayed. Showing the newest backup; retrying the live connection."
     : final ? "Final event record. Automatic updates have stopped."
-    : `Checked at ${checked}. Checking every 2 seconds.`;
-  if (state.data) message += ` Data published at ${formatDate(Date.parse(state.data.generated_at), { hour: "numeric", minute: "2-digit", second: "2-digit" })}.`;
-  if (!final && state.clock && state.clock.mode !== "follow-now") message += " Viewing an earlier time — choose Return to Now to see current actions.";
+    : `Checked at ${checked}. Checking every ${state.pollSeconds} seconds.`;
+  if (state.data) {
+    const published = Date.parse(state.data.generated_at);
+    const today = { year: "numeric", month: "numeric", day: "numeric" };
+    const withDate = formatDate(published, today) !== formatDate(wallNow(), today);
+    message += ` Data published at ${formatDate(published, withDate ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" } : { hour: "numeric", minute: "2-digit", second: "2-digit" })}.`;
+  }
+  if (!final && state.clock && state.clock.mode !== "follow-now" && state.clock.mode !== "upcoming") {
+    message += beforeDoors() ? " Previewing the planned day. Choose Return to Now to see the hall as it is."
+      : " Viewing an earlier time — choose Return to Now to see current actions.";
+  }
   if ($("sync-status").textContent !== message) $("sync-status").textContent = message;
 }
 
@@ -1236,6 +1338,8 @@ function installTimeline(data, initial = false) {
   state.frameKey = null;
   renderActions();
   state.adminEvents = indexAdminEvents(data);
+  state.gatheringPlaces = gatheringLocations(data);
+  state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;
   syncPeople();
   state.activity = publicActivity(data);
   state.activityKey = null;
@@ -1273,9 +1377,11 @@ async function refresh() {
 }
 
 $("refresh-now")?.addEventListener("click", () => { void refresh(); });
+// Cadence: 30 s during the sign-up window, 2 s from an hour before doors; nothing while the tab is hidden.
 function checkLiveUpdates() {
+  if (document.hidden) return;
   if (state.data?.phase === "live" && state.clock?.source === "live"
-      && performance.now() - state.lastRefresh >= 2_000) void refresh();
+      && performance.now() - state.lastRefresh >= state.pollSeconds * 1000) void refresh();
 }
 // Polling must survive suspended animation frames and catch up on returning from Discord.
 setInterval(checkLiveUpdates, 2_000);
@@ -1285,14 +1391,15 @@ document.addEventListener?.("visibilitychange", () => {
 
 function renderActivity() {
   if (!state.data || !state.clock) return;
-  const cutoff = state.clock.mode === "follow-now" ? Date.now() : slotToMs(state.data, state.time);
+  const anchoredToNow = state.clock.mode === "follow-now" || state.clock.mode === "upcoming";
+  const cutoff = anchoredToNow ? wallNow() : slotToMs(state.data, state.time);
   const second = Math.floor(cutoff / 1000);
   if (second === state.activitySecond) return;
   state.activitySecond = second;
   const visible = state.activity.filter((entry) => entry.at <= cutoff);
   const entries = visible.slice(0, state.activityLimit);
   const key = `${state.activityLimit}:${entries.map((entry) => entry.id).join(",")}:${visible.length}`;
-  $("activity-note").textContent = `Newest first · ${state.clock.mode === "follow-now" ? "Live" : "Selected time"} · ${state.data.event.tz}`;
+  $("activity-note").textContent = `Newest first · ${state.clock.mode === "follow-now" ? "Live · " : state.clock.mode === "upcoming" ? "" : "Selected time · "}${state.data.event.tz}`;
   if (key === state.activityKey) return;
   state.activityKey = key;
   const list = $("activity-log");
@@ -1429,12 +1536,13 @@ canvas.addEventListener("keydown", (event) => {
 $("play").addEventListener("click", () => {
   if (!state.data) return;
   const next = toggleViewerPlayback(state.clock, state.data);
-  setClock(next, true, next.slot !== state.clock.slot);
+  // Leaving the gathering for the preview snaps, so nobody watches the hall re-seat itself.
+  setClock(next, true, next.slot !== state.clock.slot || state.clock.mode === "upcoming");
   state.lastTime = performance.now();
 });
 $("return-now").addEventListener("click", () => {
   if (!state.data) return;
-  setClock(followNowClock(state.clock, state.data, Date.now()));
+  setClock(followNowClock(state.clock, state.data, wallNow()));
 });
 $("speed").addEventListener("change", (event) => {
   const speed = Number(event.target.value);
@@ -1480,13 +1588,17 @@ function loop(now) {
   if (!state.data) return;
   const realSeconds = Math.max(0, Math.min(.1, (now - state.lastTime) / 1000 || 0));
   state.lastTime = now;
+  const wall = wallNow();
   const previous = state.clock;
-  state.clock = tickViewerClock(previous, state.data, Date.now(), realSeconds, state.speed);
+  state.clock = tickViewerClock(previous, state.data, wall, realSeconds, state.speed);
   state.time = state.clock.slot;
+  updateStage(wall);
   if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
-  if (previous.mode !== state.clock.mode && (previous.mode === "follow-now" || state.clock.mode === "follow-now")) { clearSpeech(); state.snap = true; }
-  const active = activeEvents(state.data, state.time, state.adminEvents);
-  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 2_000) {
+  const anchored = (mode) => mode === "follow-now" || mode === "upcoming";
+  if (previous.mode !== state.clock.mode && (anchored(previous.mode) || anchored(state.clock.mode))) { clearSpeech(); state.snap = true; }
+  // Nothing is happening yet in the gathering: no announcements, breaks, meals, spotlights, speech or dice.
+  const active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents);
+  if (state.clock.source === "live" && state.data.phase === "live" && !document.hidden && now - state.lastRefresh >= state.pollSeconds * 1000) {
     state.lastRefresh = now;
     void refresh();
   }
@@ -1507,14 +1619,18 @@ async function boot() {
     installTimeline(data, true);
     state.lastChecked = Date.now();
     state.lastRefresh = performance.now();
-    state.clock = createViewerClock(data, Date.now(), { source: state.archive ? "archive" : state.sample ? "sample" : "live", mobile: mobile.matches, reducedMotion: reducedMotion.matches });
+    // A `?now=` override lets the sample package show the gathering, the eve and the doors-open handover on demand.
+    const wall = wallNow();
+    const source = state.archive ? "archive" : state.sample && !state.nowOverride ? "sample" : "live";
+    state.clock = createViewerClock(data, wall, { source, mobile: mobile.matches, reducedMotion: reducedMotion.matches });
     const at = new URLSearchParams(location.search).get("at");
     if (at !== null && at.trim() !== "" && Number.isFinite(Number(at))) state.clock = seekViewerClock(state.clock, data, Number(at));
     state.time = state.clock.slot;
+    updateStage(wall);
     if (state.clock.source === "live") state.live = createLiveState(data);
     state.lastTime = performance.now();
     state.lastRefresh = state.lastTime;
-    const active = activeEvents(state.data, state.time, state.adminEvents);
+    const active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents);
     updatePeople(0, state.lastTime, active);
     render(state.lastTime, active);
     updateHeader(active);

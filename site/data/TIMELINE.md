@@ -282,7 +282,11 @@ its rolls under the existing final-snapshot retention model.
   `[start, start + window + 1h]` when `phase` is live. A user's pause, seek, or
   replay choice persists until Return to Now; refreshing never overrides it.
   Follow-now clamps at event end and does not automatically rewind. Live-source
-  packages refetch every 60 s while `phase` is live, even when paused or replaying.
+  packages refetch while `phase` is live, even when paused or replaying: every
+  30 s before the event, every 2 s from one hour before doors, and never while
+  the tab is hidden. Before `start` the site shows the gathering (attendees
+  placed by their sign-ups) and, in the last 24 h, the dark eve; `upcoming` is
+  a viewer clock mode derived from the wall clock, not a package phase.
   Sample/archive sources never auto-follow; archive and final replay start paused.
   `phase: final` continues to mean privacy finalization, not a viewer clock mode.
 - **Lifecycle:** scenery is derived from table windows and selected slots, without

@@ -390,6 +390,14 @@ const EXIT_SECONDS = 2;
 const SWITCHING_OFF = 'The hall is empty. Staff are switching off the lights.';
 const HEADING_HOME = 'The lights are off. Staff are heading home.';
 const GONE_HOME = 'The hall is dark and empty. Staff have gone home.';
+const CIRCULATING = 'Lights are on. Staff are circulating through the hall.';
+/** The eve is the last day before doors; the hall empties and goes dark at its start. */
+export const EVE_MS = 24 * 60 * 60_000;
+/** Tour dwells are 3–10 event-seconds (mean 6.5); at real-time pace one stop should take about half a minute. */
+export const GATHERING_DWELL_FACTOR = 4.6;
+/** Seconds after the eve begins until the caretaker has switched off and left. */
+export const EVE_EXIT_SECONDS = 60 + EXIT_SECONDS;
+const GATHERING_TOURS = new WeakMap();
 
 // FNV-1a over the event start seeds a mulberry32 stream, so every replay, seek and reload walks one tour.
 function seededRandom(seed) {
@@ -550,7 +558,7 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
     if (reducedMotion) { staff = food; foodCount = 6; }
   } else if (occupied) {
     staff = roam(seconds - opening - 60);
-    action = 'Lights are on. Staff are circulating through the hall.';
+    action = CIRCULATING;
     if (occupied !== intervals[0] && seconds - occupied[0] < 12) {
       const elapsed = seconds - occupied[0];
       // Return from wherever closing left the caretaker: the door once gone, or mid-walk if still leaving.
@@ -564,6 +572,72 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
   }
   return { staff: staff && { ...staff, load: sinceOpen >= 8 && sinceOpen < 50 ? 'food' : null },
     lights, foodCount, lightSwitch, action, occupied: Boolean(occupied) };
+}
+
+/** The seeded tour at wall-clock pace: walking legs unchanged, dwells stretched to about half a minute. */
+function gatheringTour(timeline, layout) {
+  const tour = caretakerTour(timeline, layout);
+  let scaled = GATHERING_TOURS.get(tour);
+  if (!scaled) {
+    const segments = tour.segments.map(segment => segment.from.x === segment.to.x && segment.from.y === segment.to.y
+      ? { ...segment, seconds: segment.seconds * GATHERING_DWELL_FACTOR } : segment);
+    scaled = { stops: tour.stops, segments, seconds: segments.reduce((sum, segment) => sum + segment.seconds, 0) };
+    GATHERING_TOURS.set(tour, scaled);
+  }
+  return scaled;
+}
+
+function doorsOpenText(timeline) {
+  const start = Date.parse(timeline.event.start);
+  const part = options => {
+    try { return new Intl.DateTimeFormat('en-US', { timeZone: timeline.event.tz, ...options }).format(new Date(start)); }
+    catch { return new Date(start).toISOString(); }
+  };
+  return `The hall is dark. Doors open ${part({ weekday: 'long' })} at ${part({ hour: 'numeric', minute: '2-digit' })}.`;
+}
+
+/** Ambience before the event, driven by the wall clock: a lit gathering, then the eve's closing and a dark hall.
+ * Same shape as `hallAmbience`. Position is a function of the instant, so every page load agrees. */
+export function gatheringAmbience(timeline, layout, milliseconds, reducedMotion = false) {
+  const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
+  const tour = gatheringTour(timeline, layout);
+  const clamp = value => Math.max(0, Math.min(1, value));
+  const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
+  const roam = seconds => {
+    if (reducedMotion) return { ...tour.stops[0] };
+    let remaining = ((seconds % tour.seconds) + tour.seconds) % tour.seconds;
+    for (const segment of tour.segments) {
+      if (remaining <= segment.seconds) {
+        const progress = segment.seconds ? remaining / segment.seconds : 1;
+        return { x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+          y: segment.from.y + (segment.to.y - segment.from.y) * progress };
+      }
+      remaining -= segment.seconds;
+    }
+    return { ...tour.stops[0] };
+  };
+  const eveStart = Date.parse(timeline.event.start) - EVE_MS;
+  const elapsed = (milliseconds - eveStart) / 1000;
+  let staff, lights = 1, action = CIRCULATING, occupied = true;
+  if (elapsed < 0) {
+    staff = roam(milliseconds / 1000);
+  } else if (elapsed < 48) {
+    // Attendees are walking out (staggered over the first 45 s); the caretaker keeps touring.
+    staff = roam(eveStart / 1000 + elapsed);
+  } else if (elapsed <= 60) {
+    // Walk to the switch (48–56 s), then fade the lights (56–60 s), like the event-day closing.
+    staff = reducedMotion ? { ...tour.stops[0] } : elapsed < 56 ? move(roam(eveStart / 1000 + 48), lightSwitch, (elapsed - 48) / 8) : { ...lightSwitch };
+    lights = reducedMotion ? (elapsed < 60 ? 1 : 0) : 1 - clamp((elapsed - 56) / 4);
+    action = SWITCHING_OFF;
+  } else if (elapsed < EVE_EXIT_SECONDS) {
+    staff = reducedMotion ? { ...tour.stops[0] } : move(lightSwitch, layout.doorPosition, (elapsed - 60) / EXIT_SECONDS);
+    lights = 0;
+    action = reducedMotion ? SWITCHING_OFF : HEADING_HOME;
+  } else {
+    staff = null; lights = 0; occupied = false;
+    action = doorsOpenText(timeline);
+  }
+  return { staff: staff && { ...staff, load: null }, lights, foodCount: 0, lightSwitch, action, occupied };
 }
 
 export function effectiveSignupRange(signup) {
@@ -911,6 +985,25 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
   return ordinary.kind === "food" ? { kind: "lounge", label: "the lounge" } : ordinary;
 }
 
+/** Where everyone waits during the gathering: the earliest table they run or joined, else the lounge
+ * for a planned attendance, else outside. Plans only; nobody is really here yet. */
+export function gatheringLocations(timeline) {
+  const ordered = timeline.tables.map((table, tableIndex) => ({ table, tableIndex }))
+    .sort((a, b) => a.table.start - b.table.start || a.tableIndex - b.tableIndex);
+  const result = new Map();
+  for (const person of timeline.people) {
+    let place = null;
+    for (const { table, tableIndex } of ordered) {
+      if (table.dm === person.id) { place = { kind: "table", label: table.name, table, tableIndex, seat: 0 }; break; }
+      const signupIndex = table.signups.findIndex((signup) => signup.person === person.id);
+      if (signupIndex >= 0) { place = { kind: "table", label: table.name, table, tableIndex, seat: signupIndex + 1 }; break; }
+    }
+    if (!place) place = person.presence.planned !== null ? { kind: "lounge", label: "the lounge" } : { kind: "absent", label: "outside the hall" };
+    result.set(person.id, place);
+  }
+  return result;
+}
+
 /** Food tables, seats and bin share geometry with the rendered furniture. */
 export function foodGeometry(layout, index = 0, count = 1) {
   const { x, y } = layout.food;
@@ -961,6 +1054,24 @@ export function modeAt(timeline, milliseconds) {
   const start = Date.parse(timeline.event.start);
   const endPlusHour = slotToMs(timeline, timeline.event.slots) + 60 * 60_000;
   return milliseconds >= start && milliseconds <= endPlusHour ? "live" : "replay";
+}
+
+/** "gathering" | "eve" | "day" | "after" for a wall-clock instant. */
+export function hallStage(timeline, milliseconds) {
+  if (modeAt(timeline, milliseconds) === "live") return "day";
+  const start = Date.parse(timeline.event.start);
+  if (milliseconds > start) return "after";
+  return milliseconds >= start - EVE_MS ? "eve" : "gathering";
+}
+
+/** Countdown to doors for the header, rounded up to the coarsest unit that still moves. */
+export function countdownText(remainingMs) {
+  const minute = 60_000, hour = 60 * minute, day = 24 * hour;
+  const away = (count, unit) => `${count} ${unit}${count === 1 ? "" : "s"} away`;
+  if (remainingMs > day) return away(Math.ceil(remainingMs / day), "day");
+  if (remainingMs > hour) return away(Math.ceil(remainingMs / hour), "hour");
+  if (remainingMs > minute) return away(Math.ceil(remainingMs / minute), "minute");
+  return "Doors open any moment";
 }
 
 export function crossedSpeechEvents(timeline, fromSlot, toSlot) {

@@ -60,10 +60,14 @@ or used to choose a sprite. Hidden people are rendered and described as
 
 ## GitHub Pages
 
-`.github/workflows/pages.yml` uploads exactly this `site/` directory as the
-Pages artifact and deploys it with GitHub's standard Pages actions. In the
-repository's Pages settings, select **GitHub Actions** as the source. No build
-output, server, repository ID, custom token, or secret is required.
+The public site repository, `NahFhey/longtable-site`, carries
+`.github/workflows/pages.yml`, which uploads exactly this `site/` directory as
+the Pages artifact and deploys it with GitHub's standard Pages actions; its
+Pages settings select **GitHub Actions** as the source. No build output, server,
+repository ID, custom token, or secret is required. The private project
+repository has no Pages workflow (it cannot serve Pages and the workflow failed
+on every push); promote changes as described under "Testing deployment and
+later launch" below.
 
 The page is intentionally marked `noindex`; access control is out of scope.
 
@@ -118,8 +122,9 @@ These are schedule-derived states, not claims about cancellation or actual staff
 publication privacy phase, and viewer modes (`follow-now`, `paused`, `replay`).
 During a live event, Pause or scrubbing leaves follow-now; Play replays from the
 chosen time and **Return to Now** resumes wall-clock tracking. Live-source data
-continues refreshing every 2 seconds while rewound, before doors, and after event
-end, until the package becomes final. Refreshes retain the viewer's time and camera.
+continues refreshing while rewound, before doors, and after event end, until the
+package becomes final: every 30 seconds during the sign-up window and every 2
+seconds from one hour before doors. Refreshes retain the viewer's time and camera.
 A final snapshot stops follow-now without resetting the selected time. Samples
 never follow the wall clock or poll live data.
 
@@ -129,6 +134,57 @@ play while figures snap to their destinations. Replay stops at the end; Play the
 restarts from zero. A live clock remains at event end rather than jumping to zero.
 Before doors, an untouched live-source preview begins following when doors open;
 any explicit time choice disables that automatic switch.
+
+### Before the event: the gathering and the eve
+
+The site derives a viewer stage from the wall clock against `event.start`; the
+bot publishes nothing new for it. A live-source package in `phase: "live"` has
+four stages: **gathering** (until 24 hours before doors), **eve** (the last 24
+hours), **day** (the existing follow-now window) and **after** (the existing
+replay). Before doors, every device, including mobile and reduced motion, opens
+in the `upcoming` clock mode: slot 0, watching the hall as it is now. Nothing
+auto-plays.
+
+During the gathering the hall is lit with no day-night cycle and the caretaker
+walks the seeded tour at real-time pace (about half a minute per stop; reduced
+motion keeps the caretaker at the first stop). Anyone with a table sign-up sits
+at their earliest table (lowest `start`, then lowest table index; the DM at
+seat 0, signups at their index + 1); anyone with only a planned attendance
+window stands in the lounge; everyone else is outside. Actual attendance,
+movements, breaks, meals, spotlights, dice and speech are ignored, and hidden
+people are the usual anonymous sprites. A visitor opening the page sees
+everyone already in place; walk-ins, moves and walk-outs animate only for
+changes an open tab observes through polling, at walking pace.
+
+At the start of the eve an open tab sees everyone leave over about a minute
+(departures spread over 45 seconds), then the caretaker switches the lights off
+at 60 seconds and walks out. After that the hall is dark and empty until doors
+open, the caption reads "The hall is dark. Doors open Saturday at 10:00 AM.",
+and sign-ups during the eve still count in the table cards without anyone
+walking in. Doors open is a hard cut into the event-day rules.
+
+The header shows the full event date (`Saturday, November 7, 10:00 AM`) and a
+countdown ("40 days away", "3 hours away", "12 minutes away", "Doors open any
+moment") under an `UPCOMING` badge; slot labels show the day whenever the event
+is 24 hours or longer. The status line reads "14 gathered so far · 3 games with
+signup space · Sign up on Discord" (a link outside sample and archive views),
+or "Nobody has arrived yet · …" when empty, and the activity log shows
+everything newest first under "Newest first · America/New_York". Play or
+scrubbing runs the existing replay of the planned day on demand (`REPLAY` /
+`PAUSED`, "Previewing the planned day."), and Return to Now restores the
+gathering; the two placements never walk into each other. The "Now" marker is
+hidden before doors because now lies outside the scrubber's range.
+
+Polling runs every 30 seconds while the tab is visible, not at all while it is
+hidden (a refresh fires on return), and every 2 seconds from one hour before
+doors. `?now=<ISO-8601 or epoch ms>` overrides the wall clock for review and
+tests; time keeps flowing from the override, and on the sample package it also
+turns on the live-source behaviour so the stages can be seen on demand:
+
+- `/?sample=1&now=2026-09-25T12:00:00-04:00` — the gathering
+- `/?sample=1&now=2026-11-06T09:59:50-05:00` — watch the exodus begin ten seconds later (the eve starts at 10:00 AM the day before doors)
+- `/?sample=1&now=2026-11-06T10:30:00-05:00` — the eve, dark and empty
+- `/?sample=1&now=2026-11-07T09:59:30-05:00` — watch the doors-open handover
 
 Seeking clears transient speech in either direction. Sequential playback still
 queues crossed reactions in order, retaining every custom message and at most the
@@ -331,7 +387,9 @@ Dice support 1–100 dice with 2–1000 sides, including custom sizes.
 
 The bot publishes public changes to the live-data service after a 250 ms debounce
 (one second maximum), independently of Git pushes. The browser checks that service
-every two seconds. Reads come from the primary database with caching disabled.
+every 30 seconds during the sign-up window and every two seconds from one hour
+before doors, and not at all while the tab is hidden. Reads come from the
+primary database with caching disabled.
 If the service fails, the browser chooses the newest available GitHub/Pages backup
 and visibly reports the delay; those backups can be several minutes behind.
 The visible update status separately reports the last successful check and when

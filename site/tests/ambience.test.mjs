@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { caretakerTour, createRoomLayout, hallAmbience } from '../model.mjs';
+import { EVE_EXIT_SECONDS, EVE_MS, GATHERING_DWELL_FACTOR, caretakerTour, createRoomLayout, gatheringAmbience, hallAmbience } from '../model.mjs';
 const layout=createRoomLayout([]);
 const person=(planned, actual={here:null,leaving:null})=>({presence:{planned,actual}});
 const timeline=people=>({event:{slots:8,slot_minutes:30},people});
@@ -158,4 +158,60 @@ test('before the doors open the hall is dark and nobody is drawn, then the caret
   assert.match(at(data,opening+1).action,/turning on/);
   assert.ok(entering.y<layout.doorPosition.y&&entering.y>lightSwitch.y,'between the door and the switch');
   assert.ok(entering.x>=layout.doorPosition.x&&entering.x<=lightSwitch.x);
+});
+test('the gathering keeps the lights on and the caretaker touring at real-time pace, the same on every load',()=>{
+  const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2026-11-07T10:00:00-05:00',tz:'America/New_York'}};
+  const start=Date.parse(data.event.start);
+  const instant=start-40*24*3600e3;
+  const at=(ms,reduced=false)=>gatheringAmbience(data,layout,ms,reduced);
+  const early=at(instant);
+  assert.equal(early.lights,1);
+  assert.equal(early.foodCount,0);
+  assert.equal(early.occupied,true);
+  assert.equal(early.staff.load,null);
+  assert.match(early.action,/Lights are on\. Staff are circulating/);
+  assert.notDeepEqual(at(instant+30_000).staff,early.staff,'the caretaker moves within half a minute');
+  const tour=caretakerTour(data,layout);
+  const stationary=segment=>segment.from.x===segment.to.x&&segment.from.y===segment.to.y;
+  const realSeconds=tour.segments.reduce((sum,segment)=>sum+(stationary(segment)?segment.seconds*GATHERING_DWELL_FACTOR:segment.seconds),0);
+  const meanDwell=tour.dwell.reduce((sum,dwell)=>sum+dwell,0)/tour.dwell.length*GATHERING_DWELL_FACTOR;
+  assert.ok(meanDwell>22&&meanDwell<38,`mean stop of ${meanDwell.toFixed(1)} s`);
+  const later=at(instant+realSeconds*1000).staff;
+  assert.ok(Math.hypot(later.x-early.staff.x,later.y-early.staff.y)<1e-6,'the tour repeats after one full real-time cycle');
+  assert.deepEqual(at(instant),early,'position is a function of the instant alone');
+  assert.deepEqual(gatheringAmbience(structuredClone(data),layout,instant),early);
+  for (const ms of [instant,instant+30_000]) {
+    const reduced=at(ms,true);
+    assert.deepEqual({x:reduced.staff.x,y:reduced.staff.y},tour.stops[0],'reduced motion pins the caretaker at the first stop');
+    assert.equal(reduced.lights,1);
+  }
+});
+test('the eve closes the hall: lights off at a minute, caretaker gone after the exit walk, and a dated caption',()=>{
+  const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2026-11-07T10:00:00-05:00',tz:'America/New_York'}};
+  const eve=Date.parse(data.event.start)-EVE_MS;
+  const at=(ms,reduced=false)=>gatheringAmbience(data,layout,ms,reduced);
+  const opening=at(eve);
+  assert.equal(opening.lights,1);
+  assert.ok(opening.staff);
+  assert.equal(at(eve-1).lights,1);
+  const off=at(eve+60_000);
+  assert.equal(off.lights,0);
+  assert.match(off.action,/switching off/);
+  assert.deepEqual({x:off.staff.x,y:off.staff.y},off.lightSwitch);
+  assert.match(at(eve+61_000).action,/heading home/);
+  assert.equal(EVE_EXIT_SECONDS,62);
+  for (const ms of [eve+EVE_EXIT_SECONDS*1000,eve+3600e3,eve+EVE_MS-1]) {
+    const dark=at(ms);
+    assert.equal(dark.staff,null);
+    assert.equal(dark.lights,0);
+    assert.equal(dark.foodCount,0);
+    assert.equal(dark.occupied,false);
+    assert.equal(dark.action,'The hall is dark. Doors open Saturday at 10:00 AM.');
+  }
+  const reduced=at(eve+61_000,true);
+  assert.equal(reduced.lights,0);
+  assert.deepEqual({x:reduced.staff.x,y:reduced.staff.y},reduced.lightSwitch);
+  assert.equal(at(eve+EVE_EXIT_SECONDS*1000,true).staff,null);
+  const auckland={...data,event:{...data.event,tz:'Pacific/Auckland'}};
+  assert.equal(gatheringAmbience(auckland,layout,eve+3600e3).action,'The hall is dark. Doors open Sunday at 4:00 AM.','the caption uses the event time zone');
 });

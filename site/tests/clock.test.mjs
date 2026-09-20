@@ -21,7 +21,7 @@ test("source, privacy phase, and viewer clock remain independent", () => {
   assert.equal(final.mode, "paused");
   assert.equal(final.source, "live");
   for (const options of [{ mobile: true }, { reducedMotion: true }]) {
-    assert.equal(createViewerClock(data, start - 1000, options).mode, "paused");
+    assert.equal(createViewerClock(data, start - 1000, options).mode, "upcoming");
     assert.equal(createViewerClock(data, during, options).mode, "follow-now");
   }
 });
@@ -72,4 +72,37 @@ test("replay obeys slot length and announcement speed caps", () => {
   assert.equal(tickViewerClock(clock, compressed, start, 0.1, 600).slot, 1);
   const announce = { ...compressed, events: [{ kind: "announce", at: 0 }] };
   assert.equal(tickViewerClock(clock, announce, start, 0.1, 600).slot, 0.05);
+});
+
+test("before doors every live-source device waits in upcoming mode; other sources and phases are unchanged", () => {
+  const end = start + 8 * slotMs;
+  const waiting = { source: "live", mode: "upcoming", slot: 0, autoFollow: true };
+  for (const options of [{}, { mobile: true }, { reducedMotion: true }]) {
+    assert.deepEqual(createViewerClock(data, start - 1, options), waiting);
+    assert.deepEqual(createViewerClock(data, start - 40 * 24 * 60 * 60_000, options), waiting);
+  }
+  assert.deepEqual(createViewerClock(data, start - 1, { source: "archive" }), { source: "archive", mode: "paused", slot: 0, autoFollow: false });
+  assert.deepEqual(createViewerClock(data, start - 1, { source: "sample" }), { source: "sample", mode: "replay", slot: 0, autoFollow: false });
+  assert.deepEqual(createViewerClock({ ...data, phase: "final" }, start - 1), { source: "live", mode: "paused", slot: 0, autoFollow: false });
+  assert.deepEqual(createViewerClock(data, start), { source: "live", mode: "follow-now", slot: 0, autoFollow: false });
+  assert.equal(createViewerClock(data, end + 60 * 60_000).mode, "follow-now");
+  assert.equal(createViewerClock(data, end + 60 * 60_000 + 1).mode, "replay");
+  assert.equal(createViewerClock(data, end + 60 * 60_000 + 1, { mobile: true }).mode, "paused");
+});
+
+test("upcoming plays into a preview from zero, seeks to a paused preview, returns to now, and hands over at doors", () => {
+  const waiting = createViewerClock(data, start - 1000);
+  assert.deepEqual(toggleViewerPlayback(waiting, data), { source: "live", mode: "replay", slot: 0, autoFollow: false });
+  const preview = seekViewerClock(waiting, data, 3);
+  assert.deepEqual(preview, { source: "live", mode: "paused", slot: 3, autoFollow: false });
+  assert.deepEqual(followNowClock(preview, data, start - 1), { source: "live", mode: "upcoming", slot: 0, autoFollow: true });
+  assert.deepEqual(followNowClock(preview, data, start), { source: "live", mode: "follow-now", slot: 0, autoFollow: false });
+  assert.equal(followNowClock(preview, data, start + slotMs).slot, 1);
+  assert.deepEqual(followNowClock({ ...preview, source: "sample" }, data, start - 1), { ...preview, source: "sample" });
+  assert.deepEqual(tickViewerClock(waiting, data, start - 1, 3600, 600), waiting, "a long elapsed time never moves the slot");
+  assert.deepEqual(tickViewerClock(waiting, data, start, 0.1, 600), { source: "live", mode: "follow-now", slot: 0, autoFollow: false });
+  const untouched = { source: "live", mode: "replay", slot: 0, autoFollow: true };
+  assert.equal(tickViewerClock(untouched, data, start, 0.1, 600).mode, "follow-now");
+  assert.equal(tickViewerClock(preview, data, start, 0.1, 600).mode, "paused", "a chosen preview does not hand over");
+  assert.equal(tickViewerClock(waiting, { ...data, phase: "final" }, start - 1, 0.1, 600).mode, "paused");
 });

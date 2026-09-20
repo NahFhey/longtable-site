@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import { characterAppearance } from "../characters.mjs";
 import {
   ANNOUNCE_MINUTES,
+  EVE_MS,
   SPOTLIGHT_MINUTES,
   TimelineError,
   activeEvents,
   accessibleEventText,
   chairSeatIndices,
+  countdownText,
+  gatheringLocations,
+  hallStage,
   createSeatingPlan,
   createRoomLayout,
   createLiveState,
@@ -607,4 +611,52 @@ test("fresh reconstruction, forward replay and backward seeks agree on meaningfu
   // An actual departure after the table window cannot leave a person at packed furniture.
   data.tables[0].signups[0].actual = [1, 7];
   assert.equal(ordinaryLocation(data, person, 5.5).kind, "lounge");
+});
+
+test("hallStage splits the wall clock into gathering, eve, day and after", () => {
+  const data = validateTimeline(timeline());
+  const start = Date.parse(data.event.start);
+  const end = slotToMs(data, data.event.slots);
+  assert.equal(EVE_MS, 24 * 60 * 60_000);
+  assert.equal(hallStage(data, start - EVE_MS - 1), "gathering");
+  assert.equal(hallStage(data, start - EVE_MS), "eve");
+  assert.equal(hallStage(data, start - 1), "eve");
+  assert.equal(hallStage(data, start), "day");
+  assert.equal(hallStage(data, end + 60 * 60_000), "day");
+  assert.equal(hallStage(data, end + 60 * 60_000 + 1), "after");
+});
+
+test("gatheringLocations seats people at their earliest table, lounges planned attendees, and ignores actuals", () => {
+  const input = timeline();
+  input.people.push(person("attendee-only"), person("nobody", { presence: { planned: null, actual: { here: 2, leaving: 4 } } }));
+  input.people[2].presence.actual = { here: 3, leaving: 4 };
+  input.tables.push({ ...structuredClone(input.tables[0]), id: "table-early", name: "Early", start: 0, end: 3, dm: "admin",
+    signups: [{ person: "dm", planned: [0, 3], actual: null }, { person: "player", planned: [1, 3], actual: [1.5, null] }] });
+  input.tables.push({ ...structuredClone(input.tables[0]), id: "table-tie", name: "Tie", start: 1, end: 5, dm: "admin",
+    signups: [{ person: "hidden-key", planned: [1, 5], actual: null }] });
+  const data = validateTimeline(input);
+  const places = gatheringLocations(data);
+  const pick = ({ kind, label, tableIndex, seat }) => ({ kind, label, tableIndex, seat });
+  assert.deepEqual(pick(places.get("admin")), { kind: "table", label: "Early", tableIndex: 1, seat: 0 }, "the DM of two tables sits at the earliest");
+  assert.equal(places.get("admin").table, data.tables[1]);
+  assert.deepEqual(pick(places.get("dm")), { kind: "table", label: "Early", tableIndex: 1, seat: 1 }, "an earlier signup beats a later own table");
+  assert.deepEqual(pick(places.get("player")), { kind: "table", label: "Early", tableIndex: 1, seat: 2 }, "presence.actual and signup actuals are ignored");
+  assert.deepEqual(pick(places.get("hidden-key")), { kind: "table", label: "Table One", tableIndex: 0, seat: 2 }, "equal starts break on the lower table index; hidden people are placed");
+  assert.deepEqual(places.get("attendee-only"), { kind: "lounge", label: "the lounge" });
+  assert.deepEqual(places.get("nobody"), { kind: "absent", label: "outside the hall" });
+  assert.equal(places.size, data.people.length);
+});
+
+test("countdownText rounds up to days, hours, minutes, then 'any moment'", () => {
+  const hour = 60 * 60_000;
+  assert.equal(countdownText(49 * hour), "3 days away");
+  assert.equal(countdownText(48 * hour), "2 days away");
+  assert.equal(countdownText(25 * hour), "2 days away");
+  assert.equal(countdownText(24 * hour), "24 hours away");
+  assert.equal(countdownText(2 * hour), "2 hours away");
+  assert.equal(countdownText(61 * 60_000), "2 hours away");
+  assert.equal(countdownText(60 * 60_000), "60 minutes away");
+  assert.equal(countdownText(2 * 60_000), "2 minutes away");
+  assert.equal(countdownText(60_000), "Doors open any moment");
+  assert.equal(countdownText(0), "Doors open any moment");
 });

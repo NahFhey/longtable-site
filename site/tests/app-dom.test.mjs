@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, seatPositionForPlan } from "../model.mjs";
+import { createRoomLayout, gatheringLocations, loungeActivities, seatPositionForPlan } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { DISCORD_INVITE } from "../event-config.mjs";
 
@@ -784,8 +784,9 @@ test("new live custom messages use the stage queue without teleporting on refres
 });
 
 
-test("live data bypasses deployment, refreshes after two seconds, and reports the check", async () => {
+test("live data bypasses deployment, refreshes after two seconds during the event, and reports the check", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
   data.generated_at = new Date(Date.now() - 10_000).toISOString();
   const next = structuredClone(data);
   next.generated_at = new Date().toISOString();
@@ -1124,4 +1125,188 @@ test("a closed, dark hall draws no caretaker and reports that staff have gone ho
   assert.ok(app.rectCalls.some(call => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is fully dark");
   assert.match(app.nodes.get("canvas-description").textContent, /Staff have gone home/);
   assert.deepEqual(app.errors, []);
+});
+
+const DAY = 24 * 60 * 60_000;
+const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+const nowQuery = (milliseconds) => `now=${encodeURIComponent(new Date(milliseconds).toISOString())}`;
+const spritePositions = (app) => new Set(app.imageCalls.filter((call) => call.src.includes("roguelikeChar")).map((call) => `${call.args[4]},${call.args[5]}`));
+
+test("before doors the sample with ?now= opens on the settled gathering and previews the planned day on demand", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const app = await runApp([sample], "gathering-sample", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").className, "badge");
+  assert.equal(app.nodes.get("clock").textContent, "Saturday, November 7, 10:00 AM");
+  assert.equal(app.nodes.get("clock").dateTime, sample.event.start);
+  assert.equal(app.nodes.get("scene-event").textContent, "40 days away");
+  assert.equal(app.nodes.get("current-event").textContent, "Doors open Saturday, November 7, 10:00 AM. 40 days away.");
+  assert.equal(app.nodes.get("now-marker").hidden, true);
+  assert.equal(app.nodes.get("return-now").hidden, true);
+  assert.equal(app.nodes.get("play").textContent, "Play");
+  assert.equal(app.nodes.get("scrubber").value, "0");
+  assert.equal(app.nodes.get("record-note").hidden, false);
+  assert.equal(app.nodes.get("sync-controls").hidden, true);
+  const places = gatheringLocations(sample);
+  const gathered = [...places.values()].filter((place) => place.kind !== "absent").length;
+  assert.equal(gathered, 44);
+  const status = app.nodes.get("status");
+  assert.match(status.textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
+  assert.equal(status.children.length, 0, "the sample shows the invitation as text, not a link");
+  // Settled on load: everyone the model places is drawn at their seat or lounge spot after the first frame.
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const leisure = loungeActivities(layout, sample.people.filter((person) => places.get(person.id).kind === "lounge"));
+  const drawn = spritePositions(app);
+  for (const person of sample.people) {
+    const place = places.get(person.id);
+    const position = place.kind === "table" ? seatPositionForPlan(layout, place.tableIndex, place.seat) : leisure.get(person.id).position;
+    assert.ok(drawn.has(`${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6) * 32)}`), `${person.id} is drawn at ${place.label}`);
+  }
+  assert.ok(app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0)"), "the lights are on");
+  assert.equal(app.rectCalls.filter((call) => call.color === "#f7efd8").length, 0, "no dice");
+  assert.ok(!app.contextCalls.some((text) => /Announcement|spotlight|Break time|MEAL/i.test(text)), "no bubbles or banners");
+  assert.match(app.nodes.get("canvas-description").textContent, /^Lights are on\. Staff are circulating through the hall\. 44 people have gathered so far\./);
+  assert.equal(app.nodes.get("activity-note").textContent, "Newest first · America/New_York");
+  assert.equal(app.nodes.get("start-label").textContent, "Sat, Nov 7, 10:00 AM");
+  app.frames.shift()?.(performance.now() + 5_000);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING", "nothing auto-plays");
+  assert.equal(app.nodes.get("scrubber").value, "0");
+  assert.equal(app.urlWrites.length, 0, "waiting for doors is not a time choice");
+  app.nodes.get("play").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 5_100);
+  assert.equal(app.nodes.get("mode-badge").textContent, "REPLAY");
+  assert.equal(app.nodes.get("play").textContent, "Pause");
+  assert.equal(app.nodes.get("return-now").hidden, false);
+  assert.equal(app.nodes.get("now-marker").hidden, true);
+  assert.ok(Number(app.nodes.get("scrubber").value) > 0);
+  assert.match(app.nodes.get("clock").textContent, /^Sat, Nov 7, 10:0\d AM$/);
+  assert.match(app.nodes.get("status").textContent, /^44 gathered so far/, "the gathering status stays while previewing");
+  assert.equal(new URL(app.urlWrites.at(-1)).searchParams.get("now"), new Date(start - 40 * DAY).toISOString(), "the override is kept");
+  assert.equal(new URL(app.urlWrites.at(-1)).searchParams.has("at"), true);
+  app.nodes.get("return-now").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 5_200);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("scrubber").value, "0");
+  assert.equal(app.nodes.get("return-now").hidden, true);
+  assert.equal(new URL(app.urlWrites.at(-1)).searchParams.has("at"), false);
+  assert.deepEqual(app.errors, []);
+});
+
+test("in the eve the hall is dark and empty, the caption names the doors, and the status keeps the gathered count", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const app = await runApp([sample], "eve-sample", { search: `?sample=1&${nowQuery(start - DAY + 120_000)}` });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("scene-event").textContent, "24 hours away");
+  assert.equal(spritePositions(app).size, 0, "nobody, not even the caretaker, is drawn");
+  assert.ok(app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is fully dark");
+  assert.match(app.nodes.get("canvas-description").textContent, /^The hall is dark\. Doors open Saturday at 10:00 AM\. 44 people have gathered so far\./);
+  assert.match(app.nodes.get("status").textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
+  app.frames.shift()?.(performance.now() + 3_000);
+  assert.equal(spritePositions(app).size, 0);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+});
+
+test("a live tab one minute before doors polls every 2 seconds and hands over to LIVE at the start", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(data.event.start);
+  const app = await runApp([data], "doors-handover", { search: `?${nowQuery(start - 60_000)}` });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("scene-event").textContent, "Doors open any moment");
+  // The sample was published on the event day, so the publish time keeps its time-only form here.
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at .*Checking every 2 seconds\. Data published at 3:09:41 PM\.$/);
+  const realNow = Date.now;
+  try {
+    Date.now = () => realNow() + 90_000;
+    app.frames.shift()?.(performance.now() + 100);
+    await settle();
+    app.frames.shift()?.(performance.now() + 200);
+    assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+    assert.equal(app.nodes.get("mode-badge").className, "badge live");
+    assert.equal(app.nodes.get("now-marker").hidden, false);
+    assert.equal(app.nodes.get("return-now").hidden, true);
+    assert.match(app.nodes.get("clock").textContent, /^Sat, Nov 7, 10:00 AM$/);
+    assert.match(app.nodes.get("sync-status").textContent, /Checking every 2 seconds/);
+    assert.doesNotMatch(app.nodes.get("sync-status").textContent, /Viewing an earlier time|Previewing/);
+    assert.match(app.nodes.get("status").textContent, /games on the schedule/);
+    assert.equal(app.nodes.get("activity-note").textContent, "Newest first · Live · America/New_York");
+  } finally {
+    Date.now = realNow;
+  }
+  assert.deepEqual(app.errors, []);
+});
+
+test("during the sign-up window a live tab polls every 30 seconds, never while hidden, links the invitation, and previews on demand", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(data.event.start);
+  const app = await runApp([data, data, data], "gathering-polling", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: "https://feed.example/timeline.json" });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.fetchUrls.length, 1);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at .*Checking every 30 seconds\. Data published at Nov 7, 3:09 PM\.$/);
+  assert.doesNotMatch(app.nodes.get("sync-status").textContent, /Viewing an earlier time/);
+  const base = performance.now();
+  app.frames.shift()?.(base + 2_100);
+  await settle();
+  assert.equal(app.fetchUrls.length, 1, "no refresh after two seconds");
+  app.frames.shift()?.(base + 29_000);
+  await settle();
+  assert.equal(app.fetchUrls.length, 1);
+  app.frames.shift()?.(base + 30_100);
+  await settle();
+  assert.equal(app.fetchUrls.length, 2, "a refresh after thirty seconds");
+  document.hidden = true;
+  app.frames.shift()?.(base + 61_000);
+  await settle();
+  app.intervals[0]();
+  await settle();
+  assert.equal(app.fetchUrls.length, 2, "no polling while hidden");
+  document.hidden = false;
+  const status = app.nodes.get("status");
+  assert.match(status.textContent, /^44 gathered so far · \d+ games with signup space · $/);
+  assert.equal(status.children.length, 1);
+  assert.equal(status.children[0].tagName, "A");
+  assert.equal(status.children[0].textContent, "Sign up on Discord");
+  assert.equal(status.children[0].href, DISCORD_INVITE);
+  const writes = status.textContentWrites;
+  app.frames.shift()?.(base + 61_100);
+  assert.equal(status.textContentWrites, writes, "the status is not rebuilt every frame");
+  assert.equal(status.children.length, 1);
+  app.nodes.get("play").listeners.get("click")();
+  app.frames.shift()?.(base + 61_200);
+  assert.equal(app.nodes.get("mode-badge").textContent, "REPLAY");
+  assert.equal(app.nodes.get("return-now").hidden, false);
+  assert.match(app.nodes.get("sync-status").textContent, /Previewing the planned day\. Choose Return to Now to see the hall as it is\.$/);
+  assert.equal(app.nodes.get("activity-note").textContent, "Newest first · Selected time · America/New_York");
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "12" } });
+  app.frames.shift()?.(base + 61_300);
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+  assert.match(app.nodes.get("sync-status").textContent, /Previewing the planned day/);
+  app.nodes.get("return-now").listeners.get("click")();
+  app.frames.shift()?.(base + 61_400);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.doesNotMatch(app.nodes.get("sync-status").textContent, /Previewing|Viewing an earlier time/);
+  assert.equal(app.nodes.get("activity-note").textContent, "Newest first · America/New_York");
+  assert.deepEqual(app.errors, []);
+});
+
+test("?at= still seeks a paused preview under a now override, and a 24-hour event shows its day in slot labels", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const seeked = await runApp([sample], "gathering-seek", { search: `?sample=1&${nowQuery(start - 40 * DAY)}&at=12` });
+  assert.equal(seeked.nodes.get("mode-badge").textContent, "PAUSED");
+  assert.equal(seeked.nodes.get("scrubber").value, "12");
+  assert.equal(seeked.nodes.get("clock").textContent, "Sat, Nov 7, 4:00 PM");
+  assert.equal(seeked.nodes.get("return-now").hidden, false);
+  assert.match(seeked.nodes.get("status").textContent, /^44 gathered so far/);
+  const plain = await runApp([sample], "day-labels");
+  assert.equal(plain.nodes.get("start-label").textContent, "Sat, Nov 7, 10:00 AM");
+  assert.equal(plain.nodes.get("end-label").textContent, "Sun, Nov 8, 10:00 AM");
+  assert.match(plain.nodes.get("status").textContent, /games with signup space · Event starts Sat, Nov 7, 10:00 AM$/);
+  assert.match(allText(plain.nodes.get("tables")), /Sat, Nov 7, 11:00 AM–Sat, Nov 7, 3:00 PM/);
+  assert.equal(plain.nodes.get("mode-badge").textContent, "REPLAY", "the sample without an override still replays");
 });
