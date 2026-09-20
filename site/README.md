@@ -17,6 +17,13 @@ bot has published `site/data/timeline.json`, that URL intentionally shows a
 readable error. Open <http://127.0.0.1:8791/?sample=1> to explicitly use the
 checked-in QA sample. Production never falls back to sample data.
 
+The new full-day demonstration is `/?sample=50&at=0`: press Play to watch 50
+fictional attendees arrive and depart over 24 event hours, with 12 games, visitors,
+food, breaks, dice and stage messages. The default speed is 600×, with slower
+playback for announcements and meals. Regenerate its separate schema-7 dataset
+with `python3 site/data/gen_demo.py`; it leaves the legacy sample and live data
+untouched. Demo pages never poll the live feed or show live donation links.
+
 ## Test
 
 From the repository root:
@@ -270,17 +277,24 @@ Deploy the schema-7 reader before the writer; schemas 1–6 still render.
 
 ### Hall caretaker
 
-A caretaker turns on the lights and sets out food during the opening minute,
-then circulates between the entrance, food area and lounge. When the last
-attendee leaves, the caretaker walks to the switch and dims the room; a later
-arrival turns the lights back on. Staff stay on duty in an empty hall and never
-count as attendees. Occupancy uses effective attendance, including recorded
-arrival/departure overrides. The room remains faintly visible when dark, and
-controls and table information stay readable.
+Before the doors open (until a minute before the first arrival) the hall is dark
+and nobody is drawn. A caretaker then comes in from the door, turns on the lights
+and sets out food during the opening minute, then tours the hall: the corridors, the aisles between tables, the food front,
+the lounge, the stairs beside the stage and the door, pausing a few seconds at
+each stop. The route is a seeded tour fixed per event (from `event.start`), so it
+is the same on every replay and after a seek; legs follow the trunk corridor and
+the aisles rather than cutting across tables, and no leg walks straight back the
+way it came. When the last attendee leaves, the caretaker walks to the switch,
+dims the room, and then leaves through the door; the hall stays dark and empty
+with nobody drawn until a later arrival brings the caretaker back in from the
+door to relight it. Staff never count as attendees. Occupancy uses effective
+attendance, including recorded arrival/departure overrides. The room remains
+faintly visible when dark, and controls and table information stay readable.
 
 This scenery follows event time, so seeking and reloading reproduce it. Reduced
-motion uses stationary staff and immediate lighting changes. The canvas description
-also reports the caretaker's current activity. Frozen archives keep their own
+motion uses stationary staff and immediate lighting changes, and removes the
+caretaker as soon as the lights go off. The canvas description also reports the
+caretaker's current activity, including that staff have gone home. Frozen archives keep their own
 renderer; this change does not rewrite older archives or add attendance records.
 
 ### Custom messages on stage
@@ -288,9 +302,13 @@ renderer; this change does not rewrite older archives or add attendance records.
 Approved custom table messages (`donation` in the data contract) bring their
 speaker to the stage microphone through the side stairs. Pending speakers form
 an ordered queue below the stairs, with one figure per person even if they have
-several messages. The gold bubble lasts six seconds after arrival; the speaker
-then walks down the stairs before the next message starts and returns to their
-current scheduled location. Quick reactions keep their four-second bubbles.
+several messages. The gold bubble lasts six seconds after arrival at 1× and
+while paused; the speaker then walks down the stairs before the next message
+starts and returns to their current scheduled location. Quick reactions keep
+their four-second bubbles at 1×. Faster replay divides both display times by the
+effective playback speed (including the announcement and break caps), never
+below one real second, so a backlog drains at about one message per second at
+600× or 1800×. A speed change does not retime the message already on stage.
 Stage visits are temporary presentation effects and do not change attendance.
 Hidden speakers retain their anonymous figure and name. Reduced motion snaps
 figures to each destination while preserving message order and reading time.
@@ -359,7 +377,8 @@ resume their current location rules. Breaks do not extend game end times.
 
 Attendee walking uses the same event-time delta as staff, so replay speed changes
 apply to both and pausing freezes ordinary travel. Stage speech remains readable
-for its full display time; its temporary visit may finish while replay is paused.
+for its display time, which scales with replay speed down to a one-second floor and
+is unchanged at 1× and while paused; its temporary visit may finish while replay is paused.
 
 ## Hall music
 

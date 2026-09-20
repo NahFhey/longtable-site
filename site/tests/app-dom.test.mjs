@@ -475,13 +475,13 @@ test("staff scenery renders identically after seeking and reload without changin
     seek.imageCalls.length = 0;
     seek.frames.shift()?.(performance.now() + 100);
     const expected = staff(seek);
-    assert.equal(expected.length, 6, "table staff and caretaker each use three character layers");
+    assert.equal(expected.length, 3, "the table porter uses three character layers; the caretaker has gone home from a hall nobody entered");
     assert.match(allText(seek.nodes.get("tables")), /0\/5/);
     assert.doesNotMatch(roster, /STAFF/);
     const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
     assert.deepEqual(staff(fresh), expected);
     const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
-    assert.equal(staff(reduced).length, 3, "the stationary caretaker remains visible with reduced motion");
+    assert.equal(staff(reduced).length, 0, "reduced motion omits the porter, and the caretaker has gone home");
   }
 });
 
@@ -1043,4 +1043,85 @@ test('host ribbon renders the business and remains accessible without an icon', 
   sample.event.host_icon_url = 'javascript:alert(1)';
   const invalid = await runApp([sample], 'invalid-host');
   assert.match(invalid.nodes.get('status').textContent, /host icon/i);
+});
+
+function speechSpan(step, pattern, limit = 600) {
+  let started = null;
+  for (let frame = 0; frame < limit; frame += 1) {
+    const text = step();
+    if (pattern.test(text)) { if (started === null) started = frame; }
+    else if (started !== null) return { started, ended: frame };
+  }
+  return { started, ended: null };
+}
+
+test("quick reactions keep four seconds at 1x and shrink to the one-second floor at 600x", async () => {
+  const base = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const shout = base.events.find((event) => event.kind === "shout");
+  // Load paused just before the shout, so the speed chosen below is the one in force when it starts.
+  base.events = [{ ...shout, at: .041, text: "Huzzah for speed" }];
+  for (const [speed, frames] of [[1, 40], [600, 10]]) {
+    const app = await runApp([structuredClone(base)], `shout-speed-${speed}`, { search: "?sample=1&at=0.04" });
+    app.nodes.get("speed").listeners.get("change")({ target: { value: String(speed) } });
+    app.nodes.get("play").listeners.get("click")();
+    const step = stageStepper(app);
+    const span = speechSpan(step, /Huzzah for speed/);
+    assert.notEqual(span.started, null, `the shout appears at ${speed}x`);
+    assert.ok(Math.abs(span.ended - span.started - frames) <= 1, `${speed}x shout lasted ${span.ended - span.started} frames, expected ${frames}`);
+    assert.deepEqual(app.errors, []);
+  }
+});
+
+test("at 600x each stage message holds for one second and a queue of three drains in about three seconds", async () => {
+  const sample = customStageFixture(JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8")));
+  const app = await runApp([sample], "stage-fast");
+  app.nodes.get("speed").listeners.get("change")({ target: { value: "600" } });
+  const step = stageStepper(app);
+  const spoken = [];
+  let firstStarted = null, firstEnded = null, lastEnded = null;
+  for (let frame = 0; frame < 300; frame += 1) {
+    const text = step();
+    const match = text.match(/Stage message (\d)/);
+    if (match && spoken.at(-1) !== Number(match[1])) spoken.push(Number(match[1]));
+    if (text.includes("Stage message 0") && firstStarted === null) firstStarted = frame;
+    if (firstStarted !== null && !text.includes("Stage message 0") && firstEnded === null) firstEnded = frame;
+    if (spoken.length === 3 && !match) { lastEnded = frame; break; }
+  }
+  assert.deepEqual(spoken, [0, 1, 2]);
+  assert.ok(Math.abs(firstEnded - firstStarted - 10) <= 1, `first message held ${firstEnded - firstStarted} frames`);
+  assert.ok(lastEnded - firstStarted >= 30 && lastEnded - firstStarted <= 45, `three messages drained in ${lastEnded - firstStarted} frames`);
+  assert.deepEqual(app.errors, []);
+});
+
+test("a stage message that starts while the clock is paused keeps its full six seconds", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const speaker = sample.people[0];
+  sample.events = [{ id: "late-message", kind: "donation", at: sample.event.slots - .01, duration: null, text: "Late message",
+    person: speaker.id, by: sample.people.find((person) => person.dm).id }];
+  const app = await runApp([sample], "stage-paused", { search: `?sample=1&at=${sample.event.slots - .1}` });
+  app.nodes.get("speed").listeners.get("change")({ target: { value: "600" } });
+  app.nodes.get("play").listeners.get("click")();
+  const step = stageStepper(app);
+  // The badge is refreshed by the frame loop, so step before reading it.
+  let text = step();
+  for (let frame = 0; frame < 20 && app.nodes.get("mode-badge").textContent !== "PAUSED"; frame += 1) text = step();
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED", "replay pauses itself at the event end");
+  assert.match(text, /walking to the stage microphone/, "the message crossed at the event end is queued");
+  const span = speechSpan(step, /Late message/, 800);
+  assert.notEqual(span.started, null, "the speaker still reaches the microphone while paused");
+  assert.equal(span.ended - span.started, 60, "paused speech keeps the 1x duration");
+  assert.deepEqual(app.errors, []);
+});
+
+test("a closed, dark hall draws no caretaker and reports that staff have gone home", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.tables = [];
+  data.events = [];
+  data.people.forEach(person => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
+  const app = await runApp([data], "caretaker-gone", { search: "?sample=1&at=2" });
+  assert.equal(app.imageCalls.filter(call => call.src.includes("roguelikeChar")).length, 0, "no staff sprite layers");
+  assert.ok(!app.contextCalls.includes("STAFF"), "no STAFF label");
+  assert.ok(app.rectCalls.some(call => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is fully dark");
+  assert.match(app.nodes.get("canvas-description").textContent, /Staff have gone home/);
+  assert.deepEqual(app.errors, []);
 });

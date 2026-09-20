@@ -19,6 +19,7 @@ import {
   diceText,
   indexAdminEvents,
   personTooltip,
+  playbackSpeed,
   publicActivity,
   reconcileLiveSnapshot,
   resolveLocation,
@@ -38,6 +39,7 @@ const SCALE = 2;
 const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
+const MIN_SPEECH_REAL_SECONDS = 1;   // readable even at 1800×
 
 // Display milliseconds keep the opening lead and one-second hold visible in replay.
 class HallDoor {
@@ -922,7 +924,8 @@ function render(now, active) {
     ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
-  drawStaff(active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff);
+  const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff;
+  if (caretaker) drawStaff(caretaker);
   if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
     state.layout.stageFront.x + 2, state.layout.stageFront.y - 1.3, "#b6e0df", "Staff");
   const lightSwitch = state.ambience.lightSwitch;
@@ -1111,7 +1114,13 @@ function queueSpeech(events) {
   state.speechQueue = queue.filter((event) => event.kind !== "shout" || shouts-- <= 20);
 }
 
-function advanceSpeech(now) {
+// Speech holds the stage for its scripted seconds at 1× and while paused; faster replay shortens it to a one-second floor.
+function speechDurationMs(kind, active) {
+  const factor = state.clock.mode === "replay" ? playbackSpeed(state.speed, active) : 1;
+  return Math.max(MIN_SPEECH_REAL_SECONDS, SPEECH_SECONDS[kind] / factor) * 1000;
+}
+
+function advanceSpeech(now, active) {
   const speech = state.speech;
   if (speech && !state.people.has(speech.event.person)) state.speech = null;
   else if (speech?.phase === "speaking" && now >= speech.until) {
@@ -1128,20 +1137,20 @@ function advanceSpeech(now) {
       } else event = state.speechQueue.shift();
     } while (event && !state.people.has(event.person));
     if (event) state.speech = { event, phase: event.kind === "donation" ? "approaching" : "speaking",
-      until: event.kind === "donation" ? null : now + SPEECH_SECONDS[event.kind] * 1000 };
+      until: event.kind === "donation" ? null : now + speechDurationMs(event.kind, active) };
   }
   const queue = state.clock.mode === "follow-now" && state.live ? state.live.speechQueue : state.speechQueue;
   state.stageQueue = stageQueuePeople(queue, state.speech, state.people);
 }
 
-function settleStageSpeech(now) {
+function settleStageSpeech(now, active) {
   const speech = state.speech;
   if (speech?.event.kind !== "donation") return;
   const runtime = state.people.get(speech.event.person);
   if (!runtime?.visible || runtime.moving) return;
   if (speech.phase === "approaching" && samePoint(runtime.position, state.layout.stageFront)) {
     speech.phase = "speaking";
-    speech.until = now + SPEECH_SECONDS.donation * 1000;
+    speech.until = now + speechDurationMs("donation", active);
   } else if (speech.phase === "leaving" && samePoint(runtime.position, stageGeometry(state.layout).foot)) {
     state.speech = null;
   }
@@ -1482,9 +1491,9 @@ function loop(now) {
     void refresh();
   }
   persistClockSelection(now);
-  advanceSpeech(now);
+  advanceSpeech(now, active);
   updatePeople(realSeconds, now, active);
-  settleStageSpeech(now);
+  settleStageSpeech(now, active);
   render(now, active);
   updateHeader(active);
   updateSyncStatus();
