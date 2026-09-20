@@ -1,4 +1,12 @@
 {
  "format": 1,
- "events": []
+ "events": [
+  {
+   "event_id": "ae12774a1e8d41b2a39ea28bb4db2dc3",
+   "name": "Tater testers",
+   "start": "2026-09-19T10:30:00-04:00",
+   "tz": "America/New_York",
+   "tables": 1
+  }
+ ]
 }

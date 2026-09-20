@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-source="archive">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta id="live-feed" name="longtable-live-feed" content="https://longtable-live-data.arlavale.chatgpt.site/timeline.json">
+  <meta id="backup-feed" name="longtable-backup-feed" content="https://raw.githubusercontent.com/NahFhey/longtable-site/main/site/data/timeline.json">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Longtable</title>
+  <link rel="icon" href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/styles.css?v=3226e8b37688">
+</head>
+<body>
+  <a class="skip-link" href="#hall-content">Skip to the event</a>
+  <header class="masthead">
+    <div class="identity">
+      <h1 class="event-title"><a href="../../index.html">Longtable<span class="title-dot" aria-hidden="true">.</span></a></h1>
+      <p id="event-name" class="orientation"></p>
+      <nav class="site-nav" aria-label="Page navigation">
+        <a href="#hall-explorer">The hall</a>
+        <a href="#table-list">Find a game</a>
+        <a href="../../past-events.html">Past events <span aria-hidden="true">↗</span></a>
+      </nav>
+      <div id="event-actions" class="event-actions" aria-label="Event actions"></div>
+      <p id="fundraising-total" class="fundraising-total" hidden></p>
+      <p id="record-note" class="record-note" hidden>This is the final event record.</p>
+    </div>
+    <div class="event-console">
+      <div class="readout">
+        <span id="mode-badge" class="badge">LOADING</span>
+        <time id="clock">—</time>
+        <span id="scene-event"></span>
+        <span id="current-event" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
+      </div>
+      <div class="controls" aria-label="Event time controls">
+        <button id="play" type="button" disabled>Play</button>
+        <button id="return-now" type="button" hidden>Return to Now</button>
+        <label for="speed">Speed</label>
+        <select id="speed" disabled>
+          <option value="1">1×</option>
+          <option value="30">30×</option>
+          <option value="120">120×</option>
+          <option value="600" selected>600×</option>
+          <option value="1800">1800×</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main id="hall-content">
+    <div id="status" class="status" role="status" aria-live="polite">Loading the hall…</div>
+    <section id="table-list" class="table-list" aria-labelledby="table-list-heading">
+      <h2 id="table-list-heading">Tables</h2>
+      <details class="attendees-card">
+        <summary id="attendees-heading">Attendees</summary>
+        <ul id="attendees" class="attendee-list"></ul>
+      </details>
+      <div id="tables"></div>
+    </section>
+    <details id="hall-explorer" class="hall-explorer" open>
+      <summary>The Great Hall</summary>
+    <section id="hall-layout" class="hall-layout" aria-labelledby="hall-heading">
+      <div class="scene-wrap">
+        <h2 id="hall-heading" class="visually-hidden">Animated event hall</h2>
+        <div class="camera-controls" aria-label="Hall camera controls">
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="recenter" type="button">Recenter</button>
+          <button id="fit-active" type="button">Fit active tables</button>
+        </div>
+        <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
+
+        <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list.</p>
+        <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        <div class="timeline-controls">
+          <label for="scrubber">Event time</label>
+          <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
+          <div class="timeline-meta">
+            <span id="start-label">—</span>
+            <span id="now-marker" hidden>Now: —</span>
+            <span id="end-label">—</span>
+          </div>
+        </div>
+        <div id="music-controls" class="music-controls" role="group" aria-label="Hall music" hidden>
+          <audio id="hall-music" preload="none"></audio>
+          <button id="music-toggle" type="button">Play music</button>
+          <button id="music-next" type="button">Next track</button>
+          <label for="music-volume">Music volume</label>
+          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
+          <output id="music-volume-value" for="music-volume">50%</output>
+          <span id="music-track"></span>
+          <span id="music-status" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
+        <section id="detail" class="detail" aria-live="polite">
+          <h2>Table details</h2>
+          <p class="muted">Select a table in the hall or in the table list.</p>
+        </section>
+        <section class="activity-panel" aria-labelledby="activity-heading">
+          <h2 id="activity-heading">Activity</h2>
+          <p id="activity-note" class="muted"></p>
+          <ol id="activity-log" class="activity-log" tabindex="0" aria-label="Event activity"></ol>
+          <p id="activity-empty" class="muted">No public actions at this time.</p>
+          <button id="activity-more" type="button" hidden>Show older actions</button>
+        </section>
+      </aside>
+    </section>
+    </details>
+  </main>
+
+  <footer>
+    <p>Last updated <time id="updated">—</time>.</p>
+    <p>Art: Kenney · CC0.</p>
+    <p>Music: RandomMind · CC0 · <a href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/assets/music/CREDITS.txt">Credits</a>.</p>
+    <div id="sync-controls" class="sync-controls" hidden>
+      <span id="sync-status" role="status" aria-live="polite"></span>
+      <button id="refresh-now" type="button">Check for updates</button>
+    </div>
+  </footer>
+  <script type="module" src="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/app.mjs?v=73a26338faca"></script>
+</body>
+</html>

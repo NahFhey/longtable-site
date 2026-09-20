@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "fidelity": "final-schedule",
+ "event_id": "ae12774a1e8d41b2a39ea28bb4db2dc3",
+ "preserved_at": "2026-09-20T05:21:22.250397Z",
+ "presentation_version": 1,
+ "renderer": "b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f",
+ "schema": 7,
+ "room_layout": {
+  "version": 1,
+  "pad_capacity": 20,
+  "overflow_capacity": 120
+ }
+}
