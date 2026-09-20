@@ -136,6 +136,14 @@
    "actor": null,
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "f6f5cd7a1ef1473891600bd7709c2ddc",
+   "at": "2026-09-20T05:21:22.243908Z",
+   "action": "finalize",
+   "actor": "p1",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -149,8 +157,8 @@
   "pad_capacity": 20,
   "overflow_capacity": 120
  },
- "phase": "live",
- "generated_at": "2026-09-20T05:19:54.451974Z",
+ "phase": "final",
+ "generated_at": "2026-09-20T05:21:23.327655Z",
  "event": {
   "name": "Tater testers",
   "start": "2026-09-19T10:30:00-04:00",
@@ -163,7 +171,7 @@
  "people": [
   {
    "id": "p1",
-   "name": "Nah Fhey",
+   "name": "Nah F.",
    "dm": true,
    "hidden": false,
    "variant": 4082956081,
