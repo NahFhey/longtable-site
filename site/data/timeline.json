@@ -116,7 +116,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T17:03:08.591447Z",
+ "generated_at": "2026-09-21T17:03:14.471198Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -215,10 +215,10 @@
   },
   {
    "id": "p5",
-   "name": null,
+   "name": "Nick",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 355117276,
    "appearance": null,
    "movements": [],
    "presence": {
