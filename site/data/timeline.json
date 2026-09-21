@@ -204,7 +204,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T19:55:48.836529Z",
+ "generated_at": "2026-09-21T19:56:03.491258Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -375,10 +375,10 @@
   },
   {
    "id": "p8",
-   "name": null,
+   "name": "Ripwolfqueen",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 3058885053,
    "appearance": null,
    "movements": [],
    "presence": {
