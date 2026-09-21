@@ -298,8 +298,9 @@ polling and consent rules as the public page apply, and nothing new about any
 attendee appears. Keep the tab in the foreground (polling and the Extra Life
 total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
 the page also asks for a screen wake lock where the browser allows one. After
-45 seconds without input a moved camera returns to automatic framing, and the
-cursor hides after 3 seconds.
+45 seconds without input a moved camera returns to the kiosk's automatic frame,
+which is always the whole room from the back wall to the lounge (never the live
+page's close-up of the relevant tables), and the cursor hides after 3 seconds.
 
 `?sample=50&kiosk=1` is the dress rehearsal (the demo event in kiosk chrome);
 `?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
@@ -468,17 +469,32 @@ is unchanged at 1× and while paused; its temporary visit may finish while repla
 
 ## Hall music
 
-Expanding the Great Hall plays RandomMind’s CC0 recordings “The Old Tower Inn”
-and “The Bard’s Tale” in rotation. Collapsing the hall pauses the current track;
-reopening resumes it. Music stays at normal speed during replay, including when
-the event clock is paused. The controls offer mute, next track, and volume.
-Volume starts at 50%; volume and mute preferences are saved in this browser’s
-local storage (`longtable.music.v1`), shared by live pages and event archives.
+A jukebox stands on the floor against the back wall of the Great Hall, two tiles
+right of the host banner’s end (the food area fills the wall’s left end), under a
+wooden sign that reads “Click here for music”. Music never starts until a visitor
+clicks the jukebox or its sign once in that browser: the first click turns the
+music on, remembers that choice, and opens a small player beside the jukebox with
+the track line, **Pause music** / **Play music**, **Next track**, a volume slider
+and a close button. Hovering the jukebox shows a tooltip and a pointer cursor; the
+player closes with its × button, Escape, another jukebox click, or collapsing the
+hall, and never widens the automatic camera frame. Once enabled, expanding the
+Great Hall plays RandomMind’s CC0 recordings “The Old Tower Inn”, “The Bard’s
+Tale”, “Market Day”, “Minstrel Dance” and “Rejoicing” in that order, wrapping
+around, and the sign names the playing track; collapsing the hall pauses
+the current track and reopening resumes it. Music stays at normal speed during
+replay, including when the event clock is paused. **Pause music** turns the music
+off until the next click on the jukebox or **Play music**. Dragging the volume to
+0 mutes; above 0 unmutes. Volume starts at 50%; volume, mute, the last track and
+the on/off choice are saved in this browser’s local storage (`longtable.music.v1`,
+`{ volume, muted, track, enabled }`, older `{ volume, muted }` entries still load),
+shared by live pages and event archives; whether the player is open is not saved.
 If storage is unavailable, preferences last for the page session. If the browser
-blocks autoplay, **Play music** enables audio with a click. No track is fetched
-until playback is needed. Sources and licenses are in `assets/music/CREDITS.txt`.
-New archived renderers include the module, credits, and both MP3s; older archives
-retain their original renderer.
+blocks autoplay, the sign keeps inviting a click and **Play music** enables audio.
+No track is fetched until playback is needed. The jukebox, its tooltip and the
+player work the same in kiosk mode, so the projector’s music can be started and
+paused at the jukebox. Sources and licenses are in `assets/music/CREDITS.txt`.
+New archived renderers include the module, credits, and all five MP3s; archives
+frozen with the two-track or older renderers keep their original files.
 
 The current header links to Discord and Extra Life team 74917. Its public team
 amount/goal refreshes quietly every minute while the tab is visible. Extra Life

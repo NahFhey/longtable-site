@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, gatheringLocations, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
+import { createRoomLayout, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
+import { fitBounds, worldToScreen } from "../camera.mjs";
 import { DISCORD_INVITE, WALL_PLAQUES } from "../event-config.mjs";
 
 class FakeNode {
@@ -67,6 +68,19 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   nodes.get("hall").height = 480;
   nodes.get("hall").getContext = () => { if (options.contextThrows) throw new Error("Canvas disabled"); return options.noContext ? null : context; };
   nodes.get("hall").setPointerCapture = () => {};
+  // The jukebox player is optional in the harness: without it setupHallMusic returns null and clicks are no-ops.
+  if (options.music) {
+    for (const id of ["music-panel", "hall-music", "music-track", "music-toggle", "music-next", "music-close", "music-volume", "music-volume-value", "music-status"]) {
+      nodes.set(id, new FakeNode(id === "hall-music" ? "audio" : "div"));
+    }
+    const panel = nodes.get("music-panel");
+    panel.hidden = true;
+    panel.parentElement = scene;
+    panel.offsetWidth = 224;
+    panel.offsetHeight = 160;
+    Object.assign(nodes.get("hall-music"), { paused: true, plays: 0, load() {}, pause() { this.paused = true; },
+      play() { this.plays += 1; this.paused = false; return Promise.resolve(); } });
+  }
 
   const documentListeners = new Map();
   globalThis.document = {
@@ -1415,6 +1429,69 @@ test("the footer kiosk link opens the same view as a kiosk and is not offered on
   assert.equal(archive.nodes.get("kiosk-link").hidden, true);
 });
 
+test("the jukebox and its sign draw in live, kiosk and archive views and the description names them", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  for (const [label, options] of [["jukebox-live", {}], ["jukebox-kiosk", { search: "?sample=1&kiosk=1" }], ["jukebox-archive", { search: "", archive: true }]]) {
+    const app = await runApp([sample], label, options);
+    assert.deepEqual(app.errors, [], label);
+    assert.ok(app.contextCalls.includes("Click here for music"), `${label}: the sign invites a click while no music plays`);
+    assert.match(app.nodes.get("canvas-description").textContent, /A jukebox stands against the back wall under a sign that offers music when clicked\./, label);
+    assert.equal(app.nodes.get("music-panel"), undefined, `${label}: no panel in this harness`);
+  }
+});
+
+test("clicking the jukebox opens the player, starts music and names the track on the sign, in kiosk mode too", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  for (const [label, search] of [["jukebox-click", "?sample=1"], ["jukebox-click-kiosk", "?sample=1&kiosk=1"]]) {
+    const app = await runApp([sample], label, { search, music: true });
+    app.nodes.get("recenter").listeners.get("click")();
+    const layout = createRoomLayout(sample.tables, sample.room_layout);
+    const hall = { x: 0, y: layout.backWall.y, width: layout.width, height: layout.height - layout.backWall.y };
+    const camera = fitBounds(hall, { width: 960, height: 480 }, hall, 0);
+    const box = jukeboxBounds(layout);
+    const point = worldToScreen(camera, { x: box.x + box.w / 2, y: box.y + box.h / 2 });
+    const canvas = app.nodes.get("hall");
+    const events = canvas.listeners;
+    events.get("pointermove")({ pointerId: 9, clientX: point.x, clientY: point.y });
+    assert.equal(canvas.style.cursor, "pointer", `${label}: pointer over the jukebox`);
+    assert.equal(app.nodes.get("tooltip").hidden, false);
+    assert.equal(app.nodes.get("tooltip").textContent, "Jukebox — click for music");
+    assert.equal(app.nodes.get("tooltip").className, "tooltip jukebox-tip");
+    events.get("pointermove")({ pointerId: 9, clientX: 2, clientY: 2 });
+    assert.equal(canvas.style.cursor, "", `${label}: cursor restored off the jukebox`);
+    const panel = app.nodes.get("music-panel");
+    const audio = app.nodes.get("hall-music");
+    assert.equal(panel.hidden, true);
+    assert.equal(audio.plays, 0, `${label}: nothing plays before the first click`);
+    events.get("pointerdown")({ pointerId: 9, clientX: point.x, clientY: point.y, button: 0 });
+    events.get("pointerup")({ pointerId: 9 });
+    events.get("click")({ clientX: point.x, clientY: point.y });
+    assert.equal(panel.hidden, false, `${label}: the first click opens the player`);
+    assert.equal(app.nodes.get("music-toggle").focused, true, `${label}: focus moves to the play button`);
+    assert.equal(audio.plays, 1, `${label}: the first click starts the music`);
+    assert.match(allText(app.nodes.get("detail")), /Select a table/, `${label}: a jukebox click selects no table`);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    app.contextCalls.length = 0;
+    app.frames.shift()?.(performance.now() + 60);
+    assert.ok(app.contextCalls.includes("♪ The Old Tower Inn"), `${label}: the sign names the playing track`);
+    assert.ok(!app.contextCalls.includes("Click here for music"), label);
+    assert.match(panel.style.left, /^\d+px$/, `${label}: the panel is anchored in the scene`);
+    assert.match(panel.style.top, /^\d+px$/, label);
+    assert.equal(app.nodes.get("music-track").textContent, "The Old Tower Inn — RandomMind");
+    app.nodes.get("music-toggle").listeners.get("click")();
+    assert.equal(audio.paused, true, `${label}: Pause stops the music from the panel`);
+    app.contextCalls.length = 0;
+    app.frames.shift()?.(performance.now() + 120);
+    assert.ok(app.contextCalls.includes("Click here for music"), `${label}: the sign returns to the invitation`);
+    events.get("pointerdown")({ pointerId: 9, clientX: point.x, clientY: point.y, button: 0 });
+    events.get("pointerup")({ pointerId: 9 });
+    events.get("click")({ clientX: point.x, clientY: point.y });
+    assert.equal(panel.hidden, true, `${label}: a second click hides the player`);
+    assert.equal(canvas.focused, true, `${label}: closing returns focus to the canvas`);
+  }
+});
+
 test("without ?kiosk the page has no kiosk flag, wake lock or idle key handling", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "no-kiosk", { wakeLock: true });
@@ -1475,6 +1552,12 @@ test("kiosk returns a manual camera to automatic framing after 45 s idle, hides 
   assert.deepEqual(frameAt(1_000), zoomed);
   assert.equal(dataset.idle, undefined, "movement brings the cursor back");
   assert.deepEqual(frameAt(46_000), automatic, "after 45 s without input the projection reframes automatically");
+  // The projector's automatic frame is the whole room, wall to lounge, not a close-up of the relevant tables.
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const room = { x: 0, y: layout.backWall.y, width: layout.width, height: layout.height - layout.backWall.y };
+  const whole = fitBounds(room, { width: 960, height: 480 }, room, 0);
+  // The camera transform draws tiles at 32 px per unit (TILE * SCALE), so its scale is the zoom over 32.
+  assert.deepEqual(automatic, [whole.zoom / 32, 0, 0, whole.zoom / 32, whole.x, whole.y], "kiosk frames the whole hall");
   const plain = await runApp([sample], "plain-idle", { search: "?sample=1" });
   const held = (() => { plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 30); return plain.transforms[1]; })();
   plain.nodes.get("hall").listeners.get("wheel")({ clientX: 480, clientY: 240, deltaY: -180, deltaMode: 0, preventDefault() {} });

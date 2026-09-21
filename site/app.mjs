@@ -1,5 +1,5 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
-import { setupHallMusic } from "./music.mjs";
+import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
 import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
@@ -23,6 +23,8 @@ import {
   diceAt,
   diceText,
   indexAdminEvents,
+  jukeboxBounds,
+  jukeboxSignBounds,
   personTooltip,
   playbackSpeed,
   publicActivity,
@@ -38,7 +40,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=441d04d8849c";
+} from "./model.mjs?v=2d2625f72f0d";
 
 const TILE = 16;
 const SCALE = 2;
@@ -73,13 +75,15 @@ const RPG = {
 };
 
 const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
+const JUKEBOX_SENTENCE = "A jukebox stands against the back wall under a sign that offers music when clicked.";
+const JUKEBOX_TOOLTIP = "Jukebox — click for music";
 const KIOSK_CAMERA_RESET_MS = 45_000;   // a bumped mouse never leaves the projection zoomed into a corner
 const KIOSK_CURSOR_HIDE_MS = 3_000;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
-// The static prose describes the live page; the plaque sentence is re-added per mode by updateHeader.
-const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").trim();
+// The static prose describes the live page; the plaque and jukebox sentences are re-added per mode by updateHeader.
+const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").replace(JUKEBOX_SENTENCE, "").trim();
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 const mobile = matchMedia("(max-width: 650px)");
@@ -98,7 +102,9 @@ function arrangeHall() {
 }
 arrangeHall();
 mobile.addEventListener?.("change", arrangeHall);
-setupHallMusic();
+// Null when the player panel is absent: the jukebox still draws with its sign, but a click does nothing.
+const music = setupHallMusic();
+$("music-open")?.addEventListener("click", () => music?.togglePanel());
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {
@@ -271,7 +277,16 @@ function updateCamera() {
   const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
   const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
   const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
-  if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
+  if (!state.manualCamera && state.kiosk) {
+    // The projector shows the whole room: the idle reset returns to this frame, never to a close-up that
+    // cuts off the stage or the lounge. Framing by relevant tables stays a live-page behaviour.
+    if (state.frameKey !== "kiosk" || !state.camera) {
+      state.camera = fitBounds(hallBounds(), size, hallBounds(), 0);
+      state.frameKey = "kiosk";
+      hideTooltip();
+    }
+    state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+  } else if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
     // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is
     // the point: before doors, and on the projector in every mode; a live or replay view keeps zooming to
@@ -638,6 +653,96 @@ function drawHostBanner() {
   ctx.restore();
 }
 
+// A wooden jukebox with an arched top stands against the back wall; its lamps and glass glow while music plays.
+// The sign above invites a click and names the track while it plays. Both are drawn in tile space like the plaques.
+function drawJukebox() {
+  const box = jukeboxBounds(state.layout);
+  const sign = jukeboxSignBounds(state.layout);
+  const playing = !!music?.isPlaying();
+  const beat = (offset) => reducedMotion.matches ? 1 : (Math.sin(state.lastTime / 260 + offset) + 1) / 2;
+  ctx.save();
+  ctx.scale(TILE * SCALE, TILE * SCALE);
+  ctx.translate(sign.x, sign.y);
+  ctx.fillStyle = "#4a3524";
+  ctx.fillRect(0, 0, sign.w, sign.h);
+  ctx.lineWidth = .06;
+  ctx.strokeStyle = "#b89b5c";
+  ctx.strokeRect(.04, .04, sign.w - .08, sign.h - .08);
+  ctx.fillStyle = "#d8b86d";
+  for (const nail of [.2, sign.w - .2]) { ctx.beginPath(); ctx.arc(nail, .2, .07, 0, Math.PI * 2); ctx.fill(); }
+  const text = playing ? `♪ ${music.currentTitle()}` : "Click here for music";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#e9d9ae";
+  fitFont(text, .42, "Georgia, serif", sign.w - .5);
+  ctx.fillText(text, sign.w / 2, sign.h / 2 + .03);
+  ctx.translate(box.x - sign.x, box.y - sign.y);
+  const arch = { x: box.w / 2, y: .95, r: box.w / 2 };
+  ctx.fillStyle = "#5a3b22";
+  ctx.beginPath(); ctx.moveTo(0, box.h); ctx.lineTo(0, arch.y); ctx.arc(arch.x, arch.y, arch.r, Math.PI, 0); ctx.lineTo(box.w, box.h); ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = .06;
+  ctx.strokeStyle = "#2c1b10";
+  ctx.stroke();
+  ctx.strokeStyle = "#d8b86d";
+  ctx.lineWidth = .07;
+  ctx.beginPath(); ctx.arc(arch.x, arch.y, arch.r - .16, Math.PI, 0); ctx.stroke();
+  // The glass front: warm and steady when off, brighter and breathing while a track plays.
+  const glow = playing ? .6 + .4 * beat(0) : .35;
+  ctx.fillStyle = `rgba(255, 196, 110, ${glow})`;
+  ctx.beginPath(); ctx.arc(arch.x, arch.y, arch.r - .38, Math.PI, 0); ctx.lineTo(box.w - .38, 1.7); ctx.lineTo(.38, 1.7); ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#2a1a12";
+  ctx.fillRect(.3, 1.85, box.w - .6, .75);
+  ctx.fillStyle = "#8a6a45";
+  for (const line of [2.0, 2.2, 2.4]) ctx.fillRect(.42, line, box.w - .84, .06);
+  const lamps = ["#ff6a6a", "#ffd45f", "#6fdcff", "#9dff6f", "#ff6fd6"];
+  lamps.forEach((color, index) => {
+    const angle = Math.PI + Math.PI * (index + .5) / lamps.length;
+    ctx.globalAlpha = playing ? .5 + .5 * beat(index * 1.3) : .3;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(arch.x + Math.cos(angle) * (arch.r - .16), arch.y + Math.sin(angle) * (arch.r - .16), .1, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#2c1b10";
+  ctx.fillRect(.1, box.h - .12, .4, .12);
+  ctx.fillRect(box.w - .5, box.h - .12, .4, .12);
+  ctx.restore();
+}
+
+function overJukebox(point) {
+  const inside = ({ x, y, w, h }) => point.x >= x && point.x < x + w && point.y >= y && point.y < y + h;
+  return inside(jukeboxBounds(state.layout)) || inside(jukeboxSignBounds(state.layout));
+}
+
+// The player sits just above-right of the jukebox in screen space, to its left when the right side has no room,
+// and docks at the bottom-left of the scene when neither side fits (phone widths). Cheap, and only while open.
+function placeMusicPanel() {
+  if (!music?.panelOpen() || !state.camera || !state.viewport) return;
+  const panel = $("music-panel");
+  if (!panel) return;
+  const box = jukeboxBounds(state.layout);
+  const sign = jukeboxSignBounds(state.layout);
+  const right = worldToScreen(state.camera, { x: box.x + box.w, y: sign.y });
+  const left = worldToScreen(state.camera, { x: box.x, y: sign.y });
+  const width = panel.offsetWidth || 0;
+  const height = panel.offsetHeight || 0;
+  const view = state.viewport;
+  const gap = 10;
+  let x, y;
+  if (right.x >= 0 && right.x + gap + width <= view.width - 4) { x = right.x + gap; y = right.y - gap; }
+  else if (left.x <= view.width && left.x - gap - width >= 4) { x = left.x - gap - width; y = left.y - gap; }
+  else { x = 8; y = view.height - height - 8; }
+  x = clamp(x, 4, Math.max(4, view.width - width - 4));
+  y = clamp(y, 4, Math.max(4, view.height - height - 4));
+  // The panel's parent is the scene wrap, where the canvas sits below the camera controls.
+  const canvasRect = canvas.getBoundingClientRect();
+  const sceneRect = panel.parentElement?.getBoundingClientRect?.() ?? canvasRect;
+  const styleLeft = `${Math.round(canvasRect.left - sceneRect.left + x)}px`;
+  const styleTop = `${Math.round(canvasRect.top - sceneRect.top + y)}px`;
+  if (panel.style.left !== styleLeft) panel.style.left = styleLeft;
+  if (panel.style.top !== styleTop) panel.style.top = styleTop;
+}
+
 function drawRoom() {
   const layout = state.layout;
   const unit = TILE * SCALE;
@@ -725,6 +830,7 @@ function drawRoom() {
     ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
   }
   drawLabel("DOOR", 1.6, layout.door.y - 0.6, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
+  drawJukebox();
 }
 
 function drawStageStairs() {
@@ -1080,6 +1186,7 @@ function render(now, active) {
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
   drawEvents(active, now);
+  placeMusicPanel();
 }
 
 function actualText(actual) {
@@ -1189,7 +1296,7 @@ function updateHeader(active) {
   const gathered = state.gatheredCount;
   const gatheredSentence = gathered === 0 ? "Nobody has arrived yet." : `${gathered} ${gathered === 1 ? "person has" : "people have"} gathered so far.`;
   const plaqueSentence = state.archive ? "" : ` ${PLAQUE_SENTENCE}`;
-  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + hostSuffix;
+  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + ` ${JUKEBOX_SENTENCE}` + hostSuffix;
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
   const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
@@ -1558,6 +1665,7 @@ function pointerPoint(event) {
 
 function canvasPoint(event) { return screenToWorld(state.camera, pointerPoint(event)); }
 function hideTooltip() { state.hover = null; $("tooltip").hidden = true; }
+function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.cursor = value; }
 const pointers = new Map();
 let gesture = null;
 let suppressClick = false;
@@ -1609,9 +1717,13 @@ canvas.addEventListener("pointermove", (event) => {
     if (candidate < distance) { best = runtime; distance = candidate; }
   }
   state.hover = best;
+  const onJukebox = overJukebox(point);
+  setCursor(onJukebox ? "pointer" : "");
   const tooltip = $("tooltip");
-  if (!best) { tooltip.hidden = true; return; }
-  tooltip.textContent = personTooltip(best.person, best.place, best.moving);
+  if (!best && !onJukebox) { tooltip.hidden = true; return; }
+  // A person walking in front of the jukebox keeps their tooltip; the jukebox tip stays visible in kiosk mode.
+  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : JUKEBOX_TOOLTIP;
+  tooltip.className = best ? "tooltip" : "tooltip jukebox-tip";
   const sceneRect = canvas.parentElement.getBoundingClientRect();
   tooltip.style.left = `${clamp(event.clientX - sceneRect.left + 12, 0, Math.max(0, sceneRect.width - 280))}px`;
   tooltip.style.top = `${Math.max(0, event.clientY - sceneRect.top - 30)}px`;
@@ -1625,12 +1737,13 @@ function finishPointer(event) {
 canvas.addEventListener("pointerup", finishPointer);
 canvas.addEventListener("pointercancel", (event) => { suppressClick = true; finishPointer(event); });
 canvas.addEventListener("lostpointercapture", finishPointer);
-canvas.addEventListener("pointerleave", hideTooltip);
+canvas.addEventListener("pointerleave", () => { hideTooltip(); setCursor(""); });
 canvas.addEventListener("click", (event) => {
   if (!state.camera || suppressClick) return;
+  const point = canvasPoint(event);
+  if (overJukebox(point)) { music?.togglePanel(); return; }
   const screen = pointerPoint(event);
   const label = state.labelBoxes?.find((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
-  const point = canvasPoint(event);
   const index = label?.index ?? state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
   if (index >= 0 && state.data.tables[index]) selectTable(state.data.tables[index].id);
 });

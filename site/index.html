@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=5a457e1fb010">
+  <link rel="stylesheet" href="./styles.css?v=0d8a3b6c0801">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
@@ -70,9 +70,23 @@
         </div>
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
+        <button id="music-open" class="jukebox-key" type="button">Open the jukebox music player</button>
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.</p>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header. A jukebox stands against the back wall under a sign that offers music when clicked.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        <div id="music-panel" class="music-panel" role="dialog" aria-label="Jukebox" hidden>
+          <audio id="hall-music" preload="none"></audio>
+          <p id="music-track" class="music-track"></p>
+          <div class="music-buttons">
+            <button id="music-toggle" type="button">Play music</button>
+            <button id="music-next" type="button">Next track</button>
+            <button id="music-close" type="button" aria-label="Close jukebox">×</button>
+          </div>
+          <label for="music-volume">Volume</label>
+          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
+          <output id="music-volume-value" for="music-volume">50%</output>
+          <span id="music-status" role="status" aria-live="polite"></span>
+        </div>
         <div class="timeline-controls">
           <label for="scrubber">Event time</label>
           <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
@@ -81,16 +95,6 @@
             <span id="now-marker" hidden>Now: —</span>
             <span id="end-label">—</span>
           </div>
-        </div>
-        <div id="music-controls" class="music-controls" role="group" aria-label="Hall music" hidden>
-          <audio id="hall-music" preload="none"></audio>
-          <button id="music-toggle" type="button">Play music</button>
-          <button id="music-next" type="button">Next track</button>
-          <label for="music-volume">Music volume</label>
-          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
-          <output id="music-volume-value" for="music-volume">50%</output>
-          <span id="music-track"></span>
-          <span id="music-status" role="status" aria-live="polite"></span>
         </div>
       </div>
       <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
@@ -120,6 +124,6 @@
     </div>
     <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="./app.mjs?v=b451e7c39437"></script>
+  <script type="module" src="./app.mjs?v=1b4c6429d2ff"></script>
 </body>
 </html>

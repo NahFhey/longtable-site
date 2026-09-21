@@ -783,6 +783,22 @@ export function wallFixtures(layout, { plaques = 2, banner = true } = {}) {
   return { banner: banner ? { x: 3, y: -4.7, w: bannerWidth, h: 3.5 } : null, plaques: rects };
 }
 
+/**
+ * The jukebox stands on the floor with its back to the back wall, two tiles right of the host banner's end
+ * (the food area fills the wall's left end), so it moves with the banner and never sits under it or the plaques.
+ * Its top overlaps the wall's lowest brick row like furniture pushed against a wall.
+ */
+export function jukeboxBounds(layout) {
+  const { banner } = wallFixtures(layout);
+  return { x: banner.x + banner.w + 2, y: -1.2, w: 2, h: 3 };
+}
+
+/** The music sign hangs on the wall directly above the jukebox, one tile wider on each side. */
+export function jukeboxSignBounds(layout) {
+  const box = jukeboxBounds(layout);
+  return { x: box.x - 1, y: box.y - 1.4, w: box.w + 2, h: 1 };
+}
+
 export function seatPositionForPlan(plan, tableIndex, seat) {
   if (!Number.isInteger(tableIndex) || tableIndex < 0 || !plan.cells[tableIndex]) throw new RangeError("table index is out of range");
   if (!Number.isInteger(seat) || seat < 0) throw new RangeError("seat must be a non-negative integer");
