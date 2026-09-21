@@ -60,7 +60,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T16:07:51.528699Z",
+ "generated_at": "2026-09-21T16:08:05.397414Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -97,10 +97,10 @@
   },
   {
    "id": "p2",
-   "name": null,
+   "name": "Ambear",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 3835895574,
    "appearance": null,
    "movements": [],
    "presence": {
