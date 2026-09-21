@@ -42,6 +42,8 @@ test("dice frames derive solely from selected time, settle on recorded faces, an
   assert.ok(settled.dice.every((die) => die.angle === 0));
   assert.deepEqual(diceAt(data, event.table, slot, true).dice, settled.dice);
   assert.match(diceText(data, event), /2d6\+3: \[3, 4\] \+3 = 10/);
+  assert.equal(diceText(data, undefined), "", "no roll yields no text");
+  assert.equal(diceText(data, diceAt(data, event.table, event.at - 1)?.event), "");
 });
 
 test("hidden rollers stay hidden and refresh/removal never reuses a discarded outcome", () => {

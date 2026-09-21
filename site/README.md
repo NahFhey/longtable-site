@@ -115,7 +115,9 @@ and 10 minutes of cleanup afterward. Durations scale down proportionally for
 shorter slots, and clip to the event boundaries. Phases are scheduled, preparing,
 ready, playing, packing up, and inactive. Tables/chairs appear during preparation;
 props appear when ready and disappear during cleanup. Nothing waits for a prior
-animation to finish. The list and selected-table details report the same phase.
+animation to finish. The list and selected-table details report the same phase
+as a bare status line; before doors (the upcoming clock) every table reads
+"Scheduled" rather than the slot-0 phase.
 These are schedule-derived states, not claims about cancellation or actual staff.
 
 `clock.mjs` separates source (`live`, `sample`, or an `archive` entry point),
@@ -245,7 +247,8 @@ No new recorded events or history claims are introduced.
 ### Recorded dice (Milestone G)
 
 Schema 5 adds validated public dice outcomes. The latest result at selected time
-appears in each table card and its details, including all faces and the modifier.
+appears in each table card and its details, including all faces and the modifier;
+the notice is absent until a roll exists.
 The canvas draws up to six dice on a deterministic three-second toss, seeded by
 event identity and driven entirely by selected time; it always settles on the
 saved faces. Pausing, seeking, reloading, and archives do not reroll. Reduced motion

@@ -354,8 +354,9 @@ export function diceAt(timeline, tableId, slot, reducedMotion = false) {
   }) };
 }
 
+/** Text for the latest public roll; empty when there is none, so the notice only appears once a roll exists. */
 export function diceText(timeline, event) {
-  if (!event || event.kind !== "roll" || event.visibility !== "public") return "No public roll at this time.";
+  if (!event || event.kind !== "roll" || event.visibility !== "public") return "";
   const who = displayName(timeline.people.find((person) => person.id === event.person));
   const roll = event.roll;
   const modifier = roll.modifier ? ` ${roll.modifier > 0 ? "+" : ""}${roll.modifier}` : "";

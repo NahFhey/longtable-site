@@ -37,6 +37,10 @@ function allText(node) {
   return [node.textContent, ...node.children.map(allText)].join(" ");
 }
 
+const lineOf = (node, className) => node.children.find((child) => child.className === className)?.textContent;
+/** One entry per table card: [phase line, dice line]. */
+const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
+
 function installDom(dataSequence, search = "?sample=1", options = {}) {
   const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
@@ -512,8 +516,9 @@ test("lifecycle scenery and accessible status match direct seek, fresh load and 
     seek.imageCalls.length = 0;
     seek.rectCalls.length = 0;
     seek.frames.shift()?.(performance.now() + 100);
-    assert.match(allText(seek.nodes.get("tables")), new RegExp(`At selected time: ${phase}`));
-    assert.match(allText(seek.nodes.get("detail")), new RegExp(`At selected time: ${phase}`));
+    assert.deepEqual(cardLines(seek.nodes.get("tables")), [[phase, ""]], "no roll means no roll notice");
+    assert.equal(lineOf(seek.nodes.get("detail"), "table-phase"), phase);
+    assert.equal(lineOf(seek.nodes.get("detail"), "dice-result"), "");
     const expected = scenery(seek);
     assert.equal(expected.tables.length > 0, furniture);
     assert.equal(expected.maps.length > 0, props);
@@ -547,7 +552,7 @@ test("sequential replay and reload at the resulting slot paint the same lifecycl
     app.imageCalls.length = 0;
     app.rectCalls.length = 0;
     app.frames.shift()?.(baseline + frame * 100);
-    seen.add(app.nodes.get("detail").children.find((node) => node.className === "table-phase")?.textContent.replace("At selected time: ", "") || "");
+    seen.add(lineOf(app.nodes.get("detail"), "table-phase") || "");
     const slot = Number(app.nodes.get("scrubber").value);
     if (slot > 2 && slot < 2.4) capture = { slot, map: app.rectCalls.filter((call) => call.color === "#eee0b9") };
   }
@@ -1140,6 +1145,7 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
   assert.equal(app.nodes.get("mode-badge").className, "badge");
   assert.equal(app.nodes.get("clock").textContent, "Saturday, November 7, 10:00 AM");
+  assert.ok(cardLines(app.nodes.get("tables")).every(([phase]) => phase === "Scheduled"), "before doors no table reads as playing");
   assert.equal(app.nodes.get("clock").dateTime, sample.event.start);
   assert.equal(app.nodes.get("scene-event").textContent, "40 days away");
   assert.equal(app.nodes.get("current-event").textContent, "Doors open Saturday, November 7, 10:00 AM. 40 days away.");

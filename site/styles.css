@@ -125,6 +125,7 @@ canvas:active { cursor: grabbing; }
 .system { color: var(--gold); font-weight: 700; }
 .table-phase { color: #c4d5bd; font-size: .78rem; }
 .dice-result { color: var(--gold); overflow-wrap: anywhere; }
+.dice-result:empty { margin: 0; }
 .dice-result:not(:empty) { padding: .6rem .75rem; border-left: 2px solid var(--gold); background: #dfba7609; font-size: .8rem; }
 .join-instructions { color: var(--muted); font-size: .8rem; }
 

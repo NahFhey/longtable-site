@@ -163,6 +163,8 @@ function parseNowOverride(value) {
 function wallNow() { return Date.now() + state.nowOffset; }
 const upcoming = () => state.clock?.mode === "upcoming";
 const beforeDoors = () => state.stage === "gathering" || state.stage === "eve";
+/** A table's schedule-derived status at the selected time; before doors every table is simply scheduled. */
+const phaseText = (table) => upcoming() ? "Scheduled" : tableLifecycle(state.data, table, state.time).label;
 // The gathering scene: watching the hall as it is now, before doors (the preview keeps the event-day path).
 const gatheringScene = () => upcoming() && beforeDoors();
 
@@ -1027,7 +1029,7 @@ function renderDetail(focus = false) {
   heading.tabIndex = -1;
   append(panel, "p", view.system, "system");
   append(panel, "p", view.pitch);
-  state.detailPhaseNode = append(panel, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase");
+  state.detailPhaseNode = append(panel, "p", phaseText(table), "table-phase");
   state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
@@ -1085,7 +1087,7 @@ function renderTableList() {
     button.setAttribute("aria-label", `Show details for ${view.name}`);
     button.addEventListener("click", () => selectTable(table.id, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
-    state.tablePhaseNodes.set(table.id, append(article, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase"));
+    state.tablePhaseNodes.set(table.id, append(article, "p", phaseText(table), "table-phase"));
     const diceNode = append(article, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
     diceNode.setAttribute("aria-live", "polite");
     diceNode.setAttribute("aria-atomic", "true");
@@ -1147,7 +1149,7 @@ function updateHeader(active) {
   badge.textContent = upcomingNow ? "UPCOMING" : following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
   badge.className = `badge${following ? " live" : ""}`;
   for (const table of state.data.tables) {
-    const text = `At selected time: ${tableLifecycle(state.data, table, state.time).label}`;
+    const text = phaseText(table);
     const result = diceText(state.data, diceAt(state.data, table.id, state.time)?.event);
     const diceNode = state.tableDiceNodes.get(table.id);
     if (diceNode && diceNode.textContent !== result) diceNode.textContent = result;
