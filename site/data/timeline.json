@@ -32,6 +32,14 @@
    "actor": "p1",
    "table": null,
    "person": null
+  },
+  {
+   "id": "2256297329404bc1bb6847e07909d6cc",
+   "at": "2026-09-21T14:57:04.362548Z",
+   "action": "set_appearance",
+   "actor": "p1",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -44,7 +52,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T14:56:12.487371Z",
+ "generated_at": "2026-09-21T14:57:07.316580Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -58,7 +66,7 @@
   {
    "id": "p1",
    "name": "Nah Fhey",
-   "dm": false,
+   "dm": true,
    "hidden": false,
    "variant": 4082956081,
    "appearance": {
