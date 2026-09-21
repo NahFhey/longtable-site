@@ -1,24 +1,32 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
-import { setupHallMusic } from "./music.mjs";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs";
+import { setupHallMusic } from "./music.mjs?v=d1142140d771";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { eventActions, setupFundraising } from "./event-config.mjs?v=fd82af33dc85";
+import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
+  EVE_MS,
   PALETTE_SIZE,
   activeEvents,
   accessibleEventText,
+  countdownText,
   createRoomLayout,
   createLiveState,
   crossedSpeechEvents,
   displayName,
+  gatheringAmbience,
+  gatheringLocations,
   hallAmbience,
+  hallStage,
   foodGeometry,
   loungeActivities,
   diceAt,
   diceText,
   indexAdminEvents,
+  jukeboxBounds,
+  jukeboxSignBounds,
   personTooltip,
+  playbackSpeed,
   publicActivity,
   reconcileLiveSnapshot,
   resolveLocation,
@@ -31,13 +39,18 @@ import {
   tableScenery,
   validateTimeline,
   visibleVariant,
-} from "./model.mjs?v=74551816ed07";
+  wallFixtures,
+} from "./model.mjs?v=2d2625f72f0d";
 
 const TILE = 16;
 const SCALE = 2;
 const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
+const MIN_SPEECH_REAL_SECONDS = 1;   // readable even at 1800×
+const EVE_EXODUS_SECONDS = 45;       // departures at T−24 h spread over this many real seconds
+const NO_ACTIVE = Object.freeze({ break: null, meal: null, announce: null, spotlight: null });
+const ABSENT_PLACE = Object.freeze({ kind: "absent", label: "outside the hall" });
 
 // Display milliseconds keep the opening lead and one-second hold visible in replay.
 class HallDoor {
@@ -61,9 +74,16 @@ const RPG = {
   barrel: [23,0], shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
 };
 
+const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
+const JUKEBOX_SENTENCE = "A jukebox stands against the back wall under a sign that offers music when clicked.";
+const JUKEBOX_TOOLTIP = "Jukebox — click for music";
+const KIOSK_CAMERA_RESET_MS = 45_000;   // a bumped mouse never leaves the projection zoomed into a corner
+const KIOSK_CURSOR_HIDE_MS = 3_000;
+
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
-const hallDescription = $("canvas-description").textContent;
+// The static prose describes the live page; the plaque and jukebox sentences are re-added per mode by updateHeader.
+const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").replace(JUKEBOX_SENTENCE, "").trim();
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 const mobile = matchMedia("(max-width: 650px)");
@@ -82,7 +102,9 @@ function arrangeHall() {
 }
 arrangeHall();
 mobile.addEventListener?.("change", arrangeHall);
-setupHallMusic();
+// Null when the player panel is absent: the jukebox still draws with its sign, but a click does nothing.
+const music = setupHallMusic();
+$("music-open")?.addEventListener("click", () => music?.togglePanel());
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {
@@ -105,7 +127,7 @@ const state = {
   layout: null,
   people: new Map(),
   door: new HallDoor(),
-  images: { characters: null, rpg: null },
+  images: { characters: null, rpg: null, plaques: [null, null] },
   assetsFailed: false,
   snap: true,
   lastRefresh: 0,
@@ -126,17 +148,80 @@ const state = {
   locations: new Map(),
   diners: [],
   staleMessage: "",
+  statusKey: null,
+  stage: null,          // "gathering" | "eve" | "day" | "after" | null (not a live-source, live-phase package)
+  pollSeconds: 2,
+  gatheringPlaces: new Map(),
+  gatheredCount: 0,
+  nowOffset: 0,
+  nowOverride: false,
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && (
     new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50"),
+  // `?kiosk=1` is a chrome flag for the projector: it never changes the clock mode, source, polling or data path.
+  kiosk: new URLSearchParams(location.search).get("kiosk") === "1",
+  wakeLock: null,
+  lastInputAt: 0,
+  lastPointerAt: 0,
 };
+if (state.kiosk) {
+  if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
+  $("hall-explorer").open = true;
+}
+// The footer's kiosk link keeps the page's other query flags (sample, now, at) so it opens the same view as a kiosk.
+{
+  const link = $("kiosk-link");
+  if (link) {
+    const params = new URLSearchParams(location.search);
+    params.set("kiosk", "1");
+    link.href = `?${params}`;
+    link.hidden = state.archive;
+  }
+}
+
+// `?now=` (ISO-8601 or epoch milliseconds) shifts the wall clock for review and tests; time keeps flowing from it.
+function parseNowOverride(value) {
+  if (value === null || value.trim() === "") return null;
+  const trimmed = value.trim();
+  const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+{
+  const override = parseNowOverride(new URLSearchParams(location.search).get("now"));
+  state.nowOverride = override !== null;
+  state.nowOffset = override === null ? 0 : override - Date.now();
+}
+function wallNow() { return Date.now() + state.nowOffset; }
+const upcoming = () => state.clock?.mode === "upcoming";
+const beforeDoors = () => state.stage === "gathering" || state.stage === "eve";
+/** A table's schedule-derived status at the selected time; before doors every table is simply scheduled. */
+const phaseText = (table) => upcoming() ? "Scheduled" : tableLifecycle(state.data, table, state.time).label;
+// The gathering scene: watching the hall as it is now, before doors (the preview keeps the event-day path).
+const gatheringScene = () => upcoming() && beforeDoors();
+
+function updateStage(now) {
+  const liveSource = state.clock?.source === "live" && state.data?.phase === "live";
+  state.stage = liveSource ? hallStage(state.data, now) : null;
+  state.pollSeconds = beforeDoors() && Date.parse(state.data.event.start) - now > 60 * 60_000 ? 30 : 2;
+}
 
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
 
-function setStatus(message, className = "") {
+function setStatus(message, className = "", link = null) {
   const status = $("status");
   const nextClass = `status${className ? ` ${className}` : ""}`;
-  if (status.textContent !== message) status.textContent = message;
+  const key = `${message}\u0000${link?.text ?? ""}\u0000${link?.href ?? ""}`;
+  if (state.statusKey !== key) {
+    state.statusKey = key;
+    status.replaceChildren();
+    status.textContent = message;
+    if (link) {
+      const anchor = document.createElement("a");
+      anchor.textContent = link.text;
+      anchor.href = link.href;
+      status.append(anchor);
+    }
+  }
   if (status.className !== nextClass) status.className = nextClass;
 }
 
@@ -155,7 +240,7 @@ function formatDate(milliseconds, options) {
 
 function formatSlot(slot, withDay = false) {
   return formatDate(slotToMs(state.data, slot), {
-    ...(state.data.event.slots * state.data.event.slot_minutes > 1440 ? { month: "short", day: "numeric" } : {}),
+    ...(state.data.event.slots * state.data.event.slot_minutes >= 1440 ? { month: "short", day: "numeric" } : {}),
     ...(withDay ? { weekday: "short" } : {}), hour: "numeric", minute: "2-digit",
   });
 }
@@ -188,16 +273,31 @@ function updateCamera() {
     if (!state.manualCamera) state.frameKey = null;
   }
   state.viewport = size;
-  const indices = relevantTableIndices(state.data.tables, state.time);
+  // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
+  const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
   const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
   const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
-  if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
+  if (!state.manualCamera && state.kiosk) {
+    // The projector shows the whole room: the idle reset returns to this frame, never to a close-up that
+    // cuts off the stage or the lounge. Framing by relevant tables stays a live-page behaviour.
+    if (state.frameKey !== "kiosk" || !state.camera) {
+      state.camera = fitBounds(hallBounds(), size, hallBounds(), 0);
+      state.frameKey = "kiosk";
+      hideTooltip();
+    }
+    state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+  } else if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
-    if (state.data.event.host_name) {
+    // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is
+    // the point: before doors, and on the projector in every mode; a live or replay view keeps zooming to
+    // the relevant tables. Archives hang no plaques.
+    const framePlaques = !state.archive && (upcoming() || state.kiosk);
+    const fixtures = wallFixtures(state.layout, { banner: !!state.data.event.host_name, plaques: framePlaques ? 2 : 0 });
+    const hung = [fixtures.banner, ...fixtures.plaques].filter(Boolean);
+    if (hung.length) {
       const tables = tableBounds(state.layout, indices);
-      const banner = bannerBounds();
-      const x = Math.min(tables.x, banner.x - 2);
-      state.camera = fitBounds({ x, y: -6, width: Math.max(tables.x + tables.width, banner.x + banner.w + 2) - x,
+      const x = Math.min(tables.x, ...hung.map((rect) => rect.x - 2));
+      state.camera = fitBounds({ x, y: -6, width: Math.max(tables.x + tables.width, ...hung.map((rect) => rect.x + rect.w + 2)) - x,
         height: tables.y + tables.height + 6 }, size, hallBounds());
     }
     if (showStage) {
@@ -219,18 +319,9 @@ function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
   for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
+    // Header actions are plain links; the QR codes live on the wall plaques.
     const link = append(host, "a", action.label);
     link.href = action.url;
-    if (!action.qr) continue;
-    const disclosure = append(host, "details");
-    append(disclosure, "summary", `Show QR: ${action.label}`);
-    const panel = append(disclosure, "div", undefined, "qr-panel");
-    const image = append(panel, "img", undefined, "qr-image");
-    image.src = action.qr;
-    image.alt = `QR code for ${action.label}. You can also use the link.`;
-    image.width = 200; image.height = 200;
-    image.addEventListener("error", () => { image.hidden = true; });
-    append(panel, "p", action.url);
   }
 }
 
@@ -310,7 +401,18 @@ function syncPeople() {
 
 function updatePeople(realSeconds, now, active) {
   if (state.snap || reducedMotion.matches) state.door.reset();
-  state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
+  const gathering = gatheringScene();
+  if (gathering) {
+    // Planned placement, not the per-slot resolver. In the eve everyone leaves, staggered by runtime.phase
+    // from the moment the eve began, so an open tab and a tab loaded mid-exodus see the same schedule.
+    const eveElapsed = state.stage === "eve" ? (wallNow() - (Date.parse(state.data.event.start) - EVE_MS)) / 1000 : -1;
+    state.locations = new Map(state.data.people.map(person => {
+      const leaving = state.stage === "eve" && eveElapsed >= (state.people.get(person.id)?.phase ?? 0) * EVE_EXODUS_SECONDS;
+      return [person.id, leaving ? ABSENT_PLACE : state.gatheringPlaces.get(person.id) ?? ABSENT_PLACE];
+    }));
+  } else {
+    state.locations = new Map(state.data.people.map(person => [person.id, resolveLocation(state.data, person, state.time, active)]));
+  }
   const onStage = new Set(state.stageQueue);
   if (state.speech?.event.kind === "donation") onStage.add(state.speech.event.person);
   state.leisure = loungeActivities(state.layout, state.data.people.filter(person =>
@@ -344,7 +446,8 @@ function updatePeople(realSeconds, now, active) {
     if (!runtime.visible || !runtime.position) continue;
     // Use the same event-time delta as staff, including accelerated replay and pause.
     // Queued speeches can finish their stage visit while replay is paused for reading.
-    const travelSeconds = target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
+    // The gathering has no event-time delta; walk-ins and walk-outs there run at wall-clock pace.
+    const travelSeconds = gathering ? realSeconds : target.kind.startsWith("stage-") ? Math.max(realSeconds, elapsed) : elapsed;
     let budget = WALK_TILES_PER_SECOND * travelSeconds;
     if (runtime.entering) {
       if (!target.present) {
@@ -439,10 +542,62 @@ function drawLabel(value, x, y, options = {}) {
   ctx.fillText(value, options.align === "left" ? pixelX + 1.5 * SCALE : pixelX, pixelY + 0.5);
 }
 
+// The banner hangs over the entrance and first tables so it is visible in the opening view.
 function bannerBounds() {
-  const w = Math.min(25, state.layout.width - 6);
-  // Hang over the entrance and first tables so it is visible in the opening view.
-  return { x: 3, y: -4.7, w, h: 3.5 };
+  return wallFixtures(state.layout, { plaques: state.archive ? 0 : 2 }).banner;
+}
+
+// Fit `text` in `font` at `size` tile units into `available` tiles, shrinking the same way the banner does.
+function fitFont(text, size, family, available) {
+  ctx.font = `${size}px ${family}`;
+  const width = ctx.measureText(text).width;
+  if (width > available) ctx.font = `${size * available / width}px ${family}`;
+}
+
+// Two wooden plaques hang right of the banner: the Discord invite and the Extra Life page, each with its QR.
+function drawWallPlaques() {
+  if (state.archive) return;
+  const { plaques } = wallFixtures(state.layout);
+  plaques.forEach(({ x, y, w, h }, index) => {
+    const plaque = WALL_PLAQUES[index];
+    if (!plaque) return;
+    ctx.save();
+    ctx.scale(TILE * SCALE, TILE * SCALE);
+    ctx.translate(x, y);
+    ctx.fillStyle = "#4a3524";
+    ctx.fillRect(0, 0, w, h);
+    ctx.lineWidth = .08;
+    ctx.strokeStyle = "#b89b5c";
+    ctx.strokeRect(.04, .04, w - .08, h - .08);
+    ctx.fillStyle = "#d8b86d";
+    for (const nail of [.28, w - .28]) { ctx.beginPath(); ctx.arc(nail, .28, .1, 0, Math.PI * 2); ctx.fill(); }
+    const mat = { x: (w - 3.6) / 2, y: .35, side: 3.6 };
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(mat.x, mat.y, mat.side, mat.side);
+    const image = state.images.plaques[index];
+    if (image) {
+      // Snap the QR to whole device pixels so its modules stay square at any zoom.
+      const m = ctx.getTransform();
+      const device = (px, py) => ({ x: Math.round(m.a * px + m.c * py + m.e), y: Math.round(m.b * px + m.d * py + m.f) });
+      const from = device(mat.x, mat.y);
+      const to = device(mat.x + mat.side, mat.y + mat.side);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(image, from.x, from.y, to.x - from.x, to.y - from.y);
+      ctx.restore();
+      ctx.imageSmoothingEnabled = false;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#e9d9ae";
+    fitFont(plaque.label, .42, "Georgia, serif", w - .6);
+    ctx.fillText(plaque.label, w / 2, 4.35);
+    ctx.fillStyle = "#c9b98a";
+    const url = shortUrl(plaque.url);
+    fitFont(url, .3, '"Courier New", monospace', w - .6);
+    ctx.fillText(url, w / 2, 4.85);
+    ctx.restore();
+  });
 }
 
 function drawHostBanner() {
@@ -498,6 +653,96 @@ function drawHostBanner() {
   ctx.restore();
 }
 
+// A wooden jukebox with an arched top stands against the back wall; its lamps and glass glow while music plays.
+// The sign above invites a click and names the track while it plays. Both are drawn in tile space like the plaques.
+function drawJukebox() {
+  const box = jukeboxBounds(state.layout);
+  const sign = jukeboxSignBounds(state.layout);
+  const playing = !!music?.isPlaying();
+  const beat = (offset) => reducedMotion.matches ? 1 : (Math.sin(state.lastTime / 260 + offset) + 1) / 2;
+  ctx.save();
+  ctx.scale(TILE * SCALE, TILE * SCALE);
+  ctx.translate(sign.x, sign.y);
+  ctx.fillStyle = "#4a3524";
+  ctx.fillRect(0, 0, sign.w, sign.h);
+  ctx.lineWidth = .06;
+  ctx.strokeStyle = "#b89b5c";
+  ctx.strokeRect(.04, .04, sign.w - .08, sign.h - .08);
+  ctx.fillStyle = "#d8b86d";
+  for (const nail of [.2, sign.w - .2]) { ctx.beginPath(); ctx.arc(nail, .2, .07, 0, Math.PI * 2); ctx.fill(); }
+  const text = playing ? `♪ ${music.currentTitle()}` : "Click here for music";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#e9d9ae";
+  fitFont(text, .42, "Georgia, serif", sign.w - .5);
+  ctx.fillText(text, sign.w / 2, sign.h / 2 + .03);
+  ctx.translate(box.x - sign.x, box.y - sign.y);
+  const arch = { x: box.w / 2, y: .95, r: box.w / 2 };
+  ctx.fillStyle = "#5a3b22";
+  ctx.beginPath(); ctx.moveTo(0, box.h); ctx.lineTo(0, arch.y); ctx.arc(arch.x, arch.y, arch.r, Math.PI, 0); ctx.lineTo(box.w, box.h); ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = .06;
+  ctx.strokeStyle = "#2c1b10";
+  ctx.stroke();
+  ctx.strokeStyle = "#d8b86d";
+  ctx.lineWidth = .07;
+  ctx.beginPath(); ctx.arc(arch.x, arch.y, arch.r - .16, Math.PI, 0); ctx.stroke();
+  // The glass front: warm and steady when off, brighter and breathing while a track plays.
+  const glow = playing ? .6 + .4 * beat(0) : .35;
+  ctx.fillStyle = `rgba(255, 196, 110, ${glow})`;
+  ctx.beginPath(); ctx.arc(arch.x, arch.y, arch.r - .38, Math.PI, 0); ctx.lineTo(box.w - .38, 1.7); ctx.lineTo(.38, 1.7); ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#2a1a12";
+  ctx.fillRect(.3, 1.85, box.w - .6, .75);
+  ctx.fillStyle = "#8a6a45";
+  for (const line of [2.0, 2.2, 2.4]) ctx.fillRect(.42, line, box.w - .84, .06);
+  const lamps = ["#ff6a6a", "#ffd45f", "#6fdcff", "#9dff6f", "#ff6fd6"];
+  lamps.forEach((color, index) => {
+    const angle = Math.PI + Math.PI * (index + .5) / lamps.length;
+    ctx.globalAlpha = playing ? .5 + .5 * beat(index * 1.3) : .3;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(arch.x + Math.cos(angle) * (arch.r - .16), arch.y + Math.sin(angle) * (arch.r - .16), .1, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#2c1b10";
+  ctx.fillRect(.1, box.h - .12, .4, .12);
+  ctx.fillRect(box.w - .5, box.h - .12, .4, .12);
+  ctx.restore();
+}
+
+function overJukebox(point) {
+  const inside = ({ x, y, w, h }) => point.x >= x && point.x < x + w && point.y >= y && point.y < y + h;
+  return inside(jukeboxBounds(state.layout)) || inside(jukeboxSignBounds(state.layout));
+}
+
+// The player sits just above-right of the jukebox in screen space, to its left when the right side has no room,
+// and docks at the bottom-left of the scene when neither side fits (phone widths). Cheap, and only while open.
+function placeMusicPanel() {
+  if (!music?.panelOpen() || !state.camera || !state.viewport) return;
+  const panel = $("music-panel");
+  if (!panel) return;
+  const box = jukeboxBounds(state.layout);
+  const sign = jukeboxSignBounds(state.layout);
+  const right = worldToScreen(state.camera, { x: box.x + box.w, y: sign.y });
+  const left = worldToScreen(state.camera, { x: box.x, y: sign.y });
+  const width = panel.offsetWidth || 0;
+  const height = panel.offsetHeight || 0;
+  const view = state.viewport;
+  const gap = 10;
+  let x, y;
+  if (right.x >= 0 && right.x + gap + width <= view.width - 4) { x = right.x + gap; y = right.y - gap; }
+  else if (left.x <= view.width && left.x - gap - width >= 4) { x = left.x - gap - width; y = left.y - gap; }
+  else { x = 8; y = view.height - height - 8; }
+  x = clamp(x, 4, Math.max(4, view.width - width - 4));
+  y = clamp(y, 4, Math.max(4, view.height - height - 4));
+  // The panel's parent is the scene wrap, where the canvas sits below the camera controls.
+  const canvasRect = canvas.getBoundingClientRect();
+  const sceneRect = panel.parentElement?.getBoundingClientRect?.() ?? canvasRect;
+  const styleLeft = `${Math.round(canvasRect.left - sceneRect.left + x)}px`;
+  const styleTop = `${Math.round(canvasRect.top - sceneRect.top + y)}px`;
+  if (panel.style.left !== styleLeft) panel.style.left = styleLeft;
+  if (panel.style.top !== styleTop) panel.style.top = styleTop;
+}
+
 function drawRoom() {
   const layout = state.layout;
   const unit = TILE * SCALE;
@@ -518,6 +763,7 @@ function drawRoom() {
   ctx.fillRect(0, -.18 * unit, layout.width * unit, .18 * unit);
   ctx.restore();
   drawHostBanner();
+  drawWallPlaques();
   for (let y = 0; y < layout.height; y += 1) for (let x = 0; x < layout.width; x += 1) {
     const wall = x === 0 || y === 0 || x === layout.width - 1 || y === layout.height - 1;
     if (!drawTile(state.images.rpg, wall ? RPG.floor.wall : RPG.floor.wood, x, y)) {
@@ -584,6 +830,7 @@ function drawRoom() {
     ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
   }
   drawLabel("DOOR", 1.6, layout.door.y - 0.6, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
+  drawJukebox();
 }
 
 function drawStageStairs() {
@@ -623,12 +870,15 @@ function chairFor(offset) {
 
 function truncate(value, length) { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
 
+// Before doors every table is shown ready for its game (furniture and props, no porter): people wait at them.
+function scenerySlot(table) { return upcoming() ? table.start : state.time; }
+
 function drawTables() {
   state.data.tables.forEach((table, index) => {
     const cell = state.layout.cells[index];
     const firstSeat = seatPosition(index, 0);
-    const lifecycle = tableLifecycle(state.data, table, state.time);
-    const scenery = tableScenery(state.data, table, state.time, state.layout, index, reducedMotion.matches);
+    const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
+    const scenery = tableScenery(state.data, table, scenerySlot(table), state.layout, index, reducedMotion.matches);
     const open = lifecycle.phase === "active";
     if (state.selectedId === table.id) {
       ctx.fillStyle = "rgba(255,210,122,.25)";
@@ -736,7 +986,7 @@ function drawTableLabels() {
     const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
     ctx.font = "700 13px system-ui, sans-serif";
-    const lifecycle = tableLifecycle(state.data, table, state.time);
+    const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
     const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
     const text = `${truncate(table.name, 26)} · ${status}`;
     const width = Math.min(state.viewport.width - 8, ctx.measureText(text).width + 16);
@@ -894,9 +1144,14 @@ function drawEvents(active, now) {
 }
 
 function render(now, active) {
-  const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
-    (Date.now() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
-  state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
+  const gathering = gatheringScene();
+  if (gathering) {
+    state.ambience = gatheringAmbience(state.data, state.layout, wallNow(), reducedMotion.matches);
+  } else {
+    const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
+      (wallNow() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
+    state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
+  }
   updateCamera();
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
@@ -911,7 +1166,7 @@ function render(now, active) {
   drawRoom();
   drawTables();
   [...state.people.values()].filter((person) => person.visible && !person.entering).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
-  state.data.tables.forEach((table, index) => {
+  if (!gathering) state.data.tables.forEach((table, index) => {
     if (tableLifecycle(state.data, table, state.time).phase === "active") {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
     }
@@ -922,7 +1177,8 @@ function render(now, active) {
     ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
-  drawStaff(active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff);
+  const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff;
+  if (caretaker) drawStaff(caretaker);
   if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
     state.layout.stageFront.x + 2, state.layout.stageFront.y - 1.3, "#b6e0df", "Staff");
   const lightSwitch = state.ambience.lightSwitch;
@@ -930,6 +1186,7 @@ function render(now, active) {
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
   drawEvents(active, now);
+  placeMusicPanel();
 }
 
 function actualText(actual) {
@@ -953,7 +1210,7 @@ function renderDetail(focus = false) {
   heading.tabIndex = -1;
   append(panel, "p", view.system, "system");
   append(panel, "p", view.pitch);
-  state.detailPhaseNode = append(panel, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase");
+  state.detailPhaseNode = append(panel, "p", phaseText(table), "table-phase");
   state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
@@ -1011,7 +1268,7 @@ function renderTableList() {
     button.setAttribute("aria-label", `Show details for ${view.name}`);
     button.addEventListener("click", () => selectTable(table.id, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
-    state.tablePhaseNodes.set(table.id, append(article, "p", `At selected time: ${tableLifecycle(state.data, table, state.time).label}`, "table-phase"));
+    state.tablePhaseNodes.set(table.id, append(article, "p", phaseText(table), "table-phase"));
     const diceNode = append(article, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
     diceNode.setAttribute("aria-live", "polite");
     diceNode.setAttribute("aria-atomic", "true");
@@ -1033,35 +1290,48 @@ function updateHeader(active) {
   for (const person of state.leisure.values()) activityCounts[person.activity] += 1;
   const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards. Food: ${state.diners.length} collecting, eating or clearing plates.`;
   const staffAction = active.break ? "Staff are announcing the break from the stage." : state.ambience?.action ?? "";
-  const staffDescription = `${hallDescription} ${staffAction} ${loungeDescription}`.trim();
-  const description = staffDescription + (state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "");
+  const hostSuffix = state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "";
+  const upcomingNow = upcoming();
+  const start = Date.parse(state.data.event.start);
+  const gathered = state.gatheredCount;
+  const gatheredSentence = gathered === 0 ? "Nobody has arrived yet." : `${gathered} ${gathered === 1 ? "person has" : "people have"} gathered so far.`;
+  const plaqueSentence = state.archive ? "" : ` ${PLAQUE_SENTENCE}`;
+  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + ` ${JUKEBOX_SENTENCE}` + hostSuffix;
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
-  const clockText = formatSlot(state.time, true);
+  // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
+  const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
+  const clockText = upcomingNow ? doorsText : formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
-  const eventLabel = active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
+  const clockStamp = upcomingNow ? state.data.event.start : "";
+  if ($("clock").dateTime !== clockStamp) $("clock").dateTime = clockStamp;
+  const countdown = upcomingNow ? countdownText(start - wallNow()) : "";
+  const eventLabel = upcomingNow ? countdown : active.spotlight ? "SPOTLIGHT" : active.announce ? "ANNOUNCEMENT" : active.break ? "BREAK" : active.meal ? (active.meal.text || "MEAL").toUpperCase() : "";
   if ($("scene-event").textContent !== eventLabel) $("scene-event").textContent = eventLabel;
   let eventText = accessibleEventText(state.data, active, state.speech?.phase === "speaking" ? state.speech.event : null);
   if (state.speech?.event.kind === "donation" && state.speech.phase === "approaching") {
     eventText += ` ${displayName(state.people.get(state.speech.event.person)?.person)} is walking to the stage microphone.`;
   }
   if (state.stageQueue.length) eventText += ` ${state.stageQueue.length} waiting to speak at the stage.`;
+  if (upcomingNow) eventText = `Doors open ${doorsText}. ${countdown}.`;
   eventText = eventText.trim();
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
   const following = state.clock.mode === "follow-now";
-  $("play").textContent = state.clock.mode === "paused" ? "Play" : "Pause";
+  $("play").textContent = state.clock.mode === "paused" || upcomingNow ? "Play" : "Pause";
   $("play").disabled = false;
   $("scrubber").disabled = false;
   $("speed").disabled = following;
   const canFollow = state.clock.source === "live" && state.data.phase === "live";
-  $("return-now").hidden = !canFollow || following;
-  $("now-marker").hidden = !canFollow;
-  if (canFollow) $("now-marker").textContent = `Now: ${formatDate(Date.now(), { hour: "numeric", minute: "2-digit" })}`;
+  $("return-now").hidden = !canFollow || following || upcomingNow;
+  // Before doors, now lies outside the scrubber's range, so the marker would mislead.
+  const nowInRange = canFollow && !upcomingNow && !beforeDoors();
+  $("now-marker").hidden = !nowInRange;
+  if (nowInRange) $("now-marker").textContent = `Now: ${formatDate(wallNow(), { hour: "numeric", minute: "2-digit" })}`;
   const badge = $("mode-badge");
-  badge.textContent = following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : Date.now() < Date.parse(state.data.event.start) ? "UPCOMING" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
+  badge.textContent = upcomingNow ? "UPCOMING" : following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
   badge.className = `badge${following ? " live" : ""}`;
   for (const table of state.data.tables) {
-    const text = `At selected time: ${tableLifecycle(state.data, table, state.time).label}`;
+    const text = phaseText(table);
     const result = diceText(state.data, diceAt(state.data, table.id, state.time)?.event);
     const diceNode = state.tableDiceNodes.get(table.id);
     if (diceNode && diceNode.textContent !== result) diceNode.textContent = result;
@@ -1070,12 +1340,22 @@ function updateHeader(active) {
     if (node && node.textContent !== text) node.textContent = text;
     if (state.selectedId === table.id && state.detailPhaseNode && state.detailPhaseNode.textContent !== text) state.detailPhaseNode.textContent = text;
   }
-  const beforeEvent = Date.now() < Date.parse(state.data.event.start);
+  const beforeEvent = wallNow() < start;
   const available = state.data.tables.filter((table) => table.signups.length < table.seats && (beforeEvent || state.time < table.end)).length;
   const count = state.data.tables.length;
-  const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
   const note = !ctx ? " · Hall graphics unavailable; use the table list." : state.assetsFailed ? " · Sprite art unavailable; simplified graphics are in use." : "";
-  if (!state.staleMessage) setStatus(base + note, !ctx || state.assetsFailed ? "stale" : "");
+  const statusClass = !ctx || state.assetsFailed ? "stale" : "";
+  if (state.staleMessage) return;
+  if (beforeDoors()) {
+    // The sign-up window: who has gathered, what has space, and the invitation (a link outside sample/archive views).
+    const games = count ? ` · ${available} ${available === 1 ? "game" : "games"} with signup space` : "";
+    const lead = gathered === 0 ? "Nobody has arrived yet" : `${gathered} gathered so far`;
+    const invite = state.sample || state.archive ? null : { text: "Sign up on Discord", href: DISCORD_INVITE };
+    setStatus(`${lead}${games}${note} · ${invite ? "" : "Sign up on Discord"}`, statusClass, invite);
+    return;
+  }
+  const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
+  setStatus(base + note, statusClass);
 }
 
 function clearSpeech() {
@@ -1096,7 +1376,8 @@ function setClock(clock, persistNow = true, snap = true) {
 function persistClockSelection(now, force = false) {
   if (!globalThis.history?.replaceState || !location.href || (!force && now - state.lastUrlWrite < 1000)) return;
   const url = new URL(location.href);
-  if (state.clock.mode === "follow-now") url.searchParams.delete("at");
+  // Following now and waiting for doors are not time choices; `now` is never written here.
+  if (state.clock.mode === "follow-now" || state.clock.mode === "upcoming") url.searchParams.delete("at");
   else url.searchParams.set("at", String(state.time));
   if (url.href !== location.href) {
     try { history.replaceState(null, "", url.href); }
@@ -1111,7 +1392,13 @@ function queueSpeech(events) {
   state.speechQueue = queue.filter((event) => event.kind !== "shout" || shouts-- <= 20);
 }
 
-function advanceSpeech(now) {
+// Speech holds the stage for its scripted seconds at 1× and while paused; faster replay shortens it to a one-second floor.
+function speechDurationMs(kind, active) {
+  const factor = state.clock.mode === "replay" ? playbackSpeed(state.speed, active) : 1;
+  return Math.max(MIN_SPEECH_REAL_SECONDS, SPEECH_SECONDS[kind] / factor) * 1000;
+}
+
+function advanceSpeech(now, active) {
   const speech = state.speech;
   if (speech && !state.people.has(speech.event.person)) state.speech = null;
   else if (speech?.phase === "speaking" && now >= speech.until) {
@@ -1128,20 +1415,20 @@ function advanceSpeech(now) {
       } else event = state.speechQueue.shift();
     } while (event && !state.people.has(event.person));
     if (event) state.speech = { event, phase: event.kind === "donation" ? "approaching" : "speaking",
-      until: event.kind === "donation" ? null : now + SPEECH_SECONDS[event.kind] * 1000 };
+      until: event.kind === "donation" ? null : now + speechDurationMs(event.kind, active) };
   }
   const queue = state.clock.mode === "follow-now" && state.live ? state.live.speechQueue : state.speechQueue;
   state.stageQueue = stageQueuePeople(queue, state.speech, state.people);
 }
 
-function settleStageSpeech(now) {
+function settleStageSpeech(now, active) {
   const speech = state.speech;
   if (speech?.event.kind !== "donation") return;
   const runtime = state.people.get(speech.event.person);
   if (!runtime?.visible || runtime.moving) return;
   if (speech.phase === "approaching" && samePoint(runtime.position, state.layout.stageFront)) {
     speech.phase = "speaking";
-    speech.until = now + SPEECH_SECONDS.donation * 1000;
+    speech.until = now + speechDurationMs("donation", active);
   } else if (speech.phase === "leaving" && samePoint(runtime.position, stageGeometry(state.layout).foot)) {
     state.speech = null;
   }
@@ -1193,9 +1480,17 @@ function updateSyncStatus() {
     : state.staleMessage ? "Updates unavailable. Your last loaded view is still shown; we’ll retry."
     : state.feedDelayed ? "Live feed delayed. Showing the newest backup; retrying the live connection."
     : final ? "Final event record. Automatic updates have stopped."
-    : `Checked at ${checked}. Checking every 2 seconds.`;
-  if (state.data) message += ` Data published at ${formatDate(Date.parse(state.data.generated_at), { hour: "numeric", minute: "2-digit", second: "2-digit" })}.`;
-  if (!final && state.clock && state.clock.mode !== "follow-now") message += " Viewing an earlier time — choose Return to Now to see current actions.";
+    : `Checked at ${checked}. Checking every ${state.pollSeconds} seconds.`;
+  if (state.data) {
+    const published = Date.parse(state.data.generated_at);
+    const today = { year: "numeric", month: "numeric", day: "numeric" };
+    const withDate = formatDate(published, today) !== formatDate(wallNow(), today);
+    message += ` Data published at ${formatDate(published, withDate ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" } : { hour: "numeric", minute: "2-digit", second: "2-digit" })}.`;
+  }
+  if (!final && state.clock && state.clock.mode !== "follow-now" && state.clock.mode !== "upcoming") {
+    message += beforeDoors() ? " Previewing the planned day. Choose Return to Now to see the hall as it is."
+      : " Viewing an earlier time — choose Return to Now to see current actions.";
+  }
   if ($("sync-status").textContent !== message) $("sync-status").textContent = message;
 }
 
@@ -1227,6 +1522,8 @@ function installTimeline(data, initial = false) {
   state.frameKey = null;
   renderActions();
   state.adminEvents = indexAdminEvents(data);
+  state.gatheringPlaces = gatheringLocations(data);
+  state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;
   syncPeople();
   state.activity = publicActivity(data);
   state.activityKey = null;
@@ -1264,26 +1561,78 @@ async function refresh() {
 }
 
 $("refresh-now")?.addEventListener("click", () => { void refresh(); });
+// Cadence: 30 s during the sign-up window, 2 s from an hour before doors; nothing while the tab is hidden.
 function checkLiveUpdates() {
+  if (document.hidden) return;
   if (state.data?.phase === "live" && state.clock?.source === "live"
-      && performance.now() - state.lastRefresh >= 2_000) void refresh();
+      && performance.now() - state.lastRefresh >= state.pollSeconds * 1000) void refresh();
 }
 // Polling must survive suspended animation frames and catch up on returning from Discord.
 setInterval(checkLiveUpdates, 2_000);
 document.addEventListener?.("visibilitychange", () => {
-  if (!document.hidden && state.data?.phase === "live") void refresh();
+  if (document.hidden) return;
+  if (state.data?.phase === "live") void refresh();
+  requestWakeLock();
 });
+
+// Kiosk only: keep the projector awake. The sentinel is released by the browser when the tab hides.
+function requestWakeLock() {
+  if (!state.kiosk || typeof globalThis.navigator?.wakeLock?.request !== "function") return;
+  try {
+    Promise.resolve(navigator.wakeLock.request("screen"))
+      .then((sentinel) => { state.wakeLock = sentinel; }, () => { /* Denied wake locks are not an error on a projector. */ });
+  } catch { /* Same rule for a synchronous throw. */ }
+}
+
+function toggleFullscreen() {
+  try {
+    const root = document.documentElement;
+    const request = document.fullscreenElement ? document.exitFullscreen?.() : root?.requestFullscreen?.();
+    Promise.resolve(request).catch(() => {});
+  } catch { /* No fullscreen API: F11 still works. */ }
+}
+
+function inputFocused() {
+  const active = document.activeElement;
+  return !!active && (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(active.tagName) || active.isContentEditable === true);
+}
+
+// Kiosk idle rules run on the animation clock: a manual camera returns to automatic framing after
+// 45 s without input, and the cursor hides after 3 s without pointer movement.
+function applyKioskIdle(now) {
+  if (!state.kiosk) return;
+  if (state.manualCamera && now - state.lastInputAt >= KIOSK_CAMERA_RESET_MS) {
+    state.manualCamera = false;
+    state.frameKey = null;
+  }
+  const dataset = document.documentElement?.dataset;
+  if (!dataset) return;
+  if (now - state.lastPointerAt >= KIOSK_CURSOR_HIDE_MS) { if (dataset.idle !== "1") dataset.idle = "1"; }
+  else if ("idle" in dataset) delete dataset.idle;
+}
+
+if (state.kiosk) {
+  const noteInput = () => { state.lastInputAt = performance.now(); };
+  document.addEventListener?.("pointermove", () => { state.lastPointerAt = state.lastInputAt = performance.now(); }, { passive: true });
+  document.addEventListener?.("pointerdown", noteInput, { passive: true });
+  document.addEventListener?.("wheel", noteInput, { passive: true });
+  document.addEventListener?.("keydown", (event) => {
+    noteInput();
+    if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey && !inputFocused()) toggleFullscreen();
+  });
+}
 
 function renderActivity() {
   if (!state.data || !state.clock) return;
-  const cutoff = state.clock.mode === "follow-now" ? Date.now() : slotToMs(state.data, state.time);
+  const anchoredToNow = state.clock.mode === "follow-now" || state.clock.mode === "upcoming";
+  const cutoff = anchoredToNow ? wallNow() : slotToMs(state.data, state.time);
   const second = Math.floor(cutoff / 1000);
   if (second === state.activitySecond) return;
   state.activitySecond = second;
   const visible = state.activity.filter((entry) => entry.at <= cutoff);
   const entries = visible.slice(0, state.activityLimit);
   const key = `${state.activityLimit}:${entries.map((entry) => entry.id).join(",")}:${visible.length}`;
-  $("activity-note").textContent = `Newest first · ${state.clock.mode === "follow-now" ? "Live" : "Selected time"} · ${state.data.event.tz}`;
+  $("activity-note").textContent = `Newest first · ${state.clock.mode === "follow-now" ? "Live · " : state.clock.mode === "upcoming" ? "" : "Selected time · "}${state.data.event.tz}`;
   if (key === state.activityKey) return;
   state.activityKey = key;
   const list = $("activity-log");
@@ -1316,6 +1665,7 @@ function pointerPoint(event) {
 
 function canvasPoint(event) { return screenToWorld(state.camera, pointerPoint(event)); }
 function hideTooltip() { state.hover = null; $("tooltip").hidden = true; }
+function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.cursor = value; }
 const pointers = new Map();
 let gesture = null;
 let suppressClick = false;
@@ -1367,9 +1717,13 @@ canvas.addEventListener("pointermove", (event) => {
     if (candidate < distance) { best = runtime; distance = candidate; }
   }
   state.hover = best;
+  const onJukebox = overJukebox(point);
+  setCursor(onJukebox ? "pointer" : "");
   const tooltip = $("tooltip");
-  if (!best) { tooltip.hidden = true; return; }
-  tooltip.textContent = personTooltip(best.person, best.place, best.moving);
+  if (!best && !onJukebox) { tooltip.hidden = true; return; }
+  // A person walking in front of the jukebox keeps their tooltip; the jukebox tip stays visible in kiosk mode.
+  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : JUKEBOX_TOOLTIP;
+  tooltip.className = best ? "tooltip" : "tooltip jukebox-tip";
   const sceneRect = canvas.parentElement.getBoundingClientRect();
   tooltip.style.left = `${clamp(event.clientX - sceneRect.left + 12, 0, Math.max(0, sceneRect.width - 280))}px`;
   tooltip.style.top = `${Math.max(0, event.clientY - sceneRect.top - 30)}px`;
@@ -1383,12 +1737,13 @@ function finishPointer(event) {
 canvas.addEventListener("pointerup", finishPointer);
 canvas.addEventListener("pointercancel", (event) => { suppressClick = true; finishPointer(event); });
 canvas.addEventListener("lostpointercapture", finishPointer);
-canvas.addEventListener("pointerleave", hideTooltip);
+canvas.addEventListener("pointerleave", () => { hideTooltip(); setCursor(""); });
 canvas.addEventListener("click", (event) => {
   if (!state.camera || suppressClick) return;
+  const point = canvasPoint(event);
+  if (overJukebox(point)) { music?.togglePanel(); return; }
   const screen = pointerPoint(event);
   const label = state.labelBoxes?.find((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
-  const point = canvasPoint(event);
   const index = label?.index ?? state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
   if (index >= 0 && state.data.tables[index]) selectTable(state.data.tables[index].id);
 });
@@ -1420,12 +1775,13 @@ canvas.addEventListener("keydown", (event) => {
 $("play").addEventListener("click", () => {
   if (!state.data) return;
   const next = toggleViewerPlayback(state.clock, state.data);
-  setClock(next, true, next.slot !== state.clock.slot);
+  // Leaving the gathering for the preview snaps, so nobody watches the hall re-seat itself.
+  setClock(next, true, next.slot !== state.clock.slot || state.clock.mode === "upcoming");
   state.lastTime = performance.now();
 });
 $("return-now").addEventListener("click", () => {
   if (!state.data) return;
-  setClock(followNowClock(state.clock, state.data, Date.now()));
+  setClock(followNowClock(state.clock, state.data, wallNow()));
 });
 $("speed").addEventListener("change", (event) => {
   const speed = Number(event.target.value);
@@ -1461,30 +1817,39 @@ async function loadAssets() {
   const results = await Promise.allSettled([
     loadImage(new URL("./assets/roguelikeChar_transparent.png", import.meta.url).href),
     loadImage(new URL("./assets/roguelikeSheet_transparent.png", import.meta.url).href),
+    ...WALL_PLAQUES.map((plaque) => loadImage(new URL(plaque.qr, import.meta.url).href)),
   ]);
-  state.images.characters = results[0].status === "fulfilled" ? results[0].value : null;
-  state.images.rpg = results[1].status === "fulfilled" ? results[1].value : null;
-  state.assetsFailed = results.some((result) => result.status === "rejected");
+  const loaded = (result) => result.status === "fulfilled" ? result.value : null;
+  state.images.characters = loaded(results[0]);
+  state.images.rpg = loaded(results[1]);
+  // A missing QR leaves its plaque as wood and text; only the sprite atlases count as failed assets.
+  state.images.plaques = WALL_PLAQUES.map((_, index) => loaded(results[2 + index]));
+  state.assetsFailed = results.slice(0, 2).some((result) => result.status === "rejected");
 }
 
 function loop(now) {
   if (!state.data) return;
   const realSeconds = Math.max(0, Math.min(.1, (now - state.lastTime) / 1000 || 0));
   state.lastTime = now;
+  const wall = wallNow();
   const previous = state.clock;
-  state.clock = tickViewerClock(previous, state.data, Date.now(), realSeconds, state.speed);
+  state.clock = tickViewerClock(previous, state.data, wall, realSeconds, state.speed);
   state.time = state.clock.slot;
+  updateStage(wall);
   if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
-  if (previous.mode !== state.clock.mode && (previous.mode === "follow-now" || state.clock.mode === "follow-now")) { clearSpeech(); state.snap = true; }
-  const active = activeEvents(state.data, state.time, state.adminEvents);
-  if (state.clock.source === "live" && state.data.phase === "live" && now - state.lastRefresh >= 2_000) {
+  const anchored = (mode) => mode === "follow-now" || mode === "upcoming";
+  if (previous.mode !== state.clock.mode && (anchored(previous.mode) || anchored(state.clock.mode))) { clearSpeech(); state.snap = true; }
+  // Nothing is happening yet in the gathering: no announcements, breaks, meals, spotlights, speech or dice.
+  const active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents);
+  if (state.clock.source === "live" && state.data.phase === "live" && !document.hidden && now - state.lastRefresh >= state.pollSeconds * 1000) {
     state.lastRefresh = now;
     void refresh();
   }
   persistClockSelection(now);
-  advanceSpeech(now);
+  applyKioskIdle(now);
+  advanceSpeech(now, active);
   updatePeople(realSeconds, now, active);
-  settleStageSpeech(now);
+  settleStageSpeech(now, active);
   render(now, active);
   updateHeader(active);
   updateSyncStatus();
@@ -1498,17 +1863,23 @@ async function boot() {
     installTimeline(data, true);
     state.lastChecked = Date.now();
     state.lastRefresh = performance.now();
-    state.clock = createViewerClock(data, Date.now(), { source: state.archive ? "archive" : state.sample ? "sample" : "live", mobile: mobile.matches, reducedMotion: reducedMotion.matches });
+    // A `?now=` override lets the sample package show the gathering, the eve and the doors-open handover on demand.
+    const wall = wallNow();
+    const source = state.archive ? "archive" : state.sample && !state.nowOverride ? "sample" : "live";
+    state.clock = createViewerClock(data, wall, { source, mobile: mobile.matches, reducedMotion: reducedMotion.matches });
     const at = new URLSearchParams(location.search).get("at");
     if (at !== null && at.trim() !== "" && Number.isFinite(Number(at))) state.clock = seekViewerClock(state.clock, data, Number(at));
     state.time = state.clock.slot;
+    updateStage(wall);
     if (state.clock.source === "live") state.live = createLiveState(data);
     state.lastTime = performance.now();
     state.lastRefresh = state.lastTime;
-    const active = activeEvents(state.data, state.time, state.adminEvents);
+    state.lastInputAt = state.lastPointerAt = state.lastTime;
+    const active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents);
     updatePeople(0, state.lastTime, active);
     render(state.lastTime, active);
     updateHeader(active);
+    requestWakeLock();
     requestAnimationFrame(loop);
   } catch (error) {
     const message = error?.name === "TimelineError" ? `Timeline could not be loaded: ${error.message}` : "Timeline could not be loaded. Check that the published data file is available.";

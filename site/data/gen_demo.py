@@ -34,6 +34,17 @@ for index, person in enumerate(people.values()):
     person['appearance'] = None if person['hidden'] else dict(
         skin=index % 4, shirt=index % 15, hair=index % 16, hat=index % 4)
 people['u_admin']['presence']['actual'] = dict(here=.05, leaving=47.7)
+# Every guest shares one stretch of the marathon: 20% of the event (9.6 slots).
+ALL_HERE = (19, 28.6)
+for person in people.values():
+    actual = person['presence']['actual']
+    if actual['here'] > ALL_HERE[0]:
+        actual['here'] = round(ALL_HERE[0] - rng.uniform(.3, 4), 3)
+    if actual['leaving'] <= ALL_HERE[1]:
+        actual['leaving'] = round(ALL_HERE[1] + rng.uniform(.3, 4), 3)
+    planned = person['presence']['planned']
+    planned[0] = min(planned[0], int(actual['here']))
+    planned[1] = max(planned[1], int(actual['leaving']) + 1)
 data['people'] = list(people.values())
 data['visitors'] = dict(open=True, people=[f'v{i + 1}' for i in range(6)] + ['u_admin'])
 data['events'] = []

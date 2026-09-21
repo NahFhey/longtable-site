@@ -5,7 +5,7 @@
   "pad_capacity": 20,
   "overflow_capacity": 120
  },
- "phase": "live",
+ "phase": "final",
  "generated_at": "2026-11-15T15:00:00Z",
  "event": {
   "name": "Lanternlight Marathon — 50-person demo",
@@ -19,7 +19,7 @@
  "people": [
   {
    "id": "u_mara",
-   "name": "Mara Okonkwo",
+   "name": "Mara O.",
    "dm": true,
    "hidden": false,
    "variant": 2674673926,
@@ -64,7 +64,7 @@
   },
   {
    "id": "u_theo",
-   "name": "Theo Lindqvist",
+   "name": "Theo L.",
    "dm": true,
    "hidden": false,
    "variant": 3734847873,
@@ -109,7 +109,7 @@
   },
   {
    "id": "u_priya",
-   "name": "Priya Raman",
+   "name": "Priya R.",
    "dm": true,
    "hidden": false,
    "variant": 2807749152,
@@ -154,7 +154,7 @@
   },
   {
    "id": "u_jonah",
-   "name": "Jonah Beck",
+   "name": "Jonah B.",
    "dm": true,
    "hidden": false,
    "variant": 757673057,
@@ -199,7 +199,7 @@
   },
   {
    "id": "u_wen",
-   "name": "Wen Zhao",
+   "name": "Wen Z.",
    "dm": true,
    "hidden": false,
    "variant": 1982626525,
@@ -234,7 +234,7 @@
   },
   {
    "id": "u_sol",
-   "name": "Sol Ferreira",
+   "name": "Sol F.",
    "dm": true,
    "hidden": false,
    "variant": 1239807689,
@@ -269,7 +269,7 @@
   },
   {
    "id": "u_ilse",
-   "name": "Ilse Vandermeer",
+   "name": "Ilse V.",
    "dm": true,
    "hidden": false,
    "variant": 3198513396,
@@ -304,7 +304,7 @@
   },
   {
    "id": "u_rafa",
-   "name": "Rafa Domínguez",
+   "name": "Rafa D.",
    "dm": true,
    "hidden": false,
    "variant": 2283794869,
@@ -339,7 +339,7 @@
   },
   {
    "id": "u_ada",
-   "name": "Ada Whitlock",
+   "name": "Ada W.",
    "dm": false,
    "hidden": false,
    "variant": 763803779,
@@ -363,7 +363,7 @@
   },
   {
    "id": "u_bram",
-   "name": "Bram Castellano",
+   "name": "Bram C.",
    "dm": false,
    "hidden": false,
    "variant": 2472576459,
@@ -387,7 +387,7 @@
   },
   {
    "id": "u_cleo",
-   "name": "Cleo Marsh",
+   "name": "Cleo M.",
    "dm": false,
    "hidden": false,
    "variant": 3084790974,
@@ -411,7 +411,7 @@
   },
   {
    "id": "u_dev",
-   "name": "Dev Anand",
+   "name": "Dev A.",
    "dm": false,
    "hidden": false,
    "variant": 3978316516,
@@ -435,7 +435,7 @@
   },
   {
    "id": "u_esme",
-   "name": "Esme Larkin",
+   "name": "Esme L.",
    "dm": false,
    "hidden": false,
    "variant": 3757126131,
@@ -459,7 +459,7 @@
   },
   {
    "id": "u_finn",
-   "name": "Finn O'Dwyer",
+   "name": "Finn O.",
    "dm": false,
    "hidden": false,
    "variant": 2322133956,
@@ -483,7 +483,7 @@
   },
   {
    "id": "u_greta",
-   "name": "Greta Holm",
+   "name": "Greta H.",
    "dm": false,
    "hidden": false,
    "variant": 201467292,
@@ -507,7 +507,7 @@
   },
   {
    "id": "u_hugo",
-   "name": "Hugo Batista",
+   "name": "Hugo B.",
    "dm": false,
    "hidden": false,
    "variant": 3759624844,
@@ -531,7 +531,7 @@
   },
   {
    "id": "u_ines",
-   "name": "Ines Ferrer",
+   "name": "Ines F.",
    "dm": false,
    "hidden": false,
    "variant": 2246934574,
@@ -555,7 +555,7 @@
   },
   {
    "id": "u_jules",
-   "name": "Jules Moreau",
+   "name": "Jules M.",
    "dm": false,
    "hidden": false,
    "variant": 4284617568,
@@ -598,7 +598,7 @@
   },
   {
    "id": "u_lena",
-   "name": "Lena Sørensen",
+   "name": "Lena S.",
    "dm": false,
    "hidden": false,
    "variant": 518810095,
@@ -622,7 +622,7 @@
   },
   {
    "id": "u_milo",
-   "name": "Milo Petrov",
+   "name": "Milo P.",
    "dm": false,
    "hidden": false,
    "variant": 813020718,
@@ -646,7 +646,7 @@
   },
   {
    "id": "u_nadia",
-   "name": "Nadia Haddad",
+   "name": "Nadia H.",
    "dm": false,
    "hidden": false,
    "variant": 38243538,
@@ -670,7 +670,7 @@
   },
   {
    "id": "u_oisin",
-   "name": "Oisín Byrne",
+   "name": "Oisín B.",
    "dm": false,
    "hidden": false,
    "variant": 3837998693,
@@ -694,7 +694,7 @@
   },
   {
    "id": "u_pip",
-   "name": "Pip Talbot",
+   "name": "Pip T.",
    "dm": false,
    "hidden": false,
    "variant": 3485228510,
@@ -718,7 +718,7 @@
   },
   {
    "id": "u_quinn",
-   "name": "Quinn Delacroix",
+   "name": "Quinn D.",
    "dm": false,
    "hidden": false,
    "variant": 152663802,
@@ -742,7 +742,7 @@
   },
   {
    "id": "u_rosa",
-   "name": "Rosa Ibáñez",
+   "name": "Rosa I.",
    "dm": false,
    "hidden": false,
    "variant": 1438340730,
@@ -766,7 +766,7 @@
   },
   {
    "id": "u_sam",
-   "name": "Sam Kowalski",
+   "name": "Sam K.",
    "dm": false,
    "hidden": false,
    "variant": 1156905332,
@@ -790,7 +790,7 @@
   },
   {
    "id": "u_tess",
-   "name": "Tess Nakamura",
+   "name": "Tess N.",
    "dm": false,
    "hidden": false,
    "variant": 2168738360,
@@ -814,7 +814,7 @@
   },
   {
    "id": "u_umar",
-   "name": "Umar Siddiqui",
+   "name": "Umar S.",
    "dm": false,
    "hidden": false,
    "variant": 2350918152,
@@ -838,7 +838,7 @@
   },
   {
    "id": "u_vera",
-   "name": "Vera Lindgren",
+   "name": "Vera L.",
    "dm": false,
    "hidden": false,
    "variant": 2913433009,
@@ -862,7 +862,7 @@
   },
   {
    "id": "u_wyatt",
-   "name": "Wyatt Boone",
+   "name": "Wyatt B.",
    "dm": false,
    "hidden": false,
    "variant": 949449876,
@@ -886,7 +886,7 @@
   },
   {
    "id": "u_xiu",
-   "name": "Xiu Lan",
+   "name": "Xiu L.",
    "dm": false,
    "hidden": false,
    "variant": 1576846133,
@@ -910,7 +910,7 @@
   },
   {
    "id": "u_yara",
-   "name": "Yara Mansour",
+   "name": "Yara M.",
    "dm": false,
    "hidden": false,
    "variant": 3835376218,
@@ -934,7 +934,7 @@
   },
   {
    "id": "u_zeke",
-   "name": "Zeke Halloran",
+   "name": "Zeke H.",
    "dm": false,
    "hidden": false,
    "variant": 4215498364,
@@ -958,7 +958,7 @@
   },
   {
    "id": "u_abel",
-   "name": "Abel Nkemelu",
+   "name": "Abel N.",
    "dm": false,
    "hidden": false,
    "variant": 596010891,
@@ -982,7 +982,7 @@
   },
   {
    "id": "u_bea",
-   "name": "Bea Fontaine",
+   "name": "Bea F.",
    "dm": false,
    "hidden": false,
    "variant": 2239047611,
@@ -1025,7 +1025,7 @@
   },
   {
    "id": "u_dara",
-   "name": "Dara Quigley",
+   "name": "Dara Q.",
    "dm": false,
    "hidden": false,
    "variant": 1019051759,
@@ -1049,7 +1049,7 @@
   },
   {
    "id": "u_eli",
-   "name": "Eli Strand",
+   "name": "Eli S.",
    "dm": false,
    "hidden": false,
    "variant": 1797879807,
@@ -1073,7 +1073,7 @@
   },
   {
    "id": "u_freya",
-   "name": "Freya Voss",
+   "name": "Freya V.",
    "dm": false,
    "hidden": false,
    "variant": 4280303154,
@@ -1097,7 +1097,7 @@
   },
   {
    "id": "u_gus",
-   "name": "Gus Mercer",
+   "name": "Gus M.",
    "dm": false,
    "hidden": false,
    "variant": 1182883030,
@@ -1121,7 +1121,7 @@
   },
   {
    "id": "u_hana",
-   "name": "Hana Kobayashi",
+   "name": "Hana K.",
    "dm": false,
    "hidden": false,
    "variant": 3508503159,
@@ -1145,7 +1145,7 @@
   },
   {
    "id": "u_ivo",
-   "name": "Ivo Tremblay",
+   "name": "Ivo T.",
    "dm": false,
    "hidden": false,
    "variant": 3570226531,
@@ -1169,7 +1169,7 @@
   },
   {
    "id": "u_admin",
-   "name": "Morgan Vale",
+   "name": "Morgan V.",
    "dm": false,
    "hidden": false,
    "variant": 3643441772,
@@ -1193,7 +1193,7 @@
   },
   {
    "id": "v1",
-   "name": "Rowan Bell",
+   "name": "Rowan B.",
    "dm": false,
    "hidden": false,
    "variant": 10000,
@@ -1217,7 +1217,7 @@
   },
   {
    "id": "v2",
-   "name": "Sage Mercer",
+   "name": "Sage M.",
    "dm": false,
    "hidden": false,
    "variant": 10137,
@@ -1241,7 +1241,7 @@
   },
   {
    "id": "v3",
-   "name": "Alex Rivers",
+   "name": "Alex R.",
    "dm": false,
    "hidden": false,
    "variant": 10274,
@@ -1265,7 +1265,7 @@
   },
   {
    "id": "v4",
-   "name": "Robin Patel",
+   "name": "Robin P.",
    "dm": false,
    "hidden": false,
    "variant": 10411,
@@ -1289,7 +1289,7 @@
   },
   {
    "id": "v5",
-   "name": "Taylor Finch",
+   "name": "Taylor F.",
    "dm": false,
    "hidden": false,
    "variant": 10548,
@@ -1313,7 +1313,7 @@
   },
   {
    "id": "v6",
-   "name": "Casey Moon",
+   "name": "Casey M.",
    "dm": false,
    "hidden": false,
    "variant": 10685,

@@ -2,11 +2,11 @@
  "format": 1,
  "events": [
   {
-   "event_id": "ae12774a1e8d41b2a39ea28bb4db2dc3",
-   "name": "Tater testers",
-   "start": "2026-09-19T10:30:00-04:00",
+   "event_id": "9611039761ab4ce3b086f4fedae83dc2",
+   "name": "Lanternlight Marathon — 50-person demo",
+   "start": "2026-11-14T10:00:00-05:00",
    "tz": "America/New_York",
-   "tables": 1
+   "tables": 12
   }
  ]
 }

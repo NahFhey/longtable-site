@@ -19,7 +19,8 @@ checked-in QA sample. Production never falls back to sample data.
 
 The new full-day demonstration is `/?sample=50&at=0`: press Play to watch 50
 fictional attendees arrive and depart over 24 event hours, with 12 games, visitors,
-food, breaks, dice and stage messages. The default speed is 600×, with slower
+food, breaks, dice and stage messages; all 50 are in the hall together for one
+fifth of the day (slots 19 to 28.6). The default speed is 600×, with slower
 playback for announcements and meals. Regenerate its separate schema-7 dataset
 with `python3 site/data/gen_demo.py`; it leaves the legacy sample and live data
 untouched. Demo pages never poll the live feed or show live donation links.

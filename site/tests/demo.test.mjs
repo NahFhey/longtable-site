@@ -17,10 +17,17 @@ test('full-day demo has 50 distinct arrivals and departures, then an empty hall'
     assert.equal(isPresent(person, here, demo.event.slots), true);
     assert.equal(isPresent(person, leaving, demo.event.slots), false);
   }
-  for (const start of [0, 12, 24, 36]) {
+  for (const start of [0, 12]) {
     assert.ok(demo.people.some(person => person.presence.actual.here >= start && person.presence.actual.here < start + 12));
+  }
+  for (const start of [24, 36]) {
     assert.ok(demo.people.some(person => person.presence.actual.leaving >= start && person.presence.actual.leaving < start + 12));
   }
+  // Everyone is in the hall together for one fifth of the marathon.
+  const lastArrival = Math.max(...demo.people.map(person => person.presence.actual.here));
+  const firstDeparture = Math.min(...demo.people.map(person => person.presence.actual.leaving));
+  assert.ok(firstDeparture - lastArrival >= demo.event.slots * .2, `${lastArrival}..${firstDeparture}`);
+  assert.ok(demo.people.every(person => isPresent(person, lastArrival, demo.event.slots)));
   assert.ok(demo.people.every(person => !isPresent(person, 48, 48)));
   assert.ok(demo.tables.every(table => tableLifecycle(demo, table, 48).phase === 'inactive'));
   for (const table of demo.tables) for (const signup of table.signups) {

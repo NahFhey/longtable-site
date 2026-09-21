@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-source="archive">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,19 +7,19 @@
   <meta id="backup-feed" name="longtable-backup-feed" content="https://raw.githubusercontent.com/NahFhey/longtable-site/main/site/data/timeline.json">
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
-  <link rel="icon" href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/styles.css?v=3226e8b37688">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=0d8a3b6c0801">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
   <header class="masthead">
     <div class="identity">
-      <h1 class="event-title"><a href="../../index.html">Longtable<span class="title-dot" aria-hidden="true">.</span></a></h1>
+      <h1 class="event-title"><a href="./">Longtable<span class="title-dot" aria-hidden="true">.</span></a></h1>
       <p id="event-name" class="orientation"></p>
       <nav class="site-nav" aria-label="Page navigation">
         <a href="#hall-explorer">The hall</a>
         <a href="#table-list">Find a game</a>
-        <a href="../../past-events.html">Past events <span aria-hidden="true">↗</span></a>
+        <a href="./past-events.html">Past events <span aria-hidden="true">↗</span></a>
       </nav>
       <div id="event-actions" class="event-actions" aria-label="Event actions"></div>
       <p id="fundraising-total" class="fundraising-total" hidden></p>
@@ -70,9 +70,23 @@
         </div>
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
+        <button id="music-open" class="jukebox-key" type="button">Open the jukebox music player</button>
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list.</p>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header. A jukebox stands against the back wall under a sign that offers music when clicked.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        <div id="music-panel" class="music-panel" role="dialog" aria-label="Jukebox" hidden>
+          <audio id="hall-music" preload="none"></audio>
+          <p id="music-track" class="music-track"></p>
+          <div class="music-buttons">
+            <button id="music-toggle" type="button">Play music</button>
+            <button id="music-next" type="button">Next track</button>
+            <button id="music-close" type="button" aria-label="Close jukebox">×</button>
+          </div>
+          <label for="music-volume">Volume</label>
+          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
+          <output id="music-volume-value" for="music-volume">50%</output>
+          <span id="music-status" role="status" aria-live="polite"></span>
+        </div>
         <div class="timeline-controls">
           <label for="scrubber">Event time</label>
           <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
@@ -81,16 +95,6 @@
             <span id="now-marker" hidden>Now: —</span>
             <span id="end-label">—</span>
           </div>
-        </div>
-        <div id="music-controls" class="music-controls" role="group" aria-label="Hall music" hidden>
-          <audio id="hall-music" preload="none"></audio>
-          <button id="music-toggle" type="button">Play music</button>
-          <button id="music-next" type="button">Next track</button>
-          <label for="music-volume">Music volume</label>
-          <input id="music-volume" type="range" min="0" max="100" step="1" value="50">
-          <output id="music-volume-value" for="music-volume">50%</output>
-          <span id="music-track"></span>
-          <span id="music-status" role="status" aria-live="polite"></span>
         </div>
       </div>
       <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
@@ -113,12 +117,13 @@
   <footer>
     <p>Last updated <time id="updated">—</time>.</p>
     <p>Art: Kenney · CC0.</p>
-    <p>Music: RandomMind · CC0 · <a href="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/assets/music/CREDITS.txt">Credits</a>.</p>
+    <p>Music: RandomMind · CC0 · <a href="./assets/music/CREDITS.txt">Credits</a>.</p>
     <div id="sync-controls" class="sync-controls" hidden>
       <span id="sync-status" role="status" aria-live="polite"></span>
       <button id="refresh-now" type="button">Check for updates</button>
     </div>
+    <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="../../archive-assets/b249136f2951f21325c5bded6fee2cb0b0fc44987b387d850ab9bd219b7f8f9f/app.mjs?v=73a26338faca"></script>
+  <script type="module" src="./app.mjs?v=1b4c6429d2ff"></script>
 </body>
 </html>

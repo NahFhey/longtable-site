@@ -1,0 +1,34 @@
+Longtable Great Hall music
+
+All recordings are by RandomMind, released under CC0 (public domain dedication).
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Source and license checked on 2026-09-19 (first two) and 2026-09-21 (the rest).
+
+The Old Tower Inn
+https://opengameart.org/content/medieval-the-old-tower-inn
+Original file: https://opengameart.org/sites/default/files/The_Old_Tower_Inn.mp3
+SHA-256: 3fe4070015b880b591c79a7fca31156a0083a8768d88a39da39ab6c54f2f014d
+
+The Bard's Tale
+https://opengameart.org/content/medieval-the-bards-tale
+Original file: https://opengameart.org/sites/default/files/The_Bards_Tale.mp3
+SHA-256: 6e93e8e8215bea17a209c321c182111058e024c53e3ad775ce1481ca1d1fcfc2
+
+Market Day
+https://opengameart.org/content/medieval-market-day
+Original file: https://opengameart.org/sites/default/files/Market_Day.mp3
+SHA-256: 2ee59b8898adae044f29e490efabe0d5972606f93edceb501f892b3fe6613d49
+
+Minstrel Dance
+https://opengameart.org/content/medieval-minstrel-dance
+Original file: https://opengameart.org/sites/default/files/Minstrel_Dance_0.mp3
+SHA-256: b01ff311b30a6cba5c12220d2171d903c73ba463e2ba45400223175ea00b8296
+
+Rejoicing
+https://opengameart.org/content/medieval-rejoicing
+Original file: https://opengameart.org/sites/default/files/Rejoicing_0.mp3
+SHA-256: 00c08c2c7f1bab4720b387fc0a54edd54a6c618e5159b8724b766f0a02338304
+
+Files are bundled unmodified. Once a visitor has clicked the hall's jukebox, the
+full recordings alternate continuously while the Great Hall is expanded, subject
+to the visitor's audio preferences.

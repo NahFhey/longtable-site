@@ -354,8 +354,9 @@ export function diceAt(timeline, tableId, slot, reducedMotion = false) {
   }) };
 }
 
+/** Text for the latest public roll; empty when there is none, so the notice only appears once a roll exists. */
 export function diceText(timeline, event) {
-  if (!event || event.kind !== "roll" || event.visibility !== "public") return "No public roll at this time.";
+  if (!event || event.kind !== "roll" || event.visibility !== "public") return "";
   const who = displayName(timeline.people.find((person) => person.id === event.person));
   const roll = event.roll;
   const modifier = roll.modifier ? ` ${roll.modifier > 0 ? "+" : ""}${roll.modifier}` : "";
@@ -383,6 +384,108 @@ export function isPresent(person, slot, totalSlots) {
 }
 
 const HALL_OCCUPANCY = new WeakMap();
+const CARETAKER_TOURS = new WeakMap();
+const CARETAKER_TILES_PER_SECOND = 1.2;
+const CARETAKER_LEGS = 40;
+const EXIT_SECONDS = 2;
+const SWITCHING_OFF = 'The hall is empty. Staff are switching off the lights.';
+const HEADING_HOME = 'The lights are off. Staff are heading home.';
+const GONE_HOME = 'The hall is dark and empty. Staff have gone home.';
+const CIRCULATING = 'Lights are on. Staff are circulating through the hall.';
+/** The eve is the last day before doors; the hall empties and goes dark at its start. */
+export const EVE_MS = 24 * 60 * 60_000;
+/** Tour dwells are 3–10 event-seconds (mean 6.5); at real-time pace one stop should take about half a minute. */
+export const GATHERING_DWELL_FACTOR = 4.6;
+/** Seconds after the eve begins until the caretaker has switched off and left. */
+export const EVE_EXIT_SECONDS = 60 + EXIT_SECONDS;
+const GATHERING_TOURS = new WeakMap();
+
+// FNV-1a over the event start seeds a mulberry32 stream, so every replay, seek and reload walks one tour.
+function seededRandom(seed) {
+  let hash = 2166136261;
+  for (const char of seed) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  let state = hash || 1;
+  return () => {
+    state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Walkable stops for the caretaker; `row` is the corridor each one joins the trunk along. */
+function caretakerWaypoints(layout) {
+  const nearestAisle = y => layout.aisles.reduce((best, aisle) => Math.abs(aisle - y) < Math.abs(best - y) ? aisle : best);
+  const point = (x, y, row = y) => ({ x, y, row });
+  const foodY = layout.food.y + layout.food.h - 1.2;
+  const loungeY = layout.lounge.y + 2;
+  const stairsX = layout.stage.x - .8;
+  const points = [point(1.3, layout.door.y - .8)];
+  for (const aisle of layout.aisles) {
+    points.push(point(layout.trunkX, aisle));
+    for (const fraction of [.25, .5, .75]) points.push(point(Math.round(layout.width * fraction), aisle));
+  }
+  for (const x of [layout.food.x + 1.5, layout.food.x + 6, layout.food.x + layout.food.w - 2.5]) points.push(point(x, foodY));
+  for (const x of [layout.lounge.x + 1.5, layout.lounge.x + layout.lounge.w - 1.5]) points.push(point(x, loungeY));
+  for (const offset of [-3, 0, 3]) {
+    const y = Math.max(layout.aisles[0], Math.min(layout.aisles.at(-1), layout.stageFront.y + offset));
+    points.push(point(stairsX, y, nearestAisle(y)));
+  }
+  points.push(point(layout.doorPosition.x, layout.doorPosition.y));
+  return points;
+}
+
+// Manhattan legs: out to the stop's corridor, along it to the trunk, down the trunk, and in again.
+function corridorPath(layout, from, to) {
+  const path = [];
+  const push = ({ x, y }) => {
+    const last = path.at(-1) ?? from;
+    if (Math.abs(last.x - x) > 1e-9 || Math.abs(last.y - y) > 1e-9) path.push({ x, y });
+  };
+  push({ x: from.x, y: from.row });
+  if (from.row !== to.row) {
+    push({ x: layout.trunkX, y: from.row });
+    push({ x: layout.trunkX, y: to.row });
+  }
+  push({ x: to.x, y: to.row });
+  push(to);
+  return path;
+}
+
+/** The caretaker's seeded tour: stops with dwell, routed along the corridors, ending where it began. */
+export function caretakerTour(timeline, layout) {
+  const cached = CARETAKER_TOURS.get(timeline);
+  if (cached?.layout === layout) return cached.tour;
+  const points = caretakerWaypoints(layout);
+  const random = seededRandom(String(timeline.event.start ?? ''));
+  const pick = exclude => {
+    const options = points.filter(point => !exclude.includes(point));
+    return options[Math.floor(random() * options.length)];
+  };
+  const stops = [points[0]];
+  for (let index = 1; index < CARETAKER_LEGS; index += 1) {
+    const exclude = [stops.at(-1), stops.at(-2)];
+    if (index >= CARETAKER_LEGS - 2) exclude.push(points[0]);
+    if (index === CARETAKER_LEGS - 1) exclude.push(stops[1]);
+    stops.push(pick(exclude));
+  }
+  const dwell = stops.map(() => 3 + random() * 7);
+  stops.push(points[0]);
+  const segments = [];
+  for (let index = 0; index < CARETAKER_LEGS; index += 1) {
+    const here = { x: stops[index].x, y: stops[index].y };
+    segments.push({ from: here, to: here, seconds: dwell[index] });
+    let from = here;
+    for (const to of corridorPath(layout, stops[index], stops[index + 1])) {
+      segments.push({ from, to, seconds: Math.hypot(to.x - from.x, to.y - from.y) / CARETAKER_TILES_PER_SECOND });
+      from = to;
+    }
+  }
+  const tour = { stops: stops.map(({ x, y }) => ({ x, y })), dwell, segments,
+    seconds: segments.reduce((sum, segment) => sum + segment.seconds, 0) };
+  CARETAKER_TOURS.set(timeline, { layout, tour });
+  return tour;
+}
 
 /** Decorative caretaker: event-time motion, without adding attendance or events. */
 export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
@@ -410,28 +513,38 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
   const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
   const corridor = { x: layout.trunkX, y: layout.aisles[0] };
   const food = { x: layout.food.x + 6, y: layout.food.y + layout.food.h - 1.2 };
-  const lounge = { x: layout.trunkX, y: layout.lounge.y + 2 };
-  const route = [lightSwitch, corridor, food, corridor, lounge, corridor, lightSwitch];
-  const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
-  const length = lengths.reduce((sum, value) => sum + value, 0);
+  const tour = caretakerTour(timeline, layout);
   const roam = elapsed => {
     if (reducedMotion) return lightSwitch;
-    let distance = Math.max(0, elapsed) * 1.2 % length;
-    for (let i = 0; i < lengths.length; i += 1) {
-      if (distance <= lengths[i]) {
-        const progress = lengths[i] ? distance / lengths[i] : 0;
-        return { x: route[i].x + (route[i + 1].x - route[i].x) * progress,
-          y: route[i].y + (route[i + 1].y - route[i].y) * progress };
+    let remaining = Math.max(0, elapsed) % tour.seconds;
+    for (const segment of tour.segments) {
+      if (remaining <= segment.seconds) {
+        const progress = segment.seconds ? remaining / segment.seconds : 1;
+        return { x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+          y: segment.from.y + (segment.to.y - segment.from.y) * progress };
       }
-      distance -= lengths[i];
+      remaining -= segment.seconds;
     }
     return lightSwitch;
   };
   const clamp = value => Math.max(0, Math.min(1, value));
   const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
+  // Closing: walk to the switch (0–8 s), fade (8–12 s), walk out through the door, then nobody until someone returns.
+  const closingAt = atSeconds => {
+    const departure = intervals.filter(([, end]) => end <= atSeconds).at(-1)?.[1] ?? opening + 60;
+    const elapsed = atSeconds - departure;
+    if (reducedMotion) return elapsed < 8 ? { staff: lightSwitch, lights: 0, action: SWITCHING_OFF } : { staff: null, lights: 0, action: GONE_HOME };
+    if (elapsed < 12) return { staff: move(roam(Math.max(0, departure - opening - 60)), lightSwitch, elapsed / 8),
+      lights: 1 - clamp((elapsed - 8) / 4), action: SWITCHING_OFF };
+    if (elapsed < 12 + EXIT_SECONDS) return { staff: move(lightSwitch, layout.doorPosition, (elapsed - 12) / EXIT_SECONDS), lights: 0, action: HEADING_HOME };
+    return { staff: null, lights: 0, action: GONE_HOME };
+  };
   let staff = roam(seconds), lights = occupied ? 1 : 0, action = 'Staff are on duty; the empty hall’s lights are off.';
   let foodCount = Math.floor(clamp((sinceOpen - 20) / 30) * 6);
-  if (sinceOpen >= 0 && sinceOpen < 60) {
+  if (sinceOpen < 0) {
+    // Nobody is drawn before the doors open; the opening walk starts from the door.
+    staff = null; lights = 0; action = 'The hall is dark. Staff have not arrived yet.';
+  } else if (sinceOpen < 60) {
     lights = reducedMotion ? 1 : clamp((sinceOpen - 4) / 2);
     if (sinceOpen < 8) {
       staff = move(layout.doorPosition, lightSwitch, sinceOpen / 4);
@@ -446,24 +559,86 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
     if (reducedMotion) { staff = food; foodCount = 6; }
   } else if (occupied) {
     staff = roam(seconds - opening - 60);
-    action = 'Lights are on. Staff are circulating through the hall.';
+    action = CIRCULATING;
     if (occupied !== intervals[0] && seconds - occupied[0] < 12) {
       const elapsed = seconds - occupied[0];
-      staff = reducedMotion ? lightSwitch : move(roam(occupied[0]), lightSwitch, elapsed / 8);
+      // Return from wherever closing left the caretaker: the door once gone, or mid-walk if still leaving.
+      const from = closingAt(occupied[0]).staff ?? layout.doorPosition;
+      staff = reducedMotion ? lightSwitch : move(from, lightSwitch, elapsed / 8);
       lights = reducedMotion ? 1 : clamp((elapsed - 8) / 4);
       action = 'Staff are turning the lights back on.';
     }
   } else if (sinceOpen >= 60) {
-    const departure = intervals.filter(([, end]) => end <= seconds).at(-1)?.[1] ?? opening + 60;
-    const elapsed = seconds - departure;
-    if (elapsed < 12) {
-      staff = reducedMotion ? lightSwitch : move(roam(Math.max(0, departure - opening - 60)), lightSwitch, elapsed / 8);
-      lights = reducedMotion ? 0 : 1 - clamp((elapsed - 8) / 4);
-      action = 'The hall is empty. Staff are switching off the lights.';
-    } else staff = roam(elapsed - 12);
+    ({ staff, lights, action } = closingAt(seconds));
   }
-  return { staff: { ...staff, load: sinceOpen >= 8 && sinceOpen < 50 ? 'food' : null },
+  return { staff: staff && { ...staff, load: sinceOpen >= 8 && sinceOpen < 50 ? 'food' : null },
     lights, foodCount, lightSwitch, action, occupied: Boolean(occupied) };
+}
+
+/** The seeded tour at wall-clock pace: walking legs unchanged, dwells stretched to about half a minute. */
+function gatheringTour(timeline, layout) {
+  const tour = caretakerTour(timeline, layout);
+  let scaled = GATHERING_TOURS.get(tour);
+  if (!scaled) {
+    const segments = tour.segments.map(segment => segment.from.x === segment.to.x && segment.from.y === segment.to.y
+      ? { ...segment, seconds: segment.seconds * GATHERING_DWELL_FACTOR } : segment);
+    scaled = { stops: tour.stops, segments, seconds: segments.reduce((sum, segment) => sum + segment.seconds, 0) };
+    GATHERING_TOURS.set(tour, scaled);
+  }
+  return scaled;
+}
+
+function doorsOpenText(timeline) {
+  const start = Date.parse(timeline.event.start);
+  const part = options => {
+    try { return new Intl.DateTimeFormat('en-US', { timeZone: timeline.event.tz, ...options }).format(new Date(start)); }
+    catch { return new Date(start).toISOString(); }
+  };
+  return `The hall is dark. Doors open ${part({ weekday: 'long' })} at ${part({ hour: 'numeric', minute: '2-digit' })}.`;
+}
+
+/** Ambience before the event, driven by the wall clock: a lit gathering, then the eve's closing and a dark hall.
+ * Same shape as `hallAmbience`. Position is a function of the instant, so every page load agrees. */
+export function gatheringAmbience(timeline, layout, milliseconds, reducedMotion = false) {
+  const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
+  const tour = gatheringTour(timeline, layout);
+  const clamp = value => Math.max(0, Math.min(1, value));
+  const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
+  const roam = seconds => {
+    if (reducedMotion) return { ...tour.stops[0] };
+    let remaining = ((seconds % tour.seconds) + tour.seconds) % tour.seconds;
+    for (const segment of tour.segments) {
+      if (remaining <= segment.seconds) {
+        const progress = segment.seconds ? remaining / segment.seconds : 1;
+        return { x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+          y: segment.from.y + (segment.to.y - segment.from.y) * progress };
+      }
+      remaining -= segment.seconds;
+    }
+    return { ...tour.stops[0] };
+  };
+  const eveStart = Date.parse(timeline.event.start) - EVE_MS;
+  const elapsed = (milliseconds - eveStart) / 1000;
+  let staff, lights = 1, action = CIRCULATING, occupied = true;
+  if (elapsed < 0) {
+    staff = roam(milliseconds / 1000);
+  } else if (elapsed < 48) {
+    // Attendees are walking out (staggered over the first 45 s); the caretaker keeps touring.
+    staff = roam(eveStart / 1000 + elapsed);
+  } else if (elapsed <= 60) {
+    // Walk to the switch (48–56 s), then fade the lights (56–60 s), like the event-day closing.
+    staff = reducedMotion ? { ...tour.stops[0] } : elapsed < 56 ? move(roam(eveStart / 1000 + 48), lightSwitch, (elapsed - 48) / 8) : { ...lightSwitch };
+    lights = reducedMotion ? (elapsed < 60 ? 1 : 0) : 1 - clamp((elapsed - 56) / 4);
+    action = SWITCHING_OFF;
+  } else if (elapsed < EVE_EXIT_SECONDS) {
+    staff = reducedMotion ? { ...tour.stops[0] } : move(lightSwitch, layout.doorPosition, (elapsed - 60) / EXIT_SECONDS);
+    lights = 0;
+    action = reducedMotion ? SWITCHING_OFF : HEADING_HOME;
+  } else {
+    staff = null; lights = 0; occupied = false;
+    action = doorsOpenText(timeline);
+  }
+  return { staff: staff && { ...staff, load: null }, lights, foodCount: 0, lightSwitch, action, occupied };
 }
 
 export function effectiveSignupRange(signup) {
@@ -591,6 +766,37 @@ export function createRoomLayout(tables, room = null) {
   for (let row = 0; row < layout.tableRows; row += 1) layout.aisles.push(layout.gridY + row * layout.cellHeight + layout.cellHeight - 0.5);
   if (layout.overflowRows) layout.aisles.push(layout.tableGridBottom + 1.5);
   return layout;
+}
+
+/**
+ * Fixtures hung on the back wall, in tile units: the host banner over the entrance and the QR
+ * plaques flush right. Every rect lies inside `layout.backWall` above the chair rail.
+ */
+export function wallFixtures(layout, { plaques = 2, banner = true } = {}) {
+  const plaque = { w: 4.6, h: 5.2, y: -5.6 };
+  const rects = [];
+  for (let index = 0; index < plaques; index += 1) {
+    rects.unshift({ x: Number((layout.width - 1 - (index + 1) * plaque.w - index).toFixed(2)), y: plaque.y, w: plaque.w, h: plaque.h });
+  }
+  // The banner ends at least two tiles before the first plaque and never shrinks below eight tiles.
+  const bannerWidth = rects.length ? Math.max(8, Math.min(25, rects[0].x - 5)) : Math.min(25, layout.width - 6);
+  return { banner: banner ? { x: 3, y: -4.7, w: bannerWidth, h: 3.5 } : null, plaques: rects };
+}
+
+/**
+ * The jukebox stands on the floor with its back to the back wall, two tiles right of the host banner's end
+ * (the food area fills the wall's left end), so it moves with the banner and never sits under it or the plaques.
+ * Its top overlaps the wall's lowest brick row like furniture pushed against a wall.
+ */
+export function jukeboxBounds(layout) {
+  const { banner } = wallFixtures(layout);
+  return { x: banner.x + banner.w + 2, y: -1.2, w: 2, h: 3 };
+}
+
+/** The music sign hangs on the wall directly above the jukebox, one tile wider on each side. */
+export function jukeboxSignBounds(layout) {
+  const box = jukeboxBounds(layout);
+  return { x: box.x - 1, y: box.y - 1.4, w: box.w + 2, h: 1 };
 }
 
 export function seatPositionForPlan(plan, tableIndex, seat) {
@@ -811,6 +1017,25 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
   return ordinary.kind === "food" ? { kind: "lounge", label: "the lounge" } : ordinary;
 }
 
+/** Where everyone waits during the gathering: the earliest table they run or joined, else the lounge
+ * for a planned attendance, else outside. Plans only; nobody is really here yet. */
+export function gatheringLocations(timeline) {
+  const ordered = timeline.tables.map((table, tableIndex) => ({ table, tableIndex }))
+    .sort((a, b) => a.table.start - b.table.start || a.tableIndex - b.tableIndex);
+  const result = new Map();
+  for (const person of timeline.people) {
+    let place = null;
+    for (const { table, tableIndex } of ordered) {
+      if (table.dm === person.id) { place = { kind: "table", label: table.name, table, tableIndex, seat: 0 }; break; }
+      const signupIndex = table.signups.findIndex((signup) => signup.person === person.id);
+      if (signupIndex >= 0) { place = { kind: "table", label: table.name, table, tableIndex, seat: signupIndex + 1 }; break; }
+    }
+    if (!place) place = person.presence.planned !== null ? { kind: "lounge", label: "the lounge" } : { kind: "absent", label: "outside the hall" };
+    result.set(person.id, place);
+  }
+  return result;
+}
+
 /** Food tables, seats and bin share geometry with the rendered furniture. */
 export function foodGeometry(layout, index = 0, count = 1) {
   const { x, y } = layout.food;
@@ -861,6 +1086,24 @@ export function modeAt(timeline, milliseconds) {
   const start = Date.parse(timeline.event.start);
   const endPlusHour = slotToMs(timeline, timeline.event.slots) + 60 * 60_000;
   return milliseconds >= start && milliseconds <= endPlusHour ? "live" : "replay";
+}
+
+/** "gathering" | "eve" | "day" | "after" for a wall-clock instant. */
+export function hallStage(timeline, milliseconds) {
+  if (modeAt(timeline, milliseconds) === "live") return "day";
+  const start = Date.parse(timeline.event.start);
+  if (milliseconds > start) return "after";
+  return milliseconds >= start - EVE_MS ? "eve" : "gathering";
+}
+
+/** Countdown to doors for the header, rounded up to the coarsest unit that still moves. */
+export function countdownText(remainingMs) {
+  const minute = 60_000, hour = 60 * minute, day = 24 * hour;
+  const away = (count, unit) => `${count} ${unit}${count === 1 ? "" : "s"} away`;
+  if (remainingMs > day) return away(Math.ceil(remainingMs / day), "day");
+  if (remainingMs > hour) return away(Math.ceil(remainingMs / hour), "hour");
+  if (remainingMs > minute) return away(Math.ceil(remainingMs / minute), "minute");
+  return "Doors open any moment";
 }
 
 export function crossedSpeechEvents(timeline, fromSlot, toSlot) {
