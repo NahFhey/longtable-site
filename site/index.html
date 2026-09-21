@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=a75f639d8ae0">
+  <link rel="stylesheet" href="./styles.css?v=272781567fa9">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
@@ -71,7 +71,7 @@
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list.</p>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
         <div class="timeline-controls">
           <label for="scrubber">Event time</label>
@@ -93,6 +93,7 @@
           <span id="music-status" role="status" aria-live="polite"></span>
         </div>
       </div>
+      <aside id="kiosk-rail" class="kiosk-rail" hidden aria-label="Join or donate"></aside>
       <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
         <section id="detail" class="detail" aria-live="polite">
           <h2>Table details</h2>
@@ -119,6 +120,6 @@
       <button id="refresh-now" type="button">Check for updates</button>
     </div>
   </footer>
-  <script type="module" src="./app.mjs?v=9ae4954927b7"></script>
+  <script type="module" src="./app.mjs?v=ca03c2fd31fa"></script>
 </body>
 </html>

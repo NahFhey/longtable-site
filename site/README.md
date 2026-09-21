@@ -263,22 +263,47 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
-The header contains one **Discord** link. Update `DISCORD_INVITE` in
-`event-config.mjs` to change its destination; it is shared across current events
-without depending on their names or dates. Samples and archived replays suppress
-current community links. Table cards and details do not repeat signup instructions.
-The old Discord QR asset is retained for compatibility but is not displayed for
-the current invite.
+The header always carries two links, **Discord** and **Donate**, each with a
+"Show QR" panel. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
+to change their destinations; they are shared across current events without
+depending on their names or dates. Samples and archived replays suppress the
+header links. Table cards and details do not repeat signup instructions.
 
 Optional event actions in `EVENT_CONFIG` still match the event name and exact
 start string. Only absolute HTTPS URLs without credentials are accepted. Labels
-are rendered as text. The Extra Life action is documented but not enabled by
-default. Any supplied QR image must be verified against its configured destination;
-an image failure leaves the direct link usable.
+are rendered as text. Extra links that repeat the Discord or Donate URL are
+dropped. Any supplied QR image must be verified against its configured
+destination; an image failure leaves the direct link usable.
+
+**Wall plaques.** `WALL_PLAQUES` in `event-config.mjs` lists the two plaques
+drawn on the back wall of the hall (and shown on the kiosk rail): the Discord
+invite and the Extra Life page, each with its label, URL and QR file under
+`assets/events/`. The QR files must be decode-verified against their URL before
+they are listed; `event-assets/README.md` has the command and the provenance of
+each file. `discord-k6GYjek53-qr.png` is a stale invite retained only for old
+printed materials; it is never displayed.
 
 Static props are locally drawn
 geometric maps, GM screens, dice trays, and close-view accessories; no additional
 art license or bot event is needed.
+
+## Kiosk mode (projector)
+
+Open `https://longtable.party/?kiosk=1` in Chrome or Firefox on the projector
+laptop and press `f` (or F11) for fullscreen. The page strips itself to a slim
+bar (event name, Extra Life total, badge and clock), the doors countdown line,
+the hall scene filling the viewport, and a rail of the two plaques with QR codes
+large enough to scan from the room. It needs no other setup: the same timeline,
+polling and consent rules as the public page apply, and nothing new about any
+attendee appears. Keep the tab in the foreground (polling and the Extra Life
+total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
+the page also asks for a screen wake lock where the browser allows one. After
+45 seconds without input a moved camera returns to automatic framing, and the
+cursor hides after 3 seconds.
+
+`?sample=50&kiosk=1` is the dress rehearsal (the demo event with the rail);
+`?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
+combines with `?at=` and is kept when the clock rewrites the URL.
 
 ### Testing deployment and later launch
 

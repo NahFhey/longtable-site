@@ -14,6 +14,7 @@ import {
   hallStage,
   createSeatingPlan,
   createRoomLayout,
+  wallFixtures,
   createLiveState,
   crossedSpeechEvents,
   displayName,
@@ -659,4 +660,28 @@ test("countdownText rounds up to days, hours, minutes, then 'any moment'", () =>
   assert.equal(countdownText(2 * 60_000), "2 minutes away");
   assert.equal(countdownText(60_000), "Doors open any moment");
   assert.equal(countdownText(0), "Doors open any moment");
+});
+
+test("wall fixtures hang inside the back wall without overlap, plaques flush right, banner 8 to 25 wide", () => {
+  const rooms = [2, 10, 40].map((count) => createRoomLayout(Array.from({ length: count }, (_, index) => ({ id: `t${index}`, signups: [] }))));
+  const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  for (const layout of rooms) {
+    const { banner, plaques } = wallFixtures(layout);
+    const rects = [banner, ...plaques];
+    assert.equal(plaques.length, 2);
+    for (const rect of rects) {
+      assert.ok(rect.y >= layout.backWall.y && rect.y + rect.h <= 0, "inside the wall band above the chair rail");
+      assert.ok(rect.x >= 0 && rect.x + rect.w <= layout.width, "inside the room width");
+    }
+    for (const [index, rect] of rects.entries()) for (const other of rects.slice(index + 1)) assert.ok(!overlaps(rect, other), "fixtures never overlap");
+    assert.deepEqual(banner, { x: 3, y: -4.7, w: banner.w, h: 3.5 });
+    assert.ok(banner.w >= 8 && banner.w <= 25);
+    assert.ok(banner.x + banner.w <= plaques[0].x - 2, "the banner ends at least two tiles before the first plaque without clamping");
+    const edge = (rect) => Number((rect.x + rect.w).toFixed(6));
+    assert.equal(edge(plaques[1]), layout.width - 1, "the right plaque keeps a one-tile margin");
+    assert.equal(edge(plaques[0]), Number((plaques[1].x - 1).toFixed(6)), "the left plaque sits one tile to the left");
+    for (const plaque of plaques) assert.deepEqual([plaque.w, plaque.h, plaque.y], [4.6, 5.2, -5.6]);
+    assert.equal(wallFixtures(layout, { banner: false }).banner, null);
+    assert.deepEqual(wallFixtures(layout, { plaques: 0 }), { banner: { x: 3, y: -4.7, w: Math.min(25, layout.width - 6), h: 3.5 }, plaques: [] });
+  }
 });

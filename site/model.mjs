@@ -768,6 +768,21 @@ export function createRoomLayout(tables, room = null) {
   return layout;
 }
 
+/**
+ * Fixtures hung on the back wall, in tile units: the host banner over the entrance and the QR
+ * plaques flush right. Every rect lies inside `layout.backWall` above the chair rail.
+ */
+export function wallFixtures(layout, { plaques = 2, banner = true } = {}) {
+  const plaque = { w: 4.6, h: 5.2, y: -5.6 };
+  const rects = [];
+  for (let index = 0; index < plaques; index += 1) {
+    rects.unshift({ x: Number((layout.width - 1 - (index + 1) * plaque.w - index).toFixed(2)), y: plaque.y, w: plaque.w, h: plaque.h });
+  }
+  // The banner ends at least two tiles before the first plaque and never shrinks below eight tiles.
+  const bannerWidth = rects.length ? Math.max(8, Math.min(25, rects[0].x - 5)) : Math.min(25, layout.width - 6);
+  return { banner: banner ? { x: 3, y: -4.7, w: bannerWidth, h: 3.5 } : null, plaques: rects };
+}
+
 export function seatPositionForPlan(plan, tableIndex, seat) {
   if (!Number.isInteger(tableIndex) || tableIndex < 0 || !plan.cells[tableIndex]) throw new RangeError("table index is out of range");
   if (!Number.isInteger(seat) || seat < 0) throw new RangeError("seat must be a non-negative integer");

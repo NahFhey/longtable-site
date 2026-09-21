@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, gatheringLocations, loungeActivities, seatPositionForPlan } from "../model.mjs";
+import { createRoomLayout, gatheringLocations, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
-import { DISCORD_INVITE } from "../event-config.mjs";
+import { DISCORD_INVITE, WALL_PLAQUES } from "../event-config.mjs";
 
 class FakeNode {
   constructor(tag = "div") {
@@ -42,8 +42,9 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
+  nodes.get("kiosk-rail").hidden = true;
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
@@ -54,6 +55,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   const transforms = [];
   const context = new Proxy({
     setTransform(...args) { transforms.push(args); },
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
     measureText(value) { return { width: String(value).length * 5 }; },
     fillText(value) { contextCalls.push(String(value)); },
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
@@ -75,6 +77,10 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     getElementById(id) { return nodes.get(id); },
     createElement(tag) { return new FakeNode(tag); },
   };
+  const wakeLockRequests = [];
+  Object.defineProperty(globalThis, "navigator", { configurable: true, writable: true, value: options.wakeLock ? { wakeLock: {
+    async request(kind) { wakeLockRequests.push(kind); if (options.wakeLock === "rejects") throw new Error("NotAllowedError"); return { release() {} }; },
+  } } : {} });
   const urlWrites = [];
   globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
   globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
@@ -83,9 +89,15 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   globalThis.setInterval = callback => { intervals.push(callback); return intervals.length; };
   const frames = [];
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
+  // Listeners are attached before `src`; the outcome is decided per URL once the source is known.
   globalThis.Image = class {
-    addEventListener(kind, listener) { if (kind === (options.assetsFailed ? "error" : "load")) queueMicrotask(listener); }
-    set src(value) { this._src = value; }
+    constructor() { this.imageListeners = new Map(); }
+    addEventListener(kind, listener) { this.imageListeners.set(kind, listener); }
+    set src(value) {
+      this._src = value;
+      const fails = options.assetsFailed || (options.plaquesFail && /-qr\.png$/.test(value));
+      queueMicrotask(() => this.imageListeners.get(fails ? "error" : "load")?.());
+    }
   };
   let fetchIndex = 0;
   const fetchUrls = [];
@@ -95,7 +107,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls };
+  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -341,9 +353,14 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  assert.equal(actions.children.length, 2);
+  // Discord link, its QR panel, Donate link, its QR panel.
+  assert.equal(actions.children.length, 4);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
+  assert.equal(actions.children[1].tagName, "DETAILS");
+  assert.equal(actions.children[1].children[0].textContent, "Show QR: Discord");
+  assert.equal(actions.children[3].children[0].textContent, "Show QR: Donate");
+  assert.equal(actions.children[3].children[1].children[0].src, "./assets/events/extra-life-team-74917-qr.png");
   assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
   const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
   button.listeners.get("click")();
@@ -1315,4 +1332,164 @@ test("?at= still seeks a paused preview under a now override, and a 24-hour even
   assert.match(plain.nodes.get("status").textContent, /games with signup space · Event starts Sat, Nov 7, 10:00 AM$/);
   assert.match(allText(plain.nodes.get("tables")), /Sat, Nov 7, 11:00 AM–Sat, Nov 7, 3:00 PM/);
   assert.equal(plain.nodes.get("mode-badge").textContent, "REPLAY", "the sample without an override still replays");
+});
+
+test("the plaque QR images load from the WALL_PLAQUES paths and a missing QR is not a failed asset", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "plaque-images");
+  assert.deepEqual(app.errors, []);
+  const drawn = app.imageCalls.filter((call) => /-qr\.png$/.test(call.src)).map((call) => call.src);
+  assert.deepEqual(drawn, WALL_PLAQUES.map((plaque) => new URL(plaque.qr, new URL("../app.mjs", import.meta.url)).href));
+  assert.ok(app.contextCalls.includes("Join the Discord") && app.contextCalls.includes("discord.gg/tc9NqpjBrb"));
+  assert.ok(app.contextCalls.includes("Donate · Extra Life") && app.contextCalls.includes("dd.extra-life.org/teams/74917"));
+  assert.match(app.nodes.get("canvas-description").textContent, /Two plaques on the back wall carry QR codes/);
+  const missing = await runApp([sample], "plaque-images-missing", { plaquesFail: true });
+  assert.deepEqual(missing.errors, []);
+  assert.equal(missing.imageCalls.filter((call) => /-qr\.png$/.test(call.src)).length, 0);
+  assert.ok(missing.contextCalls.includes("Join the Discord"), "the plaque keeps its wood and text without a QR");
+  assert.doesNotMatch(missing.nodes.get("status").textContent, /simplified graphics/);
+  const archive = await runApp([sample], "plaque-images-archive", { archive: true, search: "" });
+  assert.equal(archive.contextCalls.filter((text) => text === "Join the Discord").length, 0, "archives hang no plaques");
+  assert.doesNotMatch(archive.nodes.get("canvas-description").textContent, /Two plaques/);
+});
+
+test("without ?kiosk the page has no kiosk flag and the rail stays hidden and empty", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "no-kiosk", { wakeLock: true });
+  assert.equal(document.documentElement.dataset.kiosk, undefined);
+  assert.equal(app.nodes.get("kiosk-rail").hidden, true);
+  assert.equal(app.nodes.get("kiosk-rail").children.length, 0);
+  assert.deepEqual(app.wakeLockRequests, [], "no wake lock outside kiosk");
+  assert.equal(app.documentListeners.has("keydown"), false);
+});
+
+test("?kiosk=1 flags the document, opens the hall on mobile, fills the rail through textContent and keeps the clock mode", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "kiosk", { search: "?sample=1&kiosk=1", mobile: true, wakeLock: true });
+  assert.deepEqual(app.errors, []);
+  assert.equal(document.documentElement.dataset.kiosk, "1");
+  assert.equal(app.nodes.get("hall-explorer").open, true);
+  assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED", "kiosk never changes the derived mode (mobile begins paused)");
+  const rail = app.nodes.get("kiosk-rail");
+  assert.equal(rail.hidden, false);
+  assert.equal(rail.children.length, 2);
+  for (const [index, figure] of rail.children.entries()) {
+    assert.equal(figure.tagName, "FIGURE");
+    const [image, caption] = figure.children;
+    assert.equal(image.tagName, "IMG");
+    assert.equal(image.src, new URL(WALL_PLAQUES[index].qr, new URL("../app.mjs", import.meta.url)).href);
+    assert.equal(image.alt, `QR code for ${WALL_PLAQUES[index].label}`);
+    assert.equal(caption.children[0].textContent, WALL_PLAQUES[index].label);
+    assert.equal(caption.children[0].textContentWrites, 1);
+    assert.equal(caption.children[1].textContentWrites, 1);
+    image.listeners.get("error")();
+    assert.equal(image.hidden, true, "a broken QR hides only the image");
+  }
+  assert.equal(rail.children[0].children[1].children[1].textContent, "discord.gg/tc9NqpjBrb");
+  assert.equal(rail.children[1].children[1].children[1].textContent, "dd.extra-life.org/teams/74917");
+  assert.deepEqual(app.wakeLockRequests, ["screen"]);
+  document.hidden = false;
+  app.documentListeners.get("visibilitychange")();
+  assert.deepEqual(app.wakeLockRequests, ["screen", "screen"], "each return to visible re-requests the lock");
+  const archive = await runApp([sample], "kiosk-archive", { search: "?kiosk=1", archive: true });
+  assert.equal(archive.nodes.get("kiosk-rail").hidden, true, "archives never get the rail");
+});
+
+test("kiosk keeps ?kiosk=1 while the clock writes and deletes ?at=", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "kiosk-url", { search: "?sample=1&kiosk=1" });
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "15" } });
+  app.nodes.get("scrubber").listeners.get("change")();
+  assert.equal(location.searchParams.get("kiosk"), "1");
+  assert.equal(location.searchParams.get("at"), "15");
+  app.nodes.get("return-now").listeners.get("click")();
+  assert.equal(location.searchParams.get("kiosk"), "1");
+  assert.equal(location.searchParams.get("sample"), "1");
+});
+
+test("kiosk returns a manual camera to automatic framing after 45 s idle, hides the cursor after 3 s, and swallows a refused wake lock", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "kiosk-idle", { search: "?sample=1&kiosk=1", wakeLock: "rejects" });
+  assert.deepEqual(app.errors, []);
+  assert.deepEqual(app.wakeLockRequests, ["screen"]);
+  const dataset = document.documentElement.dataset;
+  const events = app.nodes.get("hall").listeners;
+  const frameAt = (offset) => {
+    app.transforms.length = 0;
+    app.frames.shift()?.(performance.now() + offset);
+    return app.transforms[1];
+  };
+  const automatic = frameAt(30);
+  assert.equal(dataset.idle, undefined);
+  events.get("wheel")({ clientX: 480, clientY: 240, deltaY: -180, deltaMode: 0, preventDefault() {} });
+  const zoomed = frameAt(60);
+  assert.ok(zoomed[0] > automatic[0]);
+  assert.deepEqual(frameAt(4_000), zoomed, "a manual camera holds well within the idle window");
+  assert.equal(dataset.idle, "1", "the cursor hides after three seconds without pointer movement");
+  app.documentListeners.get("pointermove")();
+  assert.deepEqual(frameAt(1_000), zoomed);
+  assert.equal(dataset.idle, undefined, "movement brings the cursor back");
+  assert.deepEqual(frameAt(46_000), automatic, "after 45 s without input the projection reframes automatically");
+  const plain = await runApp([sample], "plain-idle", { search: "?sample=1" });
+  const held = (() => { plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 30); return plain.transforms[1]; })();
+  plain.nodes.get("hall").listeners.get("wheel")({ clientX: 480, clientY: 240, deltaY: -180, deltaMode: 0, preventDefault() {} });
+  plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 60);
+  const plainZoomed = plain.transforms[1];
+  assert.ok(plainZoomed[0] > held[0]);
+  plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 60_000);
+  assert.deepEqual(plain.transforms[1], plainZoomed, "outside kiosk a manual camera never resets");
+  assert.equal(document.documentElement.dataset.idle, undefined);
+});
+
+test("kiosk toggles fullscreen on f only outside inputs and ignores a missing or refusing API", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "kiosk-fullscreen", { search: "?sample=1&kiosk=1" });
+  const calls = [];
+  document.documentElement.requestFullscreen = async () => { calls.push("enter"); throw new Error("Not allowed"); };
+  document.exitFullscreen = async () => { calls.push("exit"); };
+  const keydown = app.documentListeners.get("keydown");
+  keydown({ key: "f" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(calls, ["enter"]);
+  document.fullscreenElement = document.documentElement;
+  keydown({ key: "F" });
+  assert.deepEqual(calls, ["enter", "exit"]);
+  document.activeElement = { tagName: "INPUT" };
+  keydown({ key: "f" });
+  assert.deepEqual(calls, ["enter", "exit"], "typing an f into a field is not a toggle");
+  document.activeElement = null;
+  keydown({ key: "f", ctrlKey: true });
+  assert.deepEqual(calls, ["enter", "exit"], "ctrl+f stays the browser's find");
+  delete document.documentElement.requestFullscreen;
+  delete document.fullscreenElement;
+  keydown({ key: "f" });
+  assert.deepEqual(app.errors, []);
+});
+
+test("the plaques join the automatic frame before doors and on the projector, never in a live view of the public page", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const { plaques } = wallFixtures(layout);
+  // Camera transform [zoom / 32, 0, 0, zoom / 32, camera.x, camera.y] on the 960-wide fake viewport.
+  const rightEdge = (app) => {
+    app.transforms.length = 0;
+    app.frames.shift()?.(performance.now() + 30);
+    const [scale, , , , x] = app.transforms[1];
+    return (960 - x) / (scale * 32);
+  };
+  const live = structuredClone(sample);
+  live.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
+  live.generated_at = new Date(Date.now() - 10_000).toISOString();
+  // Only the first two tables are relevant now, so a live frame zooms to the left of the hall.
+  live.tables = live.tables.map((table, index) => index < 2 ? { ...table, start: 0, end: live.event.slots } : { ...table, start: live.event.slots - 2, end: live.event.slots, signups: [] });
+  const following = await runApp([live], "frame-follow-now", { search: "", liveFeed: "https://feed.example/timeline.json" });
+  assert.equal(following.nodes.get("mode-badge").textContent, "LIVE");
+  assert.ok(rightEdge(following) < plaques[0].x, "follow-now on the public page keeps zooming to the relevant tables");
+  const kiosk = await runApp([live], "frame-follow-now-kiosk", { search: "?kiosk=1", liveFeed: "https://feed.example/timeline.json" });
+  assert.equal(kiosk.nodes.get("mode-badge").textContent, "LIVE");
+  assert.ok(rightEdge(kiosk) >= plaques[1].x + plaques[1].w, "the projector frames the whole room including both plaques");
+  const start = Date.parse(sample.event.start);
+  const upcomingApp = await runApp([sample], "frame-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
+  assert.equal(upcomingApp.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.ok(rightEdge(upcomingApp) >= plaques[1].x + plaques[1].w, "before doors the public page frames the plaques too");
 });

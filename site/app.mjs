@@ -2,7 +2,7 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { DISCORD_INVITE, eventActions, setupFundraising } from "./event-config.mjs?v=fd82af33dc85";
+import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=a6faae50857c";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
   EVE_MS,
@@ -37,7 +37,8 @@ import {
   tableScenery,
   validateTimeline,
   visibleVariant,
-} from "./model.mjs?v=ed050064360e";
+  wallFixtures,
+} from "./model.mjs?v=441d04d8849c";
 
 const TILE = 16;
 const SCALE = 2;
@@ -71,9 +72,14 @@ const RPG = {
   barrel: [23,0], shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
 };
 
+const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
+const KIOSK_CAMERA_RESET_MS = 45_000;   // a bumped mouse never leaves the projection zoomed into a corner
+const KIOSK_CURSOR_HIDE_MS = 3_000;
+
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
-const hallDescription = $("canvas-description").textContent;
+// The static prose describes the live page; the plaque sentence is re-added per mode by updateHeader.
+const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").trim();
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 const mobile = matchMedia("(max-width: 650px)");
@@ -115,7 +121,7 @@ const state = {
   layout: null,
   people: new Map(),
   door: new HallDoor(),
-  images: { characters: null, rpg: null },
+  images: { characters: null, rpg: null, plaques: [null, null] },
   assetsFailed: false,
   snap: true,
   lastRefresh: 0,
@@ -146,7 +152,16 @@ const state = {
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && (
     new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50"),
+  // `?kiosk=1` is a chrome flag for the projector: it never changes the clock mode, source, polling or data path.
+  kiosk: new URLSearchParams(location.search).get("kiosk") === "1",
+  wakeLock: null,
+  lastInputAt: 0,
+  lastPointerAt: 0,
 };
+if (state.kiosk) {
+  if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
+  $("hall-explorer").open = true;
+}
 
 // `?now=` (ISO-8601 or epoch milliseconds) shifts the wall clock for review and tests; time keeps flowing from it.
 function parseNowOverride(value) {
@@ -248,11 +263,16 @@ function updateCamera() {
   const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
   if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
-    if (state.data.event.host_name) {
+    // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is
+    // the point: before doors, and on the projector in every mode; a live or replay view keeps zooming to
+    // the relevant tables. Archives hang no plaques.
+    const framePlaques = !state.archive && (upcoming() || state.kiosk);
+    const fixtures = wallFixtures(state.layout, { banner: !!state.data.event.host_name, plaques: framePlaques ? 2 : 0 });
+    const hung = [fixtures.banner, ...fixtures.plaques].filter(Boolean);
+    if (hung.length) {
       const tables = tableBounds(state.layout, indices);
-      const banner = bannerBounds();
-      const x = Math.min(tables.x, banner.x - 2);
-      state.camera = fitBounds({ x, y: -6, width: Math.max(tables.x + tables.width, banner.x + banner.w + 2) - x,
+      const x = Math.min(tables.x, ...hung.map((rect) => rect.x - 2));
+      state.camera = fitBounds({ x, y: -6, width: Math.max(tables.x + tables.width, ...hung.map((rect) => rect.x + rect.w + 2)) - x,
         height: tables.y + tables.height + 6 }, size, hallBounds());
     }
     if (showStage) {
@@ -286,6 +306,27 @@ function renderActions() {
     image.width = 200; image.height = 200;
     image.addEventListener("error", () => { image.hidden = true; });
     append(panel, "p", action.url);
+  }
+}
+
+// The projector's rail: the two wall plaques at a size a phone can scan from the room. Samples show it
+// too (it is the QA path for the projector); archives never do.
+function renderKioskRail() {
+  const rail = $("kiosk-rail");
+  if (!rail) return;
+  rail.replaceChildren();
+  rail.hidden = !state.kiosk || state.archive;
+  if (rail.hidden) return;
+  for (const plaque of WALL_PLAQUES) {
+    const figure = append(rail, "figure", undefined, "plaque");
+    const image = append(figure, "img", undefined, "plaque-qr");
+    image.src = new URL(plaque.qr, import.meta.url).href;
+    image.alt = `QR code for ${plaque.label}`;
+    image.width = 400; image.height = 400;
+    image.addEventListener("error", () => { image.hidden = true; });
+    const caption = append(figure, "figcaption");
+    append(caption, "strong", plaque.label);
+    append(caption, "span", shortUrl(plaque.url), "plaque-url");
   }
 }
 
@@ -506,10 +547,62 @@ function drawLabel(value, x, y, options = {}) {
   ctx.fillText(value, options.align === "left" ? pixelX + 1.5 * SCALE : pixelX, pixelY + 0.5);
 }
 
+// The banner hangs over the entrance and first tables so it is visible in the opening view.
 function bannerBounds() {
-  const w = Math.min(25, state.layout.width - 6);
-  // Hang over the entrance and first tables so it is visible in the opening view.
-  return { x: 3, y: -4.7, w, h: 3.5 };
+  return wallFixtures(state.layout, { plaques: state.archive ? 0 : 2 }).banner;
+}
+
+// Fit `text` in `font` at `size` tile units into `available` tiles, shrinking the same way the banner does.
+function fitFont(text, size, family, available) {
+  ctx.font = `${size}px ${family}`;
+  const width = ctx.measureText(text).width;
+  if (width > available) ctx.font = `${size * available / width}px ${family}`;
+}
+
+// Two wooden plaques hang right of the banner: the Discord invite and the Extra Life page, each with its QR.
+function drawWallPlaques() {
+  if (state.archive) return;
+  const { plaques } = wallFixtures(state.layout);
+  plaques.forEach(({ x, y, w, h }, index) => {
+    const plaque = WALL_PLAQUES[index];
+    if (!plaque) return;
+    ctx.save();
+    ctx.scale(TILE * SCALE, TILE * SCALE);
+    ctx.translate(x, y);
+    ctx.fillStyle = "#4a3524";
+    ctx.fillRect(0, 0, w, h);
+    ctx.lineWidth = .08;
+    ctx.strokeStyle = "#b89b5c";
+    ctx.strokeRect(.04, .04, w - .08, h - .08);
+    ctx.fillStyle = "#d8b86d";
+    for (const nail of [.28, w - .28]) { ctx.beginPath(); ctx.arc(nail, .28, .1, 0, Math.PI * 2); ctx.fill(); }
+    const mat = { x: (w - 3.6) / 2, y: .35, side: 3.6 };
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(mat.x, mat.y, mat.side, mat.side);
+    const image = state.images.plaques[index];
+    if (image) {
+      // Snap the QR to whole device pixels so its modules stay square at any zoom.
+      const m = ctx.getTransform();
+      const device = (px, py) => ({ x: Math.round(m.a * px + m.c * py + m.e), y: Math.round(m.b * px + m.d * py + m.f) });
+      const from = device(mat.x, mat.y);
+      const to = device(mat.x + mat.side, mat.y + mat.side);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(image, from.x, from.y, to.x - from.x, to.y - from.y);
+      ctx.restore();
+      ctx.imageSmoothingEnabled = false;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#e9d9ae";
+    fitFont(plaque.label, .42, "Georgia, serif", w - .6);
+    ctx.fillText(plaque.label, w / 2, 4.35);
+    ctx.fillStyle = "#c9b98a";
+    const url = shortUrl(plaque.url);
+    fitFont(url, .3, '"Courier New", monospace', w - .6);
+    ctx.fillText(url, w / 2, 4.85);
+    ctx.restore();
+  });
 }
 
 function drawHostBanner() {
@@ -585,6 +678,7 @@ function drawRoom() {
   ctx.fillRect(0, -.18 * unit, layout.width * unit, .18 * unit);
   ctx.restore();
   drawHostBanner();
+  drawWallPlaques();
   for (let y = 0; y < layout.height; y += 1) for (let x = 0; x < layout.width; x += 1) {
     const wall = x === 0 || y === 0 || x === layout.width - 1 || y === layout.height - 1;
     if (!drawTile(state.images.rpg, wall ? RPG.floor.wall : RPG.floor.wood, x, y)) {
@@ -1114,7 +1208,8 @@ function updateHeader(active) {
   const start = Date.parse(state.data.event.start);
   const gathered = state.gatheredCount;
   const gatheredSentence = gathered === 0 ? "Nobody has arrived yet." : `${gathered} ${gathered === 1 ? "person has" : "people have"} gathered so far.`;
-  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + hostSuffix;
+  const plaqueSentence = state.archive ? "" : ` ${PLAQUE_SENTENCE}`;
+  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + hostSuffix;
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
   const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
@@ -1339,6 +1434,7 @@ function installTimeline(data, initial = false) {
   state.layout = buildLayout();
   state.frameKey = null;
   renderActions();
+  if (initial) renderKioskRail();
   state.adminEvents = indexAdminEvents(data);
   state.gatheringPlaces = gatheringLocations(data);
   state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;
@@ -1388,8 +1484,57 @@ function checkLiveUpdates() {
 // Polling must survive suspended animation frames and catch up on returning from Discord.
 setInterval(checkLiveUpdates, 2_000);
 document.addEventListener?.("visibilitychange", () => {
-  if (!document.hidden && state.data?.phase === "live") void refresh();
+  if (document.hidden) return;
+  if (state.data?.phase === "live") void refresh();
+  requestWakeLock();
 });
+
+// Kiosk only: keep the projector awake. The sentinel is released by the browser when the tab hides.
+function requestWakeLock() {
+  if (!state.kiosk || typeof globalThis.navigator?.wakeLock?.request !== "function") return;
+  try {
+    Promise.resolve(navigator.wakeLock.request("screen"))
+      .then((sentinel) => { state.wakeLock = sentinel; }, () => { /* Denied wake locks are not an error on a projector. */ });
+  } catch { /* Same rule for a synchronous throw. */ }
+}
+
+function toggleFullscreen() {
+  try {
+    const root = document.documentElement;
+    const request = document.fullscreenElement ? document.exitFullscreen?.() : root?.requestFullscreen?.();
+    Promise.resolve(request).catch(() => {});
+  } catch { /* No fullscreen API: F11 still works. */ }
+}
+
+function inputFocused() {
+  const active = document.activeElement;
+  return !!active && (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(active.tagName) || active.isContentEditable === true);
+}
+
+// Kiosk idle rules run on the animation clock: a manual camera returns to automatic framing after
+// 45 s without input, and the cursor hides after 3 s without pointer movement.
+function applyKioskIdle(now) {
+  if (!state.kiosk) return;
+  if (state.manualCamera && now - state.lastInputAt >= KIOSK_CAMERA_RESET_MS) {
+    state.manualCamera = false;
+    state.frameKey = null;
+  }
+  const dataset = document.documentElement?.dataset;
+  if (!dataset) return;
+  if (now - state.lastPointerAt >= KIOSK_CURSOR_HIDE_MS) { if (dataset.idle !== "1") dataset.idle = "1"; }
+  else if ("idle" in dataset) delete dataset.idle;
+}
+
+if (state.kiosk) {
+  const noteInput = () => { state.lastInputAt = performance.now(); };
+  document.addEventListener?.("pointermove", () => { state.lastPointerAt = state.lastInputAt = performance.now(); }, { passive: true });
+  document.addEventListener?.("pointerdown", noteInput, { passive: true });
+  document.addEventListener?.("wheel", noteInput, { passive: true });
+  document.addEventListener?.("keydown", (event) => {
+    noteInput();
+    if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey && !inputFocused()) toggleFullscreen();
+  });
+}
 
 function renderActivity() {
   if (!state.data || !state.clock) return;
@@ -1580,10 +1725,14 @@ async function loadAssets() {
   const results = await Promise.allSettled([
     loadImage(new URL("./assets/roguelikeChar_transparent.png", import.meta.url).href),
     loadImage(new URL("./assets/roguelikeSheet_transparent.png", import.meta.url).href),
+    ...WALL_PLAQUES.map((plaque) => loadImage(new URL(plaque.qr, import.meta.url).href)),
   ]);
-  state.images.characters = results[0].status === "fulfilled" ? results[0].value : null;
-  state.images.rpg = results[1].status === "fulfilled" ? results[1].value : null;
-  state.assetsFailed = results.some((result) => result.status === "rejected");
+  const loaded = (result) => result.status === "fulfilled" ? result.value : null;
+  state.images.characters = loaded(results[0]);
+  state.images.rpg = loaded(results[1]);
+  // A missing QR leaves its plaque as wood and text; only the sprite atlases count as failed assets.
+  state.images.plaques = WALL_PLAQUES.map((_, index) => loaded(results[2 + index]));
+  state.assetsFailed = results.slice(0, 2).some((result) => result.status === "rejected");
 }
 
 function loop(now) {
@@ -1605,6 +1754,7 @@ function loop(now) {
     void refresh();
   }
   persistClockSelection(now);
+  applyKioskIdle(now);
   advanceSpeech(now, active);
   updatePeople(realSeconds, now, active);
   settleStageSpeech(now, active);
@@ -1632,10 +1782,12 @@ async function boot() {
     if (state.clock.source === "live") state.live = createLiveState(data);
     state.lastTime = performance.now();
     state.lastRefresh = state.lastTime;
+    state.lastInputAt = state.lastPointerAt = state.lastTime;
     const active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents);
     updatePeople(0, state.lastTime, active);
     render(state.lastTime, active);
     updateHeader(active);
+    requestWakeLock();
     requestAnimationFrame(loop);
   } catch (error) {
     const message = error?.name === "TimelineError" ? `Timeline could not be loaded: ${error.message}` : "Timeline could not be loaded. Check that the published data file is available.";
