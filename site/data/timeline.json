@@ -1,6 +1,15 @@
 {
  "schema": 7,
- "activity": [],
+ "activity": [
+  {
+   "id": "0d0fd376ac1742a8982e6b8aa24357dc",
+   "at": "2026-09-21T14:43:27.437163Z",
+   "action": "event_window",
+   "actor": "p1",
+   "table": null,
+   "person": null
+  }
+ ],
  "visitors": {
   "open": true,
   "people": []
@@ -11,17 +20,34 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T12:54:09.758519Z",
+ "generated_at": "2026-09-21T14:43:29.006601Z",
  "event": {
-  "name": "Longtable",
+  "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
   "tz": "America/New_York",
   "slot_minutes": 30,
   "slots": 48,
-  "host_name": "",
-  "host_icon_url": ""
+  "host_name": "Parzival's Books",
+  "host_icon_url": "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-19/718174697_18093733691030869_3480339248994000588_n.jpg?stp=dst-jpg_s150x150_tt6&_nc_cat=102&ccb=7-5&_nc_sid=f7ccc5&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4xMDgwLkMzIn0%3D&_nc_ohc=WVv6jUIggOUQ7kNvwG_boeK&_nc_oc=AdrtyciJ9jaUpJr3PBjeJZ56YQmyyiEl-_RMtR8XDlVrRKuEa2mC0rFzcT6FnPTWCUA&_nc_zt=24&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=oi826SgqAVsfbkUVOWWwSg&_nc_ss=78689&oh=00_AQL6_HDkOa0PO9M2X11KdjnRgFknS4_eoKo7gqXLHU-O5w&oe=6AB704CA"
  },
- "people": [],
+ "people": [
+  {
+   "id": "p1",
+   "name": null,
+   "dm": false,
+   "hidden": true,
+   "variant": null,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": null,
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  }
+ ],
  "tables": [],
  "events": []
 }
