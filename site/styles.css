@@ -75,11 +75,6 @@ h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
 .event-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .event-actions:not(:empty) { margin: 1rem 0; }
 .event-actions a { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
-.event-actions details { position: relative; }
-.event-actions summary { padding: .5rem; font-size: .8rem; color: var(--muted); }
-.qr-image { display: block; width: 200px; height: 200px; margin: .5rem; }
-.qr-panel { position: absolute; z-index: 10; padding: .5rem; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 8px 24px #0008; }
-.qr-panel p { max-width: 220px; overflow-wrap: anywhere; font-size: .8rem; }
 
 main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 #hall-content { display: flex; flex-direction: column; }

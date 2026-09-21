@@ -45,13 +45,16 @@ export function eventActions(event, configurations = EVENT_CONFIG) {
 
 // Extra Life's public API allows browser requests. Poll quietly; never animate totals.
 export function setupFundraising(node, { fetchTeam = globalThis.fetch, schedule = globalThis.setInterval,
-  visible = () => document.visibilityState !== "hidden" } = {}) {
+  visible = () => document.visibilityState !== "hidden", now = Date.now,
+  onVisibilityChange = (listener) => globalThis.document?.addEventListener?.("visibilitychange", listener) } = {}) {
   if (!node) return;
   let pending = false;
   let lastText = "";
+  let lastAt = -Infinity;
   const update = async () => {
-    if (pending || !visible()) return;
+    if (pending) return;
     pending = true;
+    lastAt = now();
     try {
       const response = await fetchTeam(TEAM_API, { credentials: "omit", referrerPolicy: "no-referrer",
         cache: "no-cache", signal: AbortSignal.timeout(10000) });
@@ -72,7 +75,11 @@ export function setupFundraising(node, { fetchTeam = globalThis.fetch, schedule 
       pending = false;
     }
   };
+  // The boot fetch runs even while the page is hidden (a background tab, a hidden pane) so the line is
+  // ready the first time the page is shown. Later polls run only while the page is visible, and showing
+  // the page again refreshes a total at least a minute old instead of waiting for the next poll.
   void update();
-  schedule(update, 60000);
+  schedule(() => visible() ? update() : undefined, 60000);
+  onVisibilityChange(() => { if (visible() && now() - lastAt >= 60000) void update(); });
   return update;
 }

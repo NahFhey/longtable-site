@@ -42,9 +42,10 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail", "fundraising-total"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   nodes.get("kiosk-rail").hidden = true;
+  nodes.get("fundraising-total").hidden = true;
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
@@ -70,8 +71,12 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
 
   const documentListeners = new Map();
   globalThis.document = {
-    visibilityState: "visible",
-    addEventListener(kind, listener) { documentListeners.set(kind, listener); },
+    visibilityState: options.hidden ? "hidden" : "visible",
+    // Several modules listen for the same event; the map keeps one callable per kind that runs them all in order.
+    addEventListener(kind, listener) {
+      const previous = documentListeners.get(kind);
+      documentListeners.set(kind, previous ? (event) => { previous(event); listener(event); } : listener);
+    },
     documentElement: { dataset: { source: options.archive ? "archive" : "live" } },
     title: "",
     getElementById(id) { return nodes.get(id); },
@@ -101,13 +106,21 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   };
   let fetchIndex = 0;
   const fetchUrls = [];
-  globalThis.fetch = async (url) => {
-    fetchUrls.push(new URL(url, location.href).href);
+  const teamFetches = [];
+  globalThis.fetch = async (url, init) => {
+    const href = new URL(url, location.href).href;
+    // The Extra Life team total has its own stub so it never consumes a timeline from the sequence.
+    if (href.startsWith("https://dd.extra-life.org/")) {
+      teamFetches.push({ href, init });
+      if (options.team instanceof Error) throw options.team;
+      return { ok: true, async json() { return structuredClone(options.team ?? { teamID: 74917, sumDonations: 20, fundraisingGoal: 2500 }); } };
+    }
+    fetchUrls.push(href);
     const item = dataSequence[Math.min(fetchIndex++, dataSequence.length - 1)];
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls, wakeLockRequests };
+  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -353,20 +366,57 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  // Discord link, its QR panel, Donate link, its QR panel.
-  assert.equal(actions.children.length, 4);
+  // Discord link and Donate link only: the QR codes hang on the wall plaques and the kiosk rail, not in the header.
+  assert.equal(actions.children.length, 2);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
-  assert.equal(actions.children[1].tagName, "DETAILS");
-  assert.equal(actions.children[1].children[0].textContent, "Show QR: Discord");
-  assert.equal(actions.children[3].children[0].textContent, "Show QR: Donate");
-  assert.equal(actions.children[3].children[1].children[0].src, "./assets/events/extra-life-team-74917-qr.png");
+  assert.equal(actions.children[1].textContent, "Donate");
+  assert.ok(actions.children.every((child) => child.tagName === "A"));
+  assert.doesNotMatch(allText(actions), /Show QR/);
   assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
   const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
   button.listeners.get("click")();
   assert.doesNotMatch(allText(app.nodes.get("detail")), /Discord|Sign up using Join/);
   const sample = await runApp([production], "sample-actions");
   assert.equal(sample.nodes.get("event-actions").children.length, 0);
+});
+
+test("a live page fetches the Extra Life total once at boot and shows the line", async () => {
+  const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([production], "fundraising-boot", { search: "" });
+  assert.equal(app.teamFetches.length, 1);
+  assert.equal(app.teamFetches[0].href, "https://dd.extra-life.org/api/teams/74917");
+  assert.equal(app.teamFetches[0].init.credentials, "omit");
+  const line = app.nodes.get("fundraising-total");
+  assert.equal(line.hidden, false);
+  assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
+  // A later timeline refresh reinstalls the timeline without a second setup or fetch.
+  app.nodes.get("refresh-now").listeners.get("click")();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.teamFetches.length, 1);
+  // Kiosk mode boots the same way; samples and archives never ask Extra Life.
+  const kiosk = await runApp([production], "fundraising-kiosk", { search: "?kiosk=1" });
+  assert.equal(kiosk.teamFetches.length, 1);
+  assert.equal(kiosk.nodes.get("fundraising-total").textContent, "$20 raised of $2,500 · Extra Life");
+  const sample = await runApp([production], "fundraising-sample");
+  assert.equal(sample.teamFetches.length, 0);
+  assert.equal(sample.nodes.get("fundraising-total").hidden, true);
+  const archive = await runApp([production], "fundraising-archive", { search: "", archive: true });
+  assert.equal(archive.teamFetches.length, 0);
+});
+
+test("a page that boots hidden still fetches the total once, and showing it does not refetch a fresh total", async () => {
+  const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([production], "fundraising-hidden-boot", { search: "", hidden: true });
+  assert.equal(app.teamFetches.length, 1);
+  const line = app.nodes.get("fundraising-total");
+  assert.equal(line.hidden, false);
+  assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
+  globalThis.document.visibilityState = "visible";
+  app.documentListeners.get("visibilitychange")();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.teamFetches.length, 1);
+  assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
 });
 
 test("wheel, pinch, and keyboard navigation change the camera and survive time changes", async () => {

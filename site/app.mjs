@@ -2,7 +2,7 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=a6faae50857c";
+import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import {
   EVE_MS,
@@ -294,18 +294,9 @@ function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
   for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
+    // Header actions are plain links; the QR codes live on the wall plaques and the kiosk rail.
     const link = append(host, "a", action.label);
     link.href = action.url;
-    if (!action.qr) continue;
-    const disclosure = append(host, "details");
-    append(disclosure, "summary", `Show QR: ${action.label}`);
-    const panel = append(disclosure, "div", undefined, "qr-panel");
-    const image = append(panel, "img", undefined, "qr-image");
-    image.src = action.qr;
-    image.alt = `QR code for ${action.label}. You can also use the link.`;
-    image.width = 200; image.height = 200;
-    image.addEventListener("error", () => { image.hidden = true; });
-    append(panel, "p", action.url);
   }
 }
 

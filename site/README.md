@@ -263,8 +263,8 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
-The header always carries two links, **Discord** and **Donate**, each with a
-"Show QR" panel. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
+The header always carries two links, **Discord** and **Donate**. The QR codes
+are not in the header; the wall plaques and the kiosk rail carry them. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
 to change their destinations; they are shared across current events without
 depending on their names or dates. Samples and archived replays suppress the
 header links. Table cards and details do not repeat signup instructions.

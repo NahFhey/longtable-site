@@ -81,3 +81,39 @@ test('fundraising refreshes valid totals, retains stale values, and rejects inva
   assert.match(node.textContent, /125.50.*last available total/);
   assert.doesNotMatch(node.textContent, /10,000/);
 });
+
+test('fundraising fetches once at a hidden boot, polls only while visible, and refreshes a stale total on show', async () => {
+  const node = { hidden: true };
+  let visible = false;
+  let clock = 1_000_000;
+  let fetches = 0;
+  let poll;
+  let onShow;
+  const team = { teamID: 74917, sumDonations: 20, fundraisingGoal: 2500 };
+  setupFundraising(node, {
+    fetchTeam: async () => { fetches += 1; return { ok: true, json: async () => ({ ...team, sumDonations: 20 + fetches }) }; },
+    schedule(fn) { poll = fn; }, visible: () => visible, now: () => clock, onVisibilityChange(fn) { onShow = fn; },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 1, 'the boot fetch runs while hidden so the line is ready when the page is shown');
+  assert.equal(node.hidden, false);
+  assert.equal(node.textContent, '$21 raised of $2,500 · Extra Life');
+  await poll();
+  assert.equal(fetches, 1, 'hidden pages do not poll');
+  visible = true;
+  clock += 30_000;
+  onShow();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 1, 'showing the page within a minute of the last fetch keeps the current total');
+  clock += 30_000;
+  onShow();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 2, 'showing the page with a stale total refreshes it at once');
+  assert.equal(node.textContent, '$22 raised of $2,500 · Extra Life');
+  await poll();
+  assert.equal(fetches, 3, 'visible pages poll');
+  visible = false;
+  onShow();
+  await poll();
+  assert.equal(fetches, 3);
+});
