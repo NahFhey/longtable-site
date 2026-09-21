@@ -28,6 +28,15 @@ test('full-day demo has 50 distinct arrivals and departures, then an empty hall'
   const firstDeparture = Math.min(...demo.people.map(person => person.presence.actual.leaving));
   assert.ok(firstDeparture - lastArrival >= demo.event.slots * .2, `${lastArrival}..${firstDeparture}`);
   assert.ok(demo.people.every(person => isPresent(person, lastArrival, demo.event.slots)));
+  // Every game is playing at once for one fifth of the marathon, then the tables fade in a random order.
+  const lastStart = Math.max(...demo.tables.map(table => table.start));
+  const firstEnd = Math.min(...demo.tables.map(table => table.end));
+  assert.ok(firstEnd - lastStart >= demo.event.slots * .2, `${lastStart}..${firstEnd}`);
+  assert.ok(demo.tables.every(table => tableLifecycle(demo, table, lastStart).phase === 'active'));
+  assert.ok(new Set(demo.tables.map(table => table.end)).size >= 8, 'tables fade one by one');
+  assert.equal(new Set(demo.tables.map(table => table.dm)).size, demo.tables.length, 'one DM per concurrent game');
+  const seated = demo.tables.flatMap(table => table.signups.map(signup => signup.person));
+  assert.equal(new Set(seated).size, seated.length, 'nobody sits at two concurrent games');
   assert.ok(demo.people.every(person => !isPresent(person, 48, 48)));
   assert.ok(demo.tables.every(table => tableLifecycle(demo, table, 48).phase === 'inactive'));
   for (const table of demo.tables) for (const signup of table.signups) {

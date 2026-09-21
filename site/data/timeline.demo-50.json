@@ -26,11 +26,11 @@
    "presence": {
     "planned": [
      0,
-     30
+     44
     ],
     "actual": {
      "here": 0.4,
-     "leaving": 29.245
+     "leaving": 43.598
     }
    },
    "appearance": {
@@ -41,23 +41,13 @@
    },
    "movements": [
     {
-     "at": 2.5,
-     "table": "t01",
+     "at": 13.5,
+     "table": "t07",
      "destination": "food"
     },
     {
-     "at": 2.8,
-     "table": "t01",
-     "destination": "table"
-    },
-    {
-     "at": 12.5,
-     "table": "t05",
-     "destination": "food"
-    },
-    {
-     "at": 12.8,
-     "table": "t05",
+     "at": 13.8,
+     "table": "t07",
      "destination": "table"
     }
    ]
@@ -71,11 +61,11 @@
    "presence": {
     "planned": [
      1,
-     32
+     41
     ],
     "actual": {
      "here": 1.1,
-     "leaving": 31.6
+     "leaving": 40.211
     }
    },
    "appearance": {
@@ -86,22 +76,12 @@
    },
    "movements": [
     {
-     "at": 2.5,
-     "table": "t02",
-     "destination": "food"
-    },
-    {
-     "at": 2.8,
-     "table": "t02",
-     "destination": "table"
-    },
-    {
-     "at": 22.5,
+     "at": 6.5,
      "table": "t08",
      "destination": "food"
     },
     {
-     "at": 22.8,
+     "at": 6.8,
      "table": "t08",
      "destination": "table"
     }
@@ -116,11 +96,11 @@
    "presence": {
     "planned": [
      3,
-     31
+     35
     ],
     "actual": {
-     "here": 3.218,
-     "leaving": 30.589
+     "here": 3.271,
+     "leaving": 34.373
     }
    },
    "appearance": {
@@ -131,23 +111,13 @@
    },
    "movements": [
     {
-     "at": 4.5,
-     "table": "t03",
+     "at": 8.5,
+     "table": "t04",
      "destination": "food"
     },
     {
-     "at": 4.8,
-     "table": "t03",
-     "destination": "table"
-    },
-    {
-     "at": 26.5,
-     "table": "t09",
-     "destination": "food"
-    },
-    {
-     "at": 26.8,
-     "table": "t09",
+     "at": 8.8,
+     "table": "t04",
      "destination": "table"
     }
    ]
@@ -176,23 +146,13 @@
    },
    "movements": [
     {
-     "at": 10.5,
-     "table": "t04",
+     "at": 12.5,
+     "table": "t03",
      "destination": "food"
     },
     {
-     "at": 10.8,
-     "table": "t04",
-     "destination": "table"
-    },
-    {
-     "at": 38.5,
-     "table": "t11",
-     "destination": "food"
-    },
-    {
-     "at": 38.8,
-     "table": "t11",
+     "at": 12.8,
+     "table": "t03",
      "destination": "table"
     }
    ]
@@ -206,11 +166,11 @@
    "presence": {
     "planned": [
      12,
-     31
+     43
     ],
     "actual": {
      "here": 12.9,
-     "leaving": 30.261
+     "leaving": 42.531
     }
    },
    "appearance": {
@@ -221,13 +181,13 @@
    },
    "movements": [
     {
-     "at": 14.5,
-     "table": "t06",
+     "at": 17.5,
+     "table": "t05",
      "destination": "food"
     },
     {
-     "at": 14.8,
-     "table": "t06",
+     "at": 17.8,
+     "table": "t05",
      "destination": "table"
     }
    ]
@@ -240,12 +200,12 @@
    "variant": 1239807689,
    "presence": {
     "planned": [
-     16,
-     31
+     3,
+     36
     ],
     "actual": {
-     "here": 16.326,
-     "leaving": 30.812
+     "here": 3.435,
+     "leaving": 35.218
     }
    },
    "appearance": {
@@ -256,13 +216,13 @@
    },
    "movements": [
     {
-     "at": 18.5,
-     "table": "t07",
+     "at": 4.5,
+     "table": "t12",
      "destination": "food"
     },
     {
-     "at": 18.8,
-     "table": "t07",
+     "at": 4.8,
+     "table": "t12",
      "destination": "table"
     }
    ]
@@ -275,12 +235,12 @@
    "variant": 3198513396,
    "presence": {
     "planned": [
-     18,
+     1,
      38
     ],
     "actual": {
-     "here": 18.675,
-     "leaving": 37.876
+     "here": 1.129,
+     "leaving": 37.706
     }
    },
    "appearance": {
@@ -291,13 +251,13 @@
    },
    "movements": [
     {
-     "at": 30.5,
-     "table": "t10",
+     "at": 2.5,
+     "table": "t09",
      "destination": "food"
     },
     {
-     "at": 30.8,
-     "table": "t10",
+     "at": 2.8,
+     "table": "t09",
      "destination": "table"
     }
    ]
@@ -310,11 +270,11 @@
    "variant": 2283794869,
    "presence": {
     "planned": [
-     18,
+     8,
      48
     ],
     "actual": {
-     "here": 18.667,
+     "here": 8.62,
      "leaving": 47.4
     }
    },
@@ -326,13 +286,13 @@
    },
    "movements": [
     {
-     "at": 42.5,
-     "table": "t12",
+     "at": 9.5,
+     "table": "t02",
      "destination": "food"
     },
     {
-     "at": 42.8,
-     "table": "t12",
+     "at": 9.8,
+     "table": "t02",
      "destination": "table"
     }
    ]
@@ -350,7 +310,7 @@
     ],
     "actual": {
      "here": 0.8,
-     "leaving": 31.072
+     "leaving": 31.533
     }
    },
    "appearance": {
@@ -364,17 +324,17 @@
   {
    "id": "u_bram",
    "name": "Bram Castellano",
-   "dm": false,
+   "dm": true,
    "hidden": false,
    "variant": 2472576459,
    "presence": {
     "planned": [
      0,
-     31
+     47
     ],
     "actual": {
      "here": 1.3,
-     "leaving": 30.421
+     "leaving": 46.249
     }
    },
    "appearance": {
@@ -383,7 +343,18 @@
     "hair": 9,
     "hat": 1
    },
-   "movements": []
+   "movements": [
+    {
+     "at": 16.5,
+     "table": "t01",
+     "destination": "food"
+    },
+    {
+     "at": 16.8,
+     "table": "t01",
+     "destination": "table"
+    }
+   ]
   },
   {
    "id": "u_cleo",
@@ -394,11 +365,11 @@
    "presence": {
     "planned": [
      1,
-     33
+     31
     ],
     "actual": {
-     "here": 1.432,
-     "leaving": 32.52
+     "here": 1.522,
+     "leaving": 30.971
     }
    },
    "appearance": {
@@ -418,11 +389,11 @@
    "presence": {
     "planned": [
      1,
-     33
+     30
     ],
     "actual": {
      "here": 2.2,
-     "leaving": 32.046
+     "leaving": 29.004
     }
    },
    "appearance": {
@@ -442,11 +413,11 @@
    "presence": {
     "planned": [
      2,
-     32
+     31
     ],
     "actual": {
      "here": 2.9,
-     "leaving": 31.967
+     "leaving": 30.011
     }
    },
    "appearance": {
@@ -466,11 +437,11 @@
    "presence": {
     "planned": [
      1,
-     32
+     31
     ],
     "actual": {
      "here": 1.6,
-     "leaving": 31.87
+     "leaving": 30.694
     }
    },
    "appearance": {
@@ -484,17 +455,17 @@
   {
    "id": "u_greta",
    "name": "Greta Holm",
-   "dm": false,
+   "dm": true,
    "hidden": false,
    "variant": 201467292,
    "presence": {
     "planned": [
      2,
-     30
+     42
     ],
     "actual": {
      "here": 3.4,
-     "leaving": 29.729
+     "leaving": 41.466
     }
    },
    "appearance": {
@@ -503,7 +474,18 @@
     "hair": 14,
     "hat": 2
    },
-   "movements": []
+   "movements": [
+    {
+     "at": 15.5,
+     "table": "t11",
+     "destination": "food"
+    },
+    {
+     "at": 15.8,
+     "table": "t11",
+     "destination": "table"
+    }
+   ]
   },
   {
    "id": "u_hugo",
@@ -514,11 +496,11 @@
    "presence": {
     "planned": [
      3,
-     32
+     30
     ],
     "actual": {
      "here": 4.7,
-     "leaving": 31.586
+     "leaving": 29.819
     }
    },
    "appearance": {
@@ -538,11 +520,11 @@
    "presence": {
     "planned": [
      4,
-     30
+     32
     ],
     "actual": {
      "here": 5.1,
-     "leaving": 29.262
+     "leaving": 31.795
     }
    },
    "appearance": {
@@ -562,11 +544,11 @@
    "presence": {
     "planned": [
      4,
-     30
+     32
     ],
     "actual": {
-     "here": 4.589,
-     "leaving": 29.406
+     "here": 4.457,
+     "leaving": 31.975
     }
    },
    "appearance": {
@@ -677,11 +659,11 @@
    "presence": {
     "planned": [
      6,
-     31
+     32
     ],
     "actual": {
      "here": 8.2,
-     "leaving": 30.291
+     "leaving": 31.022
     }
    },
    "appearance": {
@@ -701,11 +683,11 @@
    "presence": {
     "planned": [
      8,
-     30
+     33
     ],
     "actual": {
      "here": 10.5,
-     "leaving": 29.809
+     "leaving": 32.45
     }
    },
    "appearance": {
@@ -729,7 +711,7 @@
     ],
     "actual": {
      "here": 12.4,
-     "leaving": 29.024
+     "leaving": 29.821
     }
    },
    "appearance": {
@@ -749,11 +731,11 @@
    "presence": {
     "planned": [
      12,
-     31
+     33
     ],
     "actual": {
      "here": 12.2,
-     "leaving": 30.816
+     "leaving": 32.514
     }
    },
    "appearance": {
@@ -767,17 +749,17 @@
   {
    "id": "u_sam",
    "name": "Sam Kowalski",
-   "dm": false,
+   "dm": true,
    "hidden": false,
    "variant": 1156905332,
    "presence": {
     "planned": [
      12,
-     32
+     39
     ],
     "actual": {
      "here": 14.6,
-     "leaving": 29.1
+     "leaving": 38.425
     }
    },
    "appearance": {
@@ -786,7 +768,18 @@
     "hair": 10,
     "hat": 2
    },
-   "movements": []
+   "movements": [
+    {
+     "at": 18.5,
+     "table": "t10",
+     "destination": "food"
+    },
+    {
+     "at": 18.8,
+     "table": "t10",
+     "destination": "table"
+    }
+   ]
   },
   {
    "id": "u_tess",
@@ -801,7 +794,7 @@
     ],
     "actual": {
      "here": 16.3,
-     "leaving": 29.59
+     "leaving": 29.418
     }
    },
    "appearance": {
@@ -849,7 +842,7 @@
     ],
     "actual": {
      "here": 18.4,
-     "leaving": 35.444
+     "leaving": 35.879
     }
    },
    "appearance": {
@@ -868,12 +861,12 @@
    "variant": 949449876,
    "presence": {
     "planned": [
-     15,
+     18,
      34
     ],
     "actual": {
-     "here": 15.127,
-     "leaving": 33.42
+     "here": 18.016,
+     "leaving": 33.797
     }
    },
    "appearance": {
@@ -896,7 +889,7 @@
      48
     ],
     "actual": {
-     "here": 18.409,
+     "here": 18.275,
      "leaving": 39.4
     }
    },
@@ -920,8 +913,8 @@
      40
     ],
     "actual": {
-     "here": 17.823,
-     "leaving": 39.56
+     "here": 17.677,
+     "leaving": 39.438
     }
    },
    "appearance": {
@@ -940,11 +933,11 @@
    "variant": 4215498364,
    "presence": {
     "planned": [
-     15,
+     17,
      44
     ],
     "actual": {
-     "here": 15.273,
+     "here": 17.294,
      "leaving": 35.8
     }
    },
@@ -959,17 +952,17 @@
   {
    "id": "u_abel",
    "name": "Abel Nkemelu",
-   "dm": false,
+   "dm": true,
    "hidden": false,
    "variant": 596010891,
    "presence": {
     "planned": [
-     16,
+     18,
      36
     ],
     "actual": {
-     "here": 16.745,
-     "leaving": 35.491
+     "here": 18.503,
+     "leaving": 35.645
     }
    },
    "appearance": {
@@ -978,7 +971,18 @@
     "hair": 2,
     "hat": 2
    },
-   "movements": []
+   "movements": [
+    {
+     "at": 19.5,
+     "table": "t06",
+     "destination": "food"
+    },
+    {
+     "at": 19.8,
+     "table": "t06",
+     "destination": "table"
+    }
+   ]
   },
   {
    "id": "u_bea",
@@ -988,11 +992,11 @@
    "variant": 2239047611,
    "presence": {
     "planned": [
-     16,
+     15,
      48
     ],
     "actual": {
-     "here": 16.979,
+     "here": 15.727,
      "leaving": 47.4
     }
    },
@@ -1012,11 +1016,11 @@
    "variant": null,
    "presence": {
     "planned": [
-     17,
+     16,
      48
     ],
     "actual": {
-     "here": 17.152,
+     "here": 16.234,
      "leaving": 47.4
     }
    },
@@ -1035,7 +1039,7 @@
      48
     ],
     "actual": {
-     "here": 15.662,
+     "here": 15.133,
      "leaving": 47.4
     }
    },
@@ -1059,7 +1063,7 @@
      48
     ],
     "actual": {
-     "here": 16.96,
+     "here": 16.904,
      "leaving": 47.4
     }
    },
@@ -1079,11 +1083,11 @@
    "variant": 4280303154,
    "presence": {
     "planned": [
-     17,
+     15,
      48
     ],
     "actual": {
-     "here": 17.209,
+     "here": 15.897,
      "leaving": 47.4
     }
    },
@@ -1103,11 +1107,11 @@
    "variant": 1182883030,
    "presence": {
     "planned": [
-     17,
+     15,
      48
     ],
     "actual": {
-     "here": 17.359,
+     "here": 15.394,
      "leaving": 47.4
     }
    },
@@ -1127,11 +1131,11 @@
    "variant": 3508503159,
    "presence": {
     "planned": [
-     15,
+     16,
      48
     ],
     "actual": {
-     "here": 15.832,
+     "here": 16.758,
      "leaving": 47.4
     }
    },
@@ -1152,11 +1156,11 @@
    "presence": {
     "planned": [
      4,
-     29
+     31
     ],
     "actual": {
-     "here": 4.381,
-     "leaving": 28.971
+     "here": 4.35,
+     "leaving": 30.73
     }
    },
    "appearance": {
@@ -1200,11 +1204,11 @@
    "presence": {
     "planned": [
      1,
-     31
+     30
     ],
     "actual": {
-     "here": 1.442,
-     "leaving": 30.541
+     "here": 1.303,
+     "leaving": 29.482
     }
    },
    "movements": [],
@@ -1224,11 +1228,11 @@
    "presence": {
     "planned": [
      5,
-     32
+     33
     ],
     "actual": {
-     "here": 5.524,
-     "leaving": 31.266
+     "here": 5.138,
+     "leaving": 32.367
     }
    },
    "movements": [],
@@ -1248,11 +1252,11 @@
    "presence": {
     "planned": [
      12,
-     29
+     31
     ],
     "actual": {
-     "here": 12.583,
-     "leaving": 28.933
+     "here": 12.163,
+     "leaving": 30.138
     }
    },
    "movements": [],
@@ -1275,8 +1279,8 @@
      33
     ],
     "actual": {
-     "here": 17.528,
-     "leaving": 32.496
+     "here": 17.971,
+     "leaving": 32.758
     }
    },
    "movements": [],
@@ -1299,8 +1303,8 @@
      41
     ],
     "actual": {
-     "here": 17.417,
-     "leaving": 40.855
+     "here": 17.845,
+     "leaving": 40.422
     }
    },
    "movements": [],
@@ -1319,12 +1323,12 @@
    "variant": 10685,
    "presence": {
     "planned": [
-     16,
+     15,
      47
     ],
     "actual": {
-     "here": 16.314,
-     "leaving": 46.651
+     "here": 15.803,
+     "leaving": 46.66
     }
    },
    "movements": [],
@@ -1344,64 +1348,42 @@
    "pitch": "Level-3 dungeon crawl beneath a drowned chapel. Pregens provided.",
    "seats": 5,
    "walk_ins": true,
-   "start": 2,
-   "end": 10,
-   "dm": "u_mara",
+   "start": 16,
+   "end": 46,
+   "dm": "u_bram",
    "created_at": "2026-10-10T18:00:00-05:00",
    "signups": [
     {
-     "person": "u_lena",
+     "person": "u_ivo",
      "planned": [
-      2,
-      10
+      16,
+      46
      ],
      "actual": [
-      2,
-      10
+      16,
+      30.73
      ]
     },
     {
-     "person": "u_bram",
+     "person": "u_cleo",
      "planned": [
-      2,
-      10
+      16,
+      46
      ],
      "actual": [
-      2,
-      10
+      16,
+      30.971
      ]
     },
     {
-     "person": "u_kit",
+     "person": "u_zeke",
      "planned": [
-      2,
-      10
+      16,
+      46
      ],
      "actual": [
-      2,
-      10
-     ]
-    },
-    {
-     "person": "u_oisin",
-     "planned": [
-      6,
-      10
-     ],
-     "actual": [
-      8.2,
-      10
-     ]
-    },
-    {
-     "person": "u_ada",
-     "planned": [
-      2,
-      10
-     ],
-     "actual": [
-      2,
-      10
+      17.294,
+      35.8
      ]
     }
    ],
@@ -1414,53 +1396,42 @@
    "pitch": "One score, one crew, one very angry Spirit Warden.",
    "seats": 4,
    "walk_ins": false,
-   "start": 2,
-   "end": 8,
-   "dm": "u_theo",
+   "start": 9,
+   "end": 31,
+   "dm": "u_rafa",
    "created_at": "2026-10-11T18:04:00-05:00",
    "signups": [
     {
-     "person": "u_jules",
+     "person": "u_dev",
      "planned": [
-      4,
-      8
+      9,
+      31
      ],
      "actual": [
-      4.589,
-      8
+      9,
+      29.004
      ]
     },
     {
-     "person": "u_milo",
+     "person": "u_lena",
      "planned": [
-      2,
-      8
+      9,
+      31
      ],
      "actual": [
-      3.1,
-      8
+      9,
+      31
      ]
     },
     {
-     "person": "u_finn",
+     "person": "u_pip",
      "planned": [
-      2,
-      8
+      9,
+      31
      ],
      "actual": [
-      2,
-      8
-     ]
-    },
-    {
-     "person": "u_hugo",
-     "planned": [
-      3,
-      8
-     ],
-     "actual": [
-      4.7,
-      8
+      10.5,
+      31
      ]
     }
    ],
@@ -1473,42 +1444,42 @@
    "pitch": "Low-level, high-chaos. Bring a goblin voice.",
    "seats": 6,
    "walk_ins": true,
-   "start": 4,
-   "end": 12,
-   "dm": "u_priya",
+   "start": 12,
+   "end": 33,
+   "dm": "u_jonah",
    "created_at": "2026-10-12T18:08:00-05:00",
    "signups": [
     {
-     "person": "u_pip",
+     "person": "u_nadia",
      "planned": [
-      8,
-      12
+      12,
+      33
      ],
      "actual": [
-      10.5,
-      12
+      12,
+      29.2
      ]
     },
     {
-     "person": "u_esme",
+     "person": "u_tess",
      "planned": [
-      4,
-      12
+      12,
+      33
      ],
      "actual": [
-      4,
-      12
+      16.3,
+      29.418
      ]
     },
     {
-     "person": "u_greta",
+     "person": "u_dara",
      "planned": [
-      4,
-      12
+      12,
+      33
      ],
      "actual": [
-      4,
-      12
+      15.133,
+      33
      ]
     }
    ],
@@ -1521,53 +1492,42 @@
    "pitch": "Sci-fi horror on a derelict. You will not all make it.",
    "seats": 4,
    "walk_ins": false,
-   "start": 10,
-   "end": 16,
-   "dm": "u_jonah",
+   "start": 8,
+   "end": 34,
+   "dm": "u_priya",
    "created_at": "2026-10-13T18:12:00-05:00",
    "signups": [
     {
-     "person": "u_nadia",
+     "person": "u_wyatt",
      "planned": [
-      10,
-      16
+      8,
+      34
      ],
      "actual": [
-      10,
-      16
+      18.016,
+      33.797
      ]
     },
     {
-     "person": "u_ines",
+     "person": "u_cass",
      "planned": [
-      10,
-      12
+      8,
+      34
      ],
      "actual": [
-      10,
-      12
-     ]
-    },
-    {
-     "person": "u_lena",
-     "planned": [
-      10,
-      16
-     ],
-     "actual": [
-      10,
-      16
+      16.234,
+      34
      ]
     },
     {
      "person": "u_kit",
      "planned": [
-      10,
-      16
+      8,
+      34
      ],
      "actual": [
-      10,
-      16
+      8,
+      34
      ]
     }
    ],
@@ -1580,53 +1540,42 @@
    "pitch": "Waterdeep intro chapter, level 1, new players welcome.",
    "seats": 5,
    "walk_ins": true,
-   "start": 12,
-   "end": 20,
-   "dm": "u_mara",
+   "start": 17,
+   "end": 42,
+   "dm": "u_wen",
    "created_at": "2026-10-14T18:16:00-05:00",
    "signups": [
     {
-     "person": "u_oisin",
+     "person": "u_hugo",
      "planned": [
-      12,
-      20
+      17,
+      42
      ],
      "actual": [
-      12,
-      20
+      17,
+      29.819
      ]
     },
     {
-     "person": "u_wyatt",
+     "person": "u_xiu",
      "planned": [
-      18,
-      20
+      17,
+      42
      ],
      "actual": [
-      18,
-      20
+      18.275,
+      39.4
      ]
     },
     {
-     "person": "u_greta",
+     "person": "u_milo",
      "planned": [
-      12,
-      16
+      17,
+      42
      ],
      "actual": [
-      12,
-      16
-     ]
-    },
-    {
-     "person": "u_cleo",
-     "planned": [
-      12,
-      14
-     ],
-     "actual": [
-      12,
-      14
+      17,
+      42
      ]
     }
    ],
@@ -1639,75 +1588,42 @@
    "pitch": "Level-10 one-shot: storm Ravenloft in four hours.",
    "seats": 6,
    "walk_ins": false,
-   "start": 14,
-   "end": 22,
-   "dm": "u_wen",
+   "start": 19,
+   "end": 30,
+   "dm": "u_abel",
    "created_at": "2026-10-15T18:20:00-05:00",
    "signups": [
     {
-     "person": "u_esme",
+     "person": "u_umar",
      "planned": [
-      14,
-      22
+      19,
+      30
      ],
      "actual": [
-      14,
-      22
+      19,
+      30
      ]
     },
     {
-     "person": "u_quinn",
+     "person": "u_finn",
      "planned": [
-      14,
-      22
+      19,
+      30
      ],
      "actual": [
-      14,
-      22
+      19,
+      30
      ]
     },
     {
-     "person": "u_sam",
+     "person": "u_jules",
      "planned": [
-      14,
-      22
+      19,
+      30
      ],
      "actual": [
-      14.6,
-      22
-     ]
-    },
-    {
-     "person": "u_rosa",
-     "planned": [
-      14,
-      22
-     ],
-     "actual": [
-      14,
-      22
-     ]
-    },
-    {
-     "person": "u_dev",
-     "planned": [
-      14,
-      20
-     ],
-     "actual": [
-      14,
-      20
-     ]
-    },
-    {
-     "person": "u_xiu",
-     "planned": [
-      20,
-      22
-     ],
-     "actual": [
-      20,
-      22
+      19,
+      30
      ]
     }
    ],
@@ -1720,31 +1636,42 @@
    "pitch": "Small-town weirdness, no prep needed, rules taught at the table.",
    "seats": 5,
    "walk_ins": true,
-   "start": 18,
-   "end": 24,
-   "dm": "u_sol",
+   "start": 13,
+   "end": 43,
+   "dm": "u_mara",
    "created_at": "2026-10-16T18:24:00-05:00",
    "signups": [
     {
-     "person": "u_nadia",
+     "person": "u_bea",
      "planned": [
-      18,
-      24
+      13,
+      43
      ],
      "actual": [
-      18,
-      24
+      15.727,
+      43
      ]
     },
     {
-     "person": "u_jules",
+     "person": "u_yara",
      "planned": [
-      18,
-      24
+      13,
+      43
      ],
      "actual": [
-      18,
-      24
+      17.677,
+      39.438
+     ]
+    },
+    {
+     "person": "u_ada",
+     "planned": [
+      13,
+      43
+     ],
+     "actual": [
+      13,
+      31.533
      ]
     }
    ],
@@ -1757,64 +1684,31 @@
    "pitch": "Survival horror at level 5. Lights off, candles on.",
    "seats": 5,
    "walk_ins": false,
-   "start": 22,
-   "end": 30,
+   "start": 6,
+   "end": 40,
    "dm": "u_theo",
    "created_at": "2026-10-17T18:28:00-05:00",
    "signups": [
     {
-     "person": "u_esme",
+     "person": "u_hana",
      "planned": [
-      22,
-      24
+      6,
+      40
      ],
      "actual": [
-      22,
-      24
+      16.758,
+      40
      ]
     },
     {
-     "person": "u_oisin",
+     "person": "u_vera",
      "planned": [
-      22,
-      30
+      6,
+      40
      ],
      "actual": [
-      22,
-      30
-     ]
-    },
-    {
-     "person": "u_xiu",
-     "planned": [
-      22,
-      30
-     ],
-     "actual": [
-      22,
-      30
-     ]
-    },
-    {
-     "person": "u_kit",
-     "planned": [
-      22,
-      30
-     ],
-     "actual": [
-      22,
-      30
-     ]
-    },
-    {
-     "person": "u_quinn",
-     "planned": [
-      22,
-      24
-     ],
-     "actual": [
-      22,
-      24
+      18.4,
+      35.879
      ]
     }
    ],
@@ -1827,53 +1721,31 @@
    "pitch": "Backstabbing card game for the sleepless. Drop in, drop out.",
    "seats": 6,
    "walk_ins": true,
-   "start": 26,
-   "end": 30,
-   "dm": "u_priya",
+   "start": 2,
+   "end": 32,
+   "dm": "u_ilse",
    "created_at": "2026-10-18T18:32:00-05:00",
    "signups": [
     {
-     "person": "u_vera",
+     "person": "u_oisin",
      "planned": [
-      26,
-      30
+      2,
+      32
      ],
      "actual": [
-      26,
-      30
+      8.2,
+      31.022
      ]
     },
     {
-     "person": "u_yara",
+     "person": "u_freya",
      "planned": [
-      26,
-      30
+      2,
+      32
      ],
      "actual": [
-      26,
-      30
-     ]
-    },
-    {
-     "person": "u_milo",
-     "planned": [
-      26,
-      30
-     ],
-     "actual": [
-      26,
-      30
-     ]
-    },
-    {
-     "person": "u_lena",
-     "planned": [
-      26,
-      30
-     ],
-     "actual": [
-      26,
-      30
+      15.897,
+      32
      ]
     }
    ],
@@ -1886,53 +1758,31 @@
    "pitch": "Investigators at 1 AM. Sanity not guaranteed.",
    "seats": 4,
    "walk_ins": false,
-   "start": 30,
-   "end": 36,
-   "dm": "u_ilse",
+   "start": 18,
+   "end": 38,
+   "dm": "u_sam",
    "created_at": "2026-10-19T18:36:00-05:00",
    "signups": [
     {
-     "person": "u_kit",
+     "person": "u_eli",
      "planned": [
-      30,
-      36
+      18,
+      38
      ],
      "actual": [
-      30,
-      36
+      18,
+      38
      ]
     },
     {
-     "person": "u_abel",
+     "person": "u_quinn",
      "planned": [
-      30,
-      36
+      18,
+      38
      ],
      "actual": [
-      30,
-      35.491
-     ]
-    },
-    {
-     "person": "u_dara",
-     "planned": [
-      34,
-      36
-     ],
-     "actual": [
-      34,
-      36
-     ]
-    },
-    {
-     "person": "u_lena",
-     "planned": [
-      30,
-      36
-     ],
-     "actual": [
-      30,
-      36
+      18,
+      29.821
      ]
     }
    ],
@@ -1945,42 +1795,31 @@
    "pitch": "Level-2 skirmish for early risers and never-sleepers.",
    "seats": 5,
    "walk_ins": true,
-   "start": 38,
-   "end": 46,
-   "dm": "u_jonah",
+   "start": 15,
+   "end": 41,
+   "dm": "u_greta",
    "created_at": "2026-10-20T18:40:00-05:00",
    "signups": [
     {
      "person": "u_gus",
      "planned": [
-      40,
-      46
+      15,
+      41
      ],
      "actual": [
-      40,
-      46
+      15.394,
+      41
      ]
     },
     {
-     "person": "u_xiu",
+     "person": "u_ines",
      "planned": [
-      38,
-      46
+      15,
+      41
      ],
      "actual": [
-      38,
-      39.4
-     ]
-    },
-    {
-     "person": "u_bea",
-     "planned": [
-      38,
-      46
-     ],
-     "actual": [
-      38,
-      46
+      15,
+      31.795
      ]
     }
    ],
@@ -1993,42 +1832,31 @@
    "pitch": "Arena one-shot with pancakes. Pregens provided.",
    "seats": 6,
    "walk_ins": true,
-   "start": 42,
-   "end": 46,
-   "dm": "u_rafa",
+   "start": 4,
+   "end": 35,
+   "dm": "u_sol",
    "created_at": "2026-10-21T18:44:00-05:00",
    "signups": [
     {
-     "person": "u_milo",
+     "person": "u_rosa",
      "planned": [
-      42,
-      46
+      4,
+      35
      ],
      "actual": [
-      42,
-      46
+      12.2,
+      32.514
      ]
     },
     {
-     "person": "u_lena",
+     "person": "u_esme",
      "planned": [
-      42,
-      46
+      4,
+      35
      ],
      "actual": [
-      42,
-      46
-     ]
-    },
-    {
-     "person": "u_eli",
-     "planned": [
-      42,
-      46
-     ],
-     "actual": [
-      42,
-      46
+      4,
+      30.011
      ]
     }
    ],
@@ -2055,69 +1883,47 @@
    "by": "u_ada"
   },
   {
-   "id": "demo-1",
+   "id": "demo-9",
    "kind": "roll",
    "at": 2.9,
    "duration": null,
    "text": null,
-   "person": "u_mara",
-   "by": "u_mara",
-   "table": "t01",
+   "person": "u_ilse",
+   "by": "u_ilse",
+   "table": "t09",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
-     5,
+     2,
+     2,
+     3
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 7
+   }
+  },
+  {
+   "id": "demo-12",
+   "kind": "roll",
+   "at": 4.9,
+   "duration": null,
+   "text": null,
+   "person": "u_sol",
+   "by": "u_sol",
+   "table": "t12",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
      4,
+     5,
      1
     ],
     "sides": 6,
     "modifier": 0,
     "total": 10
-   }
-  },
-  {
-   "id": "demo-2",
-   "kind": "roll",
-   "at": 2.9,
-   "duration": null,
-   "text": null,
-   "person": "u_theo",
-   "by": "u_theo",
-   "table": "t02",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     3,
-     2,
-     4
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 9
-   }
-  },
-  {
-   "id": "demo-3",
-   "kind": "roll",
-   "at": 4.9,
-   "duration": null,
-   "text": null,
-   "person": "u_priya",
-   "by": "u_priya",
-   "table": "t03",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     2,
-     1,
-     6
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 9
    }
   },
   {
@@ -2128,6 +1934,28 @@
    "text": "Natural 20!",
    "person": "u_kit",
    "by": "u_kit"
+  },
+  {
+   "id": "demo-8",
+   "kind": "roll",
+   "at": 6.9,
+   "duration": null,
+   "text": null,
+   "person": "u_theo",
+   "by": "u_theo",
+   "table": "t08",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
+     3,
+     6,
+     4
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 13
+   }
   },
   {
    "id": "demo-14",
@@ -2141,23 +1969,45 @@
   {
    "id": "demo-4",
    "kind": "roll",
-   "at": 10.9,
+   "at": 8.9,
    "duration": null,
    "text": null,
-   "person": "u_jonah",
-   "by": "u_jonah",
+   "person": "u_priya",
+   "by": "u_priya",
    "table": "t04",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
+     2,
      1,
-     1,
-     2
+     3
     ],
     "sides": 6,
     "modifier": 0,
-    "total": 4
+    "total": 6
+   }
+  },
+  {
+   "id": "demo-2",
+   "kind": "roll",
+   "at": 9.9,
+   "duration": null,
+   "text": null,
+   "person": "u_rafa",
+   "by": "u_rafa",
+   "table": "t02",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
+     4,
+     6,
+     6
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 16
    }
   },
   {
@@ -2170,47 +2020,47 @@
    "by": "u_admin"
   },
   {
-   "id": "demo-5",
+   "id": "demo-3",
    "kind": "roll",
    "at": 12.9,
    "duration": null,
    "text": null,
-   "person": "u_mara",
-   "by": "u_mara",
-   "table": "t05",
+   "person": "u_jonah",
+   "by": "u_jonah",
+   "table": "t03",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
-     2,
-     1,
-     2
+     5,
+     5,
+     1
     ],
     "sides": 6,
     "modifier": 0,
-    "total": 5
+    "total": 11
    }
   },
   {
-   "id": "demo-6",
+   "id": "demo-7",
    "kind": "roll",
-   "at": 14.9,
+   "at": 13.9,
    "duration": null,
    "text": null,
-   "person": "u_wen",
-   "by": "u_wen",
-   "table": "t06",
+   "person": "u_mara",
+   "by": "u_mara",
+   "table": "t07",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
-     1,
-     3,
-     6
+     6,
+     4,
+     1
     ],
     "sides": 6,
     "modifier": 0,
-    "total": 10
+    "total": 11
    }
   },
   {
@@ -2223,6 +2073,28 @@
    "by": "u_mara"
   },
   {
+   "id": "demo-11",
+   "kind": "roll",
+   "at": 15.9,
+   "duration": null,
+   "text": null,
+   "person": "u_greta",
+   "by": "u_greta",
+   "table": "t11",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
+     1,
+     1,
+     3
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 5
+   }
+  },
+  {
    "id": "demo-15",
    "kind": "meal",
    "at": 16,
@@ -2232,20 +2104,64 @@
    "by": "u_admin"
   },
   {
-   "id": "demo-7",
+   "id": "demo-1",
    "kind": "roll",
-   "at": 18.9,
+   "at": 16.9,
    "duration": null,
    "text": null,
-   "person": "u_sol",
-   "by": "u_sol",
-   "table": "t07",
+   "person": "u_bram",
+   "by": "u_bram",
+   "table": "t01",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
-     6,
      3,
+     6,
+     6
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 15
+   }
+  },
+  {
+   "id": "demo-5",
+   "kind": "roll",
+   "at": 17.9,
+   "duration": null,
+   "text": null,
+   "person": "u_wen",
+   "by": "u_wen",
+   "table": "t05",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
+     1,
+     2,
+     1
+    ],
+    "sides": 6,
+    "modifier": 0,
+    "total": 4
+   }
+  },
+  {
+   "id": "demo-10",
+   "kind": "roll",
+   "at": 18.9,
+   "duration": null,
+   "text": null,
+   "person": "u_sam",
+   "by": "u_sam",
+   "table": "t10",
+   "visibility": "public",
+   "roll": {
+    "expression": "3d6",
+    "faces": [
+     4,
+     5,
      1
     ],
     "sides": 6,
@@ -2254,25 +2170,25 @@
    }
   },
   {
-   "id": "demo-8",
+   "id": "demo-6",
    "kind": "roll",
-   "at": 22.9,
+   "at": 19.9,
    "duration": null,
    "text": null,
-   "person": "u_theo",
-   "by": "u_theo",
-   "table": "t08",
+   "person": "u_abel",
+   "by": "u_abel",
+   "table": "t06",
    "visibility": "public",
    "roll": {
     "expression": "3d6",
     "faces": [
      2,
-     5,
+     2,
      1
     ],
     "sides": 6,
     "modifier": 0,
-    "total": 8
+    "total": 5
    }
   },
   {
@@ -2294,28 +2210,6 @@
    "by": "u_admin"
   },
   {
-   "id": "demo-9",
-   "kind": "roll",
-   "at": 26.9,
-   "duration": null,
-   "text": null,
-   "person": "u_priya",
-   "by": "u_priya",
-   "table": "t09",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     2,
-     5,
-     6
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 13
-   }
-  },
-  {
    "id": "demo-17",
    "kind": "break",
    "at": 30,
@@ -2323,28 +2217,6 @@
    "text": null,
    "person": null,
    "by": "u_admin"
-  },
-  {
-   "id": "demo-10",
-   "kind": "roll",
-   "at": 30.9,
-   "duration": null,
-   "text": null,
-   "person": "u_ilse",
-   "by": "u_ilse",
-   "table": "t10",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     3,
-     6,
-     5
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 14
-   }
   },
   {
    "id": "demo-25",
@@ -2365,28 +2237,6 @@
    "by": "u_cass"
   },
   {
-   "id": "demo-11",
-   "kind": "roll",
-   "at": 38.9,
-   "duration": null,
-   "text": null,
-   "person": "u_jonah",
-   "by": "u_jonah",
-   "table": "t11",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     1,
-     2,
-     4
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 7
-   }
-  },
-  {
    "id": "demo-18",
    "kind": "meal",
    "at": 39,
@@ -2394,28 +2244,6 @@
    "text": "Breakfast is served. Coffee and pancakes for the dawn crew!",
    "person": null,
    "by": "u_admin"
-  },
-  {
-   "id": "demo-12",
-   "kind": "roll",
-   "at": 42.9,
-   "duration": null,
-   "text": null,
-   "person": "u_rafa",
-   "by": "u_rafa",
-   "table": "t12",
-   "visibility": "public",
-   "roll": {
-    "expression": "3d6",
-    "faces": [
-     4,
-     4,
-     3
-    ],
-    "sides": 6,
-    "modifier": 0,
-    "total": 11
-   }
   },
   {
    "id": "demo-27",
@@ -2482,6 +2310,14 @@
    "table": null
   },
   {
+   "id": "0000000000000000000000000000000d",
+   "at": "2026-11-14T15:33:52.200000Z",
+   "action": "here",
+   "actor": "u_ilse",
+   "person": null,
+   "table": null
+  },
+  {
    "id": "00000000000000000000000000000027",
    "at": "2026-11-14T15:36:00Z",
    "action": "here",
@@ -2498,16 +2334,8 @@
    "table": null
   },
   {
-   "id": "00000000000000000000000000000015",
-   "at": "2026-11-14T15:42:57.600000Z",
-   "action": "here",
-   "actor": "u_cleo",
-   "person": null,
-   "table": null
-  },
-  {
    "id": "00000000000000000000000000000059",
-   "at": "2026-11-14T15:43:15.600000Z",
+   "at": "2026-11-14T15:39:05.400000Z",
    "action": "here",
    "actor": "v1",
    "person": null,
@@ -2518,6 +2346,14 @@
    "at": "2026-11-14T15:45:00Z",
    "action": "here",
    "actor": "u_kit",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000015",
+   "at": "2026-11-14T15:45:39.600000Z",
+   "action": "here",
+   "actor": "u_cleo",
    "person": null,
    "table": null
   },
@@ -2538,36 +2374,20 @@
    "table": null
   },
   {
-   "id": "00000000000000000000000000000065",
+   "id": "00000000000000000000000000000075",
    "at": "2026-11-14T16:15:00Z",
    "action": "move_food",
-   "actor": "u_mara",
+   "actor": "u_ilse",
    "person": null,
-   "table": "t01"
+   "table": "t09"
   },
   {
-   "id": "00000000000000000000000000000067",
-   "at": "2026-11-14T16:15:00Z",
-   "action": "move_food",
-   "actor": "u_theo",
-   "person": null,
-   "table": "t02"
-  },
-  {
-   "id": "00000000000000000000000000000066",
+   "id": "00000000000000000000000000000076",
    "at": "2026-11-14T16:24:00Z",
    "action": "move_table",
-   "actor": "u_mara",
+   "actor": "u_ilse",
    "person": null,
-   "table": "t01"
-  },
-  {
-   "id": "00000000000000000000000000000068",
-   "at": "2026-11-14T16:24:00Z",
-   "action": "move_table",
-   "actor": "u_theo",
-   "person": null,
-   "table": "t02"
+   "table": "t09"
   },
   {
    "id": "00000000000000000000000000000019",
@@ -2587,7 +2407,7 @@
   },
   {
    "id": "00000000000000000000000000000005",
-   "at": "2026-11-14T16:36:32.400000Z",
+   "at": "2026-11-14T16:38:07.800000Z",
    "action": "here",
    "actor": "u_priya",
    "person": null,
@@ -2602,28 +2422,36 @@
    "table": null
   },
   {
+   "id": "0000000000000000000000000000000b",
+   "at": "2026-11-14T16:43:03Z",
+   "action": "here",
+   "actor": "u_sol",
+   "person": null,
+   "table": null
+  },
+  {
    "id": "00000000000000000000000000000055",
-   "at": "2026-11-14T17:11:25.800000Z",
+   "at": "2026-11-14T17:10:30Z",
    "action": "here",
    "actor": "u_ivo",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000069",
-   "at": "2026-11-14T17:15:00Z",
-   "action": "move_food",
-   "actor": "u_priya",
-   "person": null,
-   "table": "t03"
-  },
-  {
    "id": "00000000000000000000000000000023",
-   "at": "2026-11-14T17:17:40.200000Z",
+   "at": "2026-11-14T17:13:42.600000Z",
    "action": "here",
    "actor": "u_jules",
    "person": null,
    "table": null
+  },
+  {
+   "id": "0000000000000000000000000000007b",
+   "at": "2026-11-14T17:15:00Z",
+   "action": "move_food",
+   "actor": "u_sol",
+   "person": null,
+   "table": "t12"
   },
   {
    "id": "0000000000000000000000000000001f",
@@ -2634,12 +2462,12 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000006a",
+   "id": "0000000000000000000000000000007c",
    "at": "2026-11-14T17:24:00Z",
    "action": "move_table",
-   "actor": "u_priya",
+   "actor": "u_sol",
    "person": null,
-   "table": "t03"
+   "table": "t12"
   },
   {
    "id": "00000000000000000000000000000021",
@@ -2651,7 +2479,7 @@
   },
   {
    "id": "0000000000000000000000000000005b",
-   "at": "2026-11-14T17:45:43.200000Z",
+   "at": "2026-11-14T17:34:08.400000Z",
    "action": "here",
    "actor": "v2",
    "person": null,
@@ -2664,6 +2492,22 @@
    "actor": "u_nadia",
    "person": null,
    "table": null
+  },
+  {
+   "id": "00000000000000000000000000000073",
+   "at": "2026-11-14T18:15:00Z",
+   "action": "move_food",
+   "actor": "u_theo",
+   "person": null,
+   "table": "t08"
+  },
+  {
+   "id": "00000000000000000000000000000074",
+   "at": "2026-11-14T18:24:00Z",
+   "action": "move_table",
+   "actor": "u_theo",
+   "person": null,
+   "table": "t08"
   },
   {
    "id": "0000000000000000000000000000002d",
@@ -2682,6 +2526,46 @@
    "table": null
   },
   {
+   "id": "0000000000000000000000000000006b",
+   "at": "2026-11-14T19:15:00Z",
+   "action": "move_food",
+   "actor": "u_priya",
+   "person": null,
+   "table": "t04"
+  },
+  {
+   "id": "0000000000000000000000000000000f",
+   "at": "2026-11-14T19:18:36Z",
+   "action": "here",
+   "actor": "u_rafa",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000006c",
+   "at": "2026-11-14T19:24:00Z",
+   "action": "move_table",
+   "actor": "u_priya",
+   "person": null,
+   "table": "t04"
+  },
+  {
+   "id": "00000000000000000000000000000067",
+   "at": "2026-11-14T19:45:00Z",
+   "action": "move_food",
+   "actor": "u_rafa",
+   "person": null,
+   "table": "t02"
+  },
+  {
+   "id": "00000000000000000000000000000068",
+   "at": "2026-11-14T19:54:00Z",
+   "action": "move_table",
+   "actor": "u_rafa",
+   "person": null,
+   "table": "t02"
+  },
+  {
    "id": "0000000000000000000000000000002f",
    "at": "2026-11-14T20:15:00Z",
    "action": "here",
@@ -2690,20 +2574,12 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000006b",
-   "at": "2026-11-14T20:15:00Z",
-   "action": "move_food",
-   "actor": "u_jonah",
+   "id": "0000000000000000000000000000005d",
+   "at": "2026-11-14T21:04:53.400000Z",
+   "action": "here",
+   "actor": "v3",
    "person": null,
-   "table": "t04"
-  },
-  {
-   "id": "0000000000000000000000000000006c",
-   "at": "2026-11-14T20:24:00Z",
-   "action": "move_table",
-   "actor": "u_jonah",
-   "person": null,
-   "table": "t04"
+   "table": null
   },
   {
    "id": "00000000000000000000000000000033",
@@ -2722,28 +2598,20 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000006d",
+   "id": "00000000000000000000000000000069",
    "at": "2026-11-14T21:15:00Z",
    "action": "move_food",
-   "actor": "u_mara",
+   "actor": "u_jonah",
    "person": null,
-   "table": "t05"
+   "table": "t03"
   },
   {
-   "id": "0000000000000000000000000000005d",
-   "at": "2026-11-14T21:17:29.400000Z",
-   "action": "here",
-   "actor": "v3",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000006e",
+   "id": "0000000000000000000000000000006a",
    "at": "2026-11-14T21:24:00Z",
    "action": "move_table",
-   "actor": "u_mara",
+   "actor": "u_jonah",
    "person": null,
-   "table": "t05"
+   "table": "t03"
   },
   {
    "id": "00000000000000000000000000000009",
@@ -2754,12 +2622,20 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000006f",
-   "at": "2026-11-14T22:15:00Z",
+   "id": "00000000000000000000000000000071",
+   "at": "2026-11-14T21:45:00Z",
    "action": "move_food",
-   "actor": "u_wen",
+   "actor": "u_mara",
    "person": null,
-   "table": "t06"
+   "table": "t07"
+  },
+  {
+   "id": "00000000000000000000000000000072",
+   "at": "2026-11-14T21:54:00Z",
+   "action": "move_table",
+   "actor": "u_mara",
+   "person": null,
+   "table": "t07"
   },
   {
    "id": "00000000000000000000000000000035",
@@ -2770,42 +2646,66 @@
    "table": null
   },
   {
-   "id": "00000000000000000000000000000070",
-   "at": "2026-11-14T22:24:00Z",
-   "action": "move_table",
-   "actor": "u_wen",
-   "person": null,
-   "table": "t06"
-  },
-  {
-   "id": "0000000000000000000000000000003d",
-   "at": "2026-11-14T22:33:48.600000Z",
-   "action": "here",
-   "actor": "u_wyatt",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000043",
-   "at": "2026-11-14T22:38:11.400000Z",
-   "action": "here",
-   "actor": "u_zeke",
-   "person": null,
-   "table": null
-  },
-  {
    "id": "0000000000000000000000000000004b",
-   "at": "2026-11-14T22:49:51.600000Z",
+   "at": "2026-11-14T22:33:59.400000Z",
    "action": "here",
    "actor": "u_dara",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000053",
-   "at": "2026-11-14T22:54:57.600000Z",
+   "id": "00000000000000000000000000000051",
+   "at": "2026-11-14T22:41:49.200000Z",
    "action": "here",
-   "actor": "u_hana",
+   "actor": "u_gus",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000079",
+   "at": "2026-11-14T22:45:00Z",
+   "action": "move_food",
+   "actor": "u_greta",
+   "person": null,
+   "table": "t11"
+  },
+  {
+   "id": "00000000000000000000000000000047",
+   "at": "2026-11-14T22:51:48.600000Z",
+   "action": "here",
+   "actor": "u_bea",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000007a",
+   "at": "2026-11-14T22:54:00Z",
+   "action": "move_table",
+   "actor": "u_greta",
+   "person": null,
+   "table": "t11"
+  },
+  {
+   "id": "00000000000000000000000000000063",
+   "at": "2026-11-14T22:54:05.400000Z",
+   "action": "here",
+   "actor": "v6",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000004f",
+   "at": "2026-11-14T22:56:54.600000Z",
+   "action": "here",
+   "actor": "u_freya",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000049",
+   "at": "2026-11-14T23:07:01.200000Z",
+   "action": "here",
+   "actor": "u_cass",
    "person": null,
    "table": null
   },
@@ -2818,28 +2718,28 @@
    "table": null
   },
   {
-   "id": "00000000000000000000000000000063",
-   "at": "2026-11-14T23:09:25.200000Z",
+   "id": "00000000000000000000000000000065",
+   "at": "2026-11-14T23:15:00Z",
+   "action": "move_food",
+   "actor": "u_bram",
+   "person": null,
+   "table": "t01"
+  },
+  {
+   "id": "00000000000000000000000000000053",
+   "at": "2026-11-14T23:22:44.400000Z",
    "action": "here",
-   "actor": "v6",
+   "actor": "u_hana",
    "person": null,
    "table": null
   },
   {
-   "id": "0000000000000000000000000000000b",
-   "at": "2026-11-14T23:09:46.800000Z",
-   "action": "here",
-   "actor": "u_sol",
+   "id": "00000000000000000000000000000066",
+   "at": "2026-11-14T23:24:00Z",
+   "action": "move_table",
+   "actor": "u_bram",
    "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000045",
-   "at": "2026-11-14T23:22:21Z",
-   "action": "here",
-   "actor": "u_abel",
-   "person": null,
-   "table": null
+   "table": "t01"
   },
   {
    "id": "00000000000000000000000000000039",
@@ -2851,47 +2751,47 @@
   },
   {
    "id": "0000000000000000000000000000004d",
-   "at": "2026-11-14T23:28:48Z",
+   "at": "2026-11-14T23:27:07.200000Z",
    "action": "here",
    "actor": "u_eli",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000047",
-   "at": "2026-11-14T23:29:22.200000Z",
+   "id": "00000000000000000000000000000043",
+   "at": "2026-11-14T23:38:49.200000Z",
    "action": "here",
-   "actor": "u_bea",
+   "actor": "u_zeke",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000049",
-   "at": "2026-11-14T23:34:33.600000Z",
+   "id": "0000000000000000000000000000006d",
+   "at": "2026-11-14T23:45:00Z",
+   "action": "move_food",
+   "actor": "u_wen",
+   "person": null,
+   "table": "t05"
+  },
+  {
+   "id": "00000000000000000000000000000041",
+   "at": "2026-11-14T23:50:18.600000Z",
    "action": "here",
-   "actor": "u_cass",
+   "actor": "u_yara",
    "person": null,
    "table": null
   },
   {
-   "id": "0000000000000000000000000000004f",
-   "at": "2026-11-14T23:36:16.200000Z",
-   "action": "here",
-   "actor": "u_freya",
+   "id": "0000000000000000000000000000006e",
+   "at": "2026-11-14T23:54:00Z",
+   "action": "move_table",
+   "actor": "u_wen",
    "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000051",
-   "at": "2026-11-14T23:40:46.200000Z",
-   "action": "here",
-   "actor": "u_gus",
-   "person": null,
-   "table": null
+   "table": "t05"
   },
   {
    "id": "00000000000000000000000000000061",
-   "at": "2026-11-14T23:42:30.600000Z",
+   "at": "2026-11-14T23:55:21Z",
    "action": "here",
    "actor": "v5",
    "person": null,
@@ -2899,17 +2799,25 @@
   },
   {
    "id": "0000000000000000000000000000005f",
-   "at": "2026-11-14T23:45:50.400000Z",
+   "at": "2026-11-14T23:59:07.800000Z",
    "action": "here",
    "actor": "v4",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000041",
-   "at": "2026-11-14T23:54:41.400000Z",
+   "id": "0000000000000000000000000000003d",
+   "at": "2026-11-15T00:00:28.800000Z",
    "action": "here",
-   "actor": "u_yara",
+   "actor": "u_wyatt",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000003f",
+   "at": "2026-11-15T00:08:15Z",
+   "action": "here",
+   "actor": "u_xiu",
    "person": null,
    "table": null
   },
@@ -2922,106 +2830,50 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000003f",
-   "at": "2026-11-15T00:12:16.200000Z",
-   "action": "here",
-   "actor": "u_xiu",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000071",
+   "id": "00000000000000000000000000000077",
    "at": "2026-11-15T00:15:00Z",
    "action": "move_food",
-   "actor": "u_sol",
+   "actor": "u_sam",
    "person": null,
-   "table": "t07"
+   "table": "t10"
   },
   {
-   "id": "0000000000000000000000000000000f",
-   "at": "2026-11-15T00:20:00.600000Z",
+   "id": "00000000000000000000000000000045",
+   "at": "2026-11-15T00:15:05.400000Z",
    "action": "here",
-   "actor": "u_rafa",
+   "actor": "u_abel",
    "person": null,
    "table": null
   },
   {
-   "id": "0000000000000000000000000000000d",
-   "at": "2026-11-15T00:20:15Z",
-   "action": "here",
-   "actor": "u_ilse",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000072",
+   "id": "00000000000000000000000000000078",
    "at": "2026-11-15T00:24:00Z",
    "action": "move_table",
-   "actor": "u_sol",
-   "person": null,
-   "table": "t07"
-  },
-  {
-   "id": "00000000000000000000000000000073",
-   "at": "2026-11-15T02:15:00Z",
-   "action": "move_food",
-   "actor": "u_theo",
-   "person": null,
-   "table": "t08"
-  },
-  {
-   "id": "00000000000000000000000000000074",
-   "at": "2026-11-15T02:24:00Z",
-   "action": "move_table",
-   "actor": "u_theo",
-   "person": null,
-   "table": "t08"
-  },
-  {
-   "id": "00000000000000000000000000000075",
-   "at": "2026-11-15T04:15:00Z",
-   "action": "move_food",
-   "actor": "u_priya",
-   "person": null,
-   "table": "t09"
-  },
-  {
-   "id": "00000000000000000000000000000076",
-   "at": "2026-11-15T04:24:00Z",
-   "action": "move_table",
-   "actor": "u_priya",
-   "person": null,
-   "table": "t09"
-  },
-  {
-   "id": "0000000000000000000000000000005e",
-   "at": "2026-11-15T05:27:59.400000Z",
-   "action": "leaving",
-   "actor": "v3",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000056",
-   "at": "2026-11-15T05:29:07.800000Z",
-   "action": "leaving",
-   "actor": "u_ivo",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000032",
-   "at": "2026-11-15T05:30:43.200000Z",
-   "action": "leaving",
-   "actor": "u_quinn",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000036",
-   "at": "2026-11-15T05:33:00Z",
-   "action": "leaving",
    "actor": "u_sam",
+   "person": null,
+   "table": "t10"
+  },
+  {
+   "id": "0000000000000000000000000000006f",
+   "at": "2026-11-15T00:45:00Z",
+   "action": "move_food",
+   "actor": "u_abel",
+   "person": null,
+   "table": "t06"
+  },
+  {
+   "id": "00000000000000000000000000000070",
+   "at": "2026-11-15T00:54:00Z",
+   "action": "move_table",
+   "actor": "u_abel",
+   "person": null,
+   "table": "t06"
+  },
+  {
+   "id": "00000000000000000000000000000018",
+   "at": "2026-11-15T05:30:07.200000Z",
+   "action": "leaving",
+   "actor": "u_dev",
    "person": null,
    "table": null
   },
@@ -3034,16 +2886,96 @@
    "table": null
   },
   {
-   "id": "00000000000000000000000000000002",
-   "at": "2026-11-15T05:37:21Z",
+   "id": "00000000000000000000000000000038",
+   "at": "2026-11-15T05:42:32.400000Z",
    "action": "leaving",
-   "actor": "u_mara",
+   "actor": "u_tess",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000005a",
+   "at": "2026-11-15T05:44:27.600000Z",
+   "action": "leaving",
+   "actor": "v1",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000020",
+   "at": "2026-11-15T05:54:34.200000Z",
+   "action": "leaving",
+   "actor": "u_hugo",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000032",
+   "at": "2026-11-15T05:54:37.800000Z",
+   "action": "leaving",
+   "actor": "u_quinn",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000001a",
+   "at": "2026-11-15T06:00:19.800000Z",
+   "action": "leaving",
+   "actor": "u_esme",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000005e",
+   "at": "2026-11-15T06:04:08.400000Z",
+   "action": "leaving",
+   "actor": "v3",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000001c",
+   "at": "2026-11-15T06:20:49.200000Z",
+   "action": "leaving",
+   "actor": "u_finn",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000056",
+   "at": "2026-11-15T06:21:54Z",
+   "action": "leaving",
+   "actor": "u_ivo",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000016",
+   "at": "2026-11-15T06:29:07.800000Z",
+   "action": "leaving",
+   "actor": "u_cleo",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "0000000000000000000000000000002e",
+   "at": "2026-11-15T06:30:39.600000Z",
+   "action": "leaving",
+   "actor": "u_oisin",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000012",
+   "at": "2026-11-15T06:45:59.400000Z",
+   "action": "leaving",
+   "actor": "u_ada",
    "person": null,
    "table": null
   },
   {
    "id": "00000000000000000000000000000022",
-   "at": "2026-11-15T05:37:51.600000Z",
+   "at": "2026-11-15T06:53:51Z",
    "action": "leaving",
    "actor": "u_ines",
    "person": null,
@@ -3051,185 +2983,57 @@
   },
   {
    "id": "00000000000000000000000000000024",
-   "at": "2026-11-15T05:42:10.800000Z",
+   "at": "2026-11-15T06:59:15Z",
    "action": "leaving",
    "actor": "u_jules",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000038",
-   "at": "2026-11-15T05:47:42Z",
-   "action": "leaving",
-   "actor": "u_tess",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000001e",
-   "at": "2026-11-15T05:51:52.200000Z",
-   "action": "leaving",
-   "actor": "u_greta",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000030",
-   "at": "2026-11-15T05:54:16.200000Z",
-   "action": "leaving",
-   "actor": "u_pip",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000000a",
-   "at": "2026-11-15T06:07:49.800000Z",
-   "action": "leaving",
-   "actor": "u_wen",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000002e",
-   "at": "2026-11-15T06:08:43.800000Z",
-   "action": "leaving",
-   "actor": "u_oisin",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000014",
-   "at": "2026-11-15T06:12:37.800000Z",
-   "action": "leaving",
-   "actor": "u_bram",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000077",
-   "at": "2026-11-15T06:15:00Z",
-   "action": "move_food",
-   "actor": "u_ilse",
-   "person": null,
-   "table": "t10"
-  },
-  {
-   "id": "0000000000000000000000000000005a",
-   "at": "2026-11-15T06:16:13.800000Z",
-   "action": "leaving",
-   "actor": "v1",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000006",
-   "at": "2026-11-15T06:17:40.200000Z",
-   "action": "leaving",
-   "actor": "u_priya",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000078",
-   "at": "2026-11-15T06:24:00Z",
-   "action": "move_table",
-   "actor": "u_ilse",
-   "person": null,
-   "table": "t10"
-  },
-  {
-   "id": "0000000000000000000000000000000c",
-   "at": "2026-11-15T06:24:21.600000Z",
-   "action": "leaving",
-   "actor": "u_sol",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000034",
-   "at": "2026-11-15T06:24:28.800000Z",
-   "action": "leaving",
-   "actor": "u_rosa",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000012",
-   "at": "2026-11-15T06:32:09.600000Z",
-   "action": "leaving",
-   "actor": "u_ada",
-   "person": null,
-   "table": null
-  },
-  {
    "id": "0000000000000000000000000000005c",
-   "at": "2026-11-15T06:37:58.800000Z",
+   "at": "2026-11-15T07:11:00.600000Z",
    "action": "leaving",
    "actor": "v2",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000020",
-   "at": "2026-11-15T06:47:34.800000Z",
+   "id": "00000000000000000000000000000030",
+   "at": "2026-11-15T07:13:30Z",
    "action": "leaving",
-   "actor": "u_hugo",
+   "actor": "u_pip",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000004",
-   "at": "2026-11-15T06:48:00Z",
+   "id": "00000000000000000000000000000034",
+   "at": "2026-11-15T07:15:25.200000Z",
    "action": "leaving",
-   "actor": "u_theo",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000001c",
-   "at": "2026-11-15T06:56:06Z",
-   "action": "leaving",
-   "actor": "u_finn",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "0000000000000000000000000000001a",
-   "at": "2026-11-15T06:59:00.600000Z",
-   "action": "leaving",
-   "actor": "u_esme",
-   "person": null,
-   "table": null
-  },
-  {
-   "id": "00000000000000000000000000000018",
-   "at": "2026-11-15T07:01:22.800000Z",
-   "action": "leaving",
-   "actor": "u_dev",
+   "actor": "u_rosa",
    "person": null,
    "table": null
   },
   {
    "id": "00000000000000000000000000000060",
-   "at": "2026-11-15T07:14:52.800000Z",
+   "at": "2026-11-15T07:22:44.400000Z",
    "action": "leaving",
    "actor": "v4",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000016",
-   "at": "2026-11-15T07:15:36Z",
+   "id": "0000000000000000000000000000003e",
+   "at": "2026-11-15T07:53:54.600000Z",
    "action": "leaving",
-   "actor": "u_cleo",
+   "actor": "u_wyatt",
    "person": null,
    "table": null
   },
   {
-   "id": "0000000000000000000000000000003e",
-   "at": "2026-11-15T07:42:36Z",
+   "id": "00000000000000000000000000000006",
+   "at": "2026-11-15T08:11:11.400000Z",
    "action": "leaving",
-   "actor": "u_wyatt",
+   "actor": "u_priya",
    "person": null,
    "table": null
   },
@@ -3242,16 +3046,16 @@
    "table": null
   },
   {
-   "id": "0000000000000000000000000000003c",
-   "at": "2026-11-15T08:43:19.200000Z",
+   "id": "0000000000000000000000000000000c",
+   "at": "2026-11-15T08:36:32.400000Z",
    "action": "leaving",
-   "actor": "u_vera",
+   "actor": "u_sol",
    "person": null,
    "table": null
   },
   {
    "id": "00000000000000000000000000000046",
-   "at": "2026-11-15T08:44:43.800000Z",
+   "at": "2026-11-15T08:49:21Z",
    "action": "leaving",
    "actor": "u_abel",
    "person": null,
@@ -3266,28 +3070,28 @@
    "table": null
   },
   {
+   "id": "0000000000000000000000000000003c",
+   "at": "2026-11-15T08:56:22.200000Z",
+   "action": "leaving",
+   "actor": "u_vera",
+   "person": null,
+   "table": null
+  },
+  {
    "id": "0000000000000000000000000000000e",
-   "at": "2026-11-15T09:56:16.800000Z",
+   "at": "2026-11-15T09:51:10.800000Z",
    "action": "leaving",
    "actor": "u_ilse",
    "person": null,
    "table": null
   },
   {
-   "id": "00000000000000000000000000000079",
-   "at": "2026-11-15T10:15:00Z",
-   "action": "move_food",
-   "actor": "u_jonah",
+   "id": "00000000000000000000000000000036",
+   "at": "2026-11-15T10:12:45Z",
+   "action": "leaving",
+   "actor": "u_sam",
    "person": null,
-   "table": "t11"
-  },
-  {
-   "id": "0000000000000000000000000000007a",
-   "at": "2026-11-15T10:24:00Z",
-   "action": "move_table",
-   "actor": "u_jonah",
-   "person": null,
-   "table": "t11"
+   "table": null
   },
   {
    "id": "00000000000000000000000000000040",
@@ -3299,39 +3103,63 @@
   },
   {
    "id": "00000000000000000000000000000042",
-   "at": "2026-11-15T10:46:48Z",
+   "at": "2026-11-15T10:43:08.400000Z",
    "action": "leaving",
    "actor": "u_yara",
    "person": null,
    "table": null
   },
   {
+   "id": "00000000000000000000000000000004",
+   "at": "2026-11-15T11:06:19.800000Z",
+   "action": "leaving",
+   "actor": "u_theo",
+   "person": null,
+   "table": null
+  },
+  {
    "id": "00000000000000000000000000000062",
-   "at": "2026-11-15T11:25:39Z",
+   "at": "2026-11-15T11:12:39.600000Z",
    "action": "leaving",
    "actor": "v5",
    "person": null,
    "table": null
   },
   {
-   "id": "0000000000000000000000000000007b",
-   "at": "2026-11-15T12:15:00Z",
-   "action": "move_food",
-   "actor": "u_rafa",
+   "id": "0000000000000000000000000000001e",
+   "at": "2026-11-15T11:43:58.800000Z",
+   "action": "leaving",
+   "actor": "u_greta",
    "person": null,
-   "table": "t12"
+   "table": null
   },
   {
-   "id": "0000000000000000000000000000007c",
-   "at": "2026-11-15T12:24:00Z",
-   "action": "move_table",
-   "actor": "u_rafa",
+   "id": "0000000000000000000000000000000a",
+   "at": "2026-11-15T12:15:55.800000Z",
+   "action": "leaving",
+   "actor": "u_wen",
    "person": null,
-   "table": "t12"
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000002",
+   "at": "2026-11-15T12:47:56.400000Z",
+   "action": "leaving",
+   "actor": "u_mara",
+   "person": null,
+   "table": null
+  },
+  {
+   "id": "00000000000000000000000000000014",
+   "at": "2026-11-15T14:07:28.200000Z",
+   "action": "leaving",
+   "actor": "u_bram",
+   "person": null,
+   "table": null
   },
   {
    "id": "00000000000000000000000000000064",
-   "at": "2026-11-15T14:19:31.800000Z",
+   "at": "2026-11-15T14:19:48Z",
    "action": "leaving",
    "actor": "v6",
    "person": null,

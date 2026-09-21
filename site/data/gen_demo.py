@@ -25,6 +25,25 @@ for index, (name, start, end) in enumerate([
                   presence=dict(planned=[start, end], actual=dict(here=None, leaving=None)))
     people[person['id']] = person
 
+# Every game is playing at once for 20% of the event (slots 19 to 29), then the
+# tables fade in a random order. Each table gets its own DM and its own players.
+ALL_HERE = (19, 28.6)
+tables = data['tables']
+starts = rng.sample(range(1, ALL_HERE[0] + 1), len(tables))
+ends = rng.sample(range(29, 47), len(tables))
+for uid in ('u_bram', 'u_greta', 'u_sam', 'u_abel'):
+    people[uid]['dm'] = True
+dms = [uid for uid, person in people.items() if person['dm'] and uid != 'u_admin']
+assert len(dms) == len(tables), dms
+rng.shuffle(dms)
+players = [uid for uid, person in people.items()
+           if not person['dm'] and uid not in ('u_admin', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6')]
+rng.shuffle(players)
+for index, table in enumerate(tables):
+    table['start'], table['end'], table['dm'] = starts[index], ends[index], dms[index]
+    table['signups'] = [dict(person=uid, planned=[table['start'], table['end']], actual=None)
+                        for uid in players[index::len(tables)]][:table['seats']]
+
 for index, person in enumerate(people.values()):
     start, end = person['presence']['planned']
     actual = person['presence']['actual']
@@ -35,13 +54,16 @@ for index, person in enumerate(people.values()):
         skin=index % 4, shirt=index % 15, hair=index % 16, hat=index % 4)
 people['u_admin']['presence']['actual'] = dict(here=.05, leaving=47.7)
 # Every guest shares one stretch of the marathon: 20% of the event (9.6 slots).
-ALL_HERE = (19, 28.6)
-for person in people.values():
+runs = {table['dm']: table for table in tables}
+for uid, person in people.items():
     actual = person['presence']['actual']
     if actual['here'] > ALL_HERE[0]:
         actual['here'] = round(ALL_HERE[0] - rng.uniform(.3, 4), 3)
     if actual['leaving'] <= ALL_HERE[1]:
         actual['leaving'] = round(ALL_HERE[1] + rng.uniform(.3, 4), 3)
+    if uid in runs:
+        actual['here'] = min(actual['here'], round(runs[uid]['start'] - rng.uniform(.3, 1), 3))
+        actual['leaving'] = min(max(actual['leaving'], round(runs[uid]['end'] + rng.uniform(.2, .6), 3)), 47.4)
     planned = person['presence']['planned']
     planned[0] = min(planned[0], int(actual['here']))
     planned[1] = max(planned[1], int(actual['leaving']) + 1)
@@ -66,9 +88,7 @@ for person in people.values():
     activity(actual['here'], 'here', person['id'])
     activity(actual['leaving'], 'leaving', person['id'])
 
-for table in data['tables']:
-    # Finish games before the final departures and cleanup.
-    table['end'] = min(table['end'], 46)
+for table in tables:
     attending = []
     for signup in table['signups']:
         signup['planned'][1] = min(signup['planned'][1], table['end'])
