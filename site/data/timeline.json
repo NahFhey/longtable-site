@@ -36,7 +36,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T14:55:13.282364Z",
+ "generated_at": "2026-09-21T14:55:39.129404Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -49,10 +49,10 @@
  "people": [
   {
    "id": "p1",
-   "name": null,
+   "name": "Nah Fhey",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 4082956081,
    "appearance": null,
    "movements": [],
    "presence": {
