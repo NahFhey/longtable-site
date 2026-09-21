@@ -88,6 +88,14 @@
    "actor": "p3",
    "table": null,
    "person": null
+  },
+  {
+   "id": "9f7d44b55b6f4fceafe26445012b06f2",
+   "at": "2026-09-21T17:02:54.031333Z",
+   "action": "set_presence",
+   "actor": "p4",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -100,7 +108,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T16:27:55.432284Z",
+ "generated_at": "2026-09-21T17:02:56.956981Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -165,6 +173,25 @@
    "dm": false,
    "hidden": false,
    "variant": 114040988,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "p4",
+   "name": "Dyingkenny",
+   "dm": true,
+   "hidden": false,
+   "variant": 2993580878,
    "appearance": null,
    "movements": [],
    "presence": {
