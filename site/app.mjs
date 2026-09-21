@@ -1817,13 +1817,14 @@ async function loadAssets() {
   const results = await Promise.allSettled([
     loadImage(new URL("./assets/roguelikeChar_transparent.png", import.meta.url).href),
     loadImage(new URL("./assets/roguelikeSheet_transparent.png", import.meta.url).href),
-    ...WALL_PLAQUES.map((plaque) => loadImage(new URL(plaque.qr, import.meta.url).href)),
+    // Archives hang no plaques, so they never request the QR images (frozen bundles do not carry them).
+    ...(state.archive ? [] : WALL_PLAQUES.map((plaque) => loadImage(new URL(plaque.qr, import.meta.url).href))),
   ]);
   const loaded = (result) => result.status === "fulfilled" ? result.value : null;
   state.images.characters = loaded(results[0]);
   state.images.rpg = loaded(results[1]);
   // A missing QR leaves its plaque as wood and text; only the sprite atlases count as failed assets.
-  state.images.plaques = WALL_PLAQUES.map((_, index) => loaded(results[2 + index]));
+  state.images.plaques = WALL_PLAQUES.map((_, index) => state.archive ? null : loaded(results[2 + index]));
   state.assetsFailed = results.slice(0, 2).some((result) => result.status === "rejected");
 }
 

@@ -108,11 +108,13 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   const frames = [];
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
   // Listeners are attached before `src`; the outcome is decided per URL once the source is known.
+  const imageRequests = [];
   globalThis.Image = class {
     constructor() { this.imageListeners = new Map(); }
     addEventListener(kind, listener) { this.imageListeners.set(kind, listener); }
     set src(value) {
       this._src = value;
+      imageRequests.push(value);
       const fails = options.assetsFailed || (options.plaquesFail && /-qr\.png$/.test(value));
       queueMicrotask(() => this.imageListeners.get(fails ? "error" : "load")?.());
     }
@@ -133,7 +135,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, imageRequests, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -1413,6 +1415,8 @@ test("the plaque QR images load from the WALL_PLAQUES paths and a missing QR is 
   assert.doesNotMatch(missing.nodes.get("status").textContent, /simplified graphics/);
   const archive = await runApp([sample], "plaque-images-archive", { archive: true, search: "" });
   assert.equal(archive.contextCalls.filter((text) => text === "Join the Discord").length, 0, "archives hang no plaques");
+  assert.equal(archive.imageRequests.filter((src) => /-qr\.png$/.test(src)).length, 0, "archives never request the QR images");
+  assert.equal(app.imageRequests.filter((src) => /-qr\.png$/.test(src)).length, 2, "live pages still request both QR images");
   assert.doesNotMatch(archive.nodes.get("canvas-description").textContent, /Two plaques/);
 });
 
