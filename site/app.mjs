@@ -304,30 +304,9 @@ function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
   for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
-    // Header actions are plain links; the QR codes live on the wall plaques and the kiosk rail.
+    // Header actions are plain links; the QR codes live on the wall plaques.
     const link = append(host, "a", action.label);
     link.href = action.url;
-  }
-}
-
-// The projector's rail: the two wall plaques at a size a phone can scan from the room. Samples show it
-// too (it is the QA path for the projector); archives never do.
-function renderKioskRail() {
-  const rail = $("kiosk-rail");
-  if (!rail) return;
-  rail.replaceChildren();
-  rail.hidden = !state.kiosk || state.archive;
-  if (rail.hidden) return;
-  for (const plaque of WALL_PLAQUES) {
-    const figure = append(rail, "figure", undefined, "plaque");
-    const image = append(figure, "img", undefined, "plaque-qr");
-    image.src = new URL(plaque.qr, import.meta.url).href;
-    image.alt = `QR code for ${plaque.label}`;
-    image.width = 400; image.height = 400;
-    image.addEventListener("error", () => { image.hidden = true; });
-    const caption = append(figure, "figcaption");
-    append(caption, "strong", plaque.label);
-    append(caption, "span", shortUrl(plaque.url), "plaque-url");
   }
 }
 
@@ -1435,7 +1414,6 @@ function installTimeline(data, initial = false) {
   state.layout = buildLayout();
   state.frameKey = null;
   renderActions();
-  if (initial) renderKioskRail();
   state.adminEvents = indexAdminEvents(data);
   state.gatheringPlaces = gatheringLocations(data);
   state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;

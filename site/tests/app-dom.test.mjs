@@ -42,9 +42,8 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail", "fundraising-total", "kiosk-link"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
-  nodes.get("kiosk-rail").hidden = true;
   nodes.get("fundraising-total").hidden = true;
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
@@ -366,7 +365,7 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  // Discord link and Donate link only: the QR codes hang on the wall plaques and the kiosk rail, not in the header.
+  // Discord link and Donate link only: the QR codes hang on the wall plaques, not in the header.
   assert.equal(actions.children.length, 2);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
@@ -1416,46 +1415,29 @@ test("the footer kiosk link opens the same view as a kiosk and is not offered on
   assert.equal(archive.nodes.get("kiosk-link").hidden, true);
 });
 
-test("without ?kiosk the page has no kiosk flag and the rail stays hidden and empty", async () => {
+test("without ?kiosk the page has no kiosk flag, wake lock or idle key handling", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "no-kiosk", { wakeLock: true });
   assert.equal(document.documentElement.dataset.kiosk, undefined);
-  assert.equal(app.nodes.get("kiosk-rail").hidden, true);
-  assert.equal(app.nodes.get("kiosk-rail").children.length, 0);
   assert.deepEqual(app.wakeLockRequests, [], "no wake lock outside kiosk");
   assert.equal(app.documentListeners.has("keydown"), false);
 });
 
-test("?kiosk=1 flags the document, opens the hall on mobile, fills the rail through textContent and keeps the clock mode", async () => {
+test("?kiosk=1 flags the document, opens the hall on mobile, adds no side rail and keeps the clock mode", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "kiosk", { search: "?sample=1&kiosk=1", mobile: true, wakeLock: true });
   assert.deepEqual(app.errors, []);
   assert.equal(document.documentElement.dataset.kiosk, "1");
   assert.equal(app.nodes.get("hall-explorer").open, true);
   assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED", "kiosk never changes the derived mode (mobile begins paused)");
-  const rail = app.nodes.get("kiosk-rail");
-  assert.equal(rail.hidden, false);
-  assert.equal(rail.children.length, 2);
-  for (const [index, figure] of rail.children.entries()) {
-    assert.equal(figure.tagName, "FIGURE");
-    const [image, caption] = figure.children;
-    assert.equal(image.tagName, "IMG");
-    assert.equal(image.src, new URL(WALL_PLAQUES[index].qr, new URL("../app.mjs", import.meta.url)).href);
-    assert.equal(image.alt, `QR code for ${WALL_PLAQUES[index].label}`);
-    assert.equal(caption.children[0].textContent, WALL_PLAQUES[index].label);
-    assert.equal(caption.children[0].textContentWrites, 1);
-    assert.equal(caption.children[1].textContentWrites, 1);
-    image.listeners.get("error")();
-    assert.equal(image.hidden, true, "a broken QR hides only the image");
-  }
-  assert.equal(rail.children[0].children[1].children[1].textContent, "discord.gg/tc9NqpjBrb");
-  assert.equal(rail.children[1].children[1].children[1].textContent, "dd.extra-life.org/teams/74917");
+  // The QR codes are the wall plaques on the canvas; no DOM rail is added beside the scene.
+  assert.equal(app.nodes.get("hall-layout").children.length, 0);
+  const drawn = app.imageCalls.filter((call) => /-qr\.png$/.test(call.src)).map((call) => call.src);
+  assert.deepEqual(drawn, WALL_PLAQUES.map((plaque) => new URL(plaque.qr, new URL("../app.mjs", import.meta.url)).href));
   assert.deepEqual(app.wakeLockRequests, ["screen"]);
   document.hidden = false;
   app.documentListeners.get("visibilitychange")();
   assert.deepEqual(app.wakeLockRequests, ["screen", "screen"], "each return to visible re-requests the lock");
-  const archive = await runApp([sample], "kiosk-archive", { search: "?kiosk=1", archive: true });
-  assert.equal(archive.nodes.get("kiosk-rail").hidden, true, "archives never get the rail");
 });
 
 test("kiosk keeps ?kiosk=1 while the clock writes and deletes ?at=", async () => {

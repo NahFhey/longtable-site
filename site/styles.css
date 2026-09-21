@@ -202,7 +202,7 @@ footer p { margin: .3rem 0; }
 
 .fundraising-total { margin: -.4rem 0 1rem; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
 
-/* Kiosk mode (`?kiosk=1`): a slim bar, the scene filling the viewport, and a rail of scannable plaques. */
+/* Kiosk mode (`?kiosk=1`): a slim bar and the scene filling the viewport; the wall plaques carry the QR codes. */
 html[data-kiosk] { --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
 html[data-kiosk] body { overflow: hidden; }
 html[data-kiosk][data-idle] body { cursor: none; }
@@ -224,12 +224,5 @@ html[data-kiosk] .badge { font-size: .85rem; padding: .25rem .8rem; }
 html[data-kiosk] main { max-width: none; padding: 0 var(--gutter); }
 html[data-kiosk] .status { height: var(--kiosk-status); padding: .35rem 0 0; border-top: 0; font-size: 1.3rem; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html[data-kiosk] .hall-explorer { margin: 0; border: 0; border-radius: 0; background: none; }
-html[data-kiosk] .hall-layout { grid-template-columns: minmax(0, 1fr) clamp(220px, 22vw, 380px); gap: var(--kiosk-gap); padding: 0; align-items: stretch; }
+html[data-kiosk] .hall-layout { grid-template-columns: minmax(0, 1fr); gap: var(--kiosk-gap); padding: 0; align-items: stretch; }
 html[data-kiosk] canvas { height: calc(100vh - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
-html[data-kiosk] .kiosk-rail { display: flex; flex-direction: column; justify-content: center; gap: var(--kiosk-gap); min-width: 0; }
-html[data-kiosk] .plaque { margin: 0; padding: .6rem; border: 2px solid #b89b5c; border-radius: .25rem; background: #4a3524; box-shadow: inset 0 0 0 1px #2c1d12, 0 6px 18px #0006; text-align: center; }
-/* A square QR bounded by the column, 34vh, and half the rail height so two plaques fit at 1280x720. */
-html[data-kiosk] .plaque-qr { display: block; width: min(100%, 34vh, calc(50vh - 10rem)); height: auto; aspect-ratio: 1 / 1; margin: 0 auto; padding: .4rem; background: #fff; image-rendering: pixelated; image-rendering: crisp-edges; }
-html[data-kiosk] .plaque figcaption { display: grid; gap: .1rem; margin-top: .45rem; }
-html[data-kiosk] .plaque strong { color: #e9d9ae; font: 400 1.4rem/1.2 Georgia, "Times New Roman", serif; }
-html[data-kiosk] .plaque-url { color: #c9b98a; font: clamp(.8rem, 1.1vw, 1rem)/1.2 "Courier New", monospace; overflow-wrap: anywhere; }

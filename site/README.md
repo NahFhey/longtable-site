@@ -264,7 +264,7 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 ### Transitional event actions
 
 The header always carries two links, **Discord** and **Donate**. The QR codes
-are not in the header; the wall plaques and the kiosk rail carry them. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
+are not in the header; the wall plaques carry them. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
 to change their destinations; they are shared across current events without
 depending on their names or dates. Samples and archived replays suppress the
 header links. Table cards and details do not repeat signup instructions.
@@ -276,7 +276,7 @@ dropped. Any supplied QR image must be verified against its configured
 destination; an image failure leaves the direct link usable.
 
 **Wall plaques.** `WALL_PLAQUES` in `event-config.mjs` lists the two plaques
-drawn on the back wall of the hall (and shown on the kiosk rail): the Discord
+drawn on the back wall of the hall: the Discord
 invite and the Extra Life page, each with its label, URL and QR file under
 `assets/events/`. The QR files must be decode-verified against their URL before
 they are listed; `event-assets/README.md` has the command and the provenance of
@@ -292,8 +292,8 @@ art license or bot event is needed.
 Open `https://longtable.party/?kiosk=1` in Chrome or Firefox on the projector
 laptop and press `f` (or F11) for fullscreen. The page strips itself to a slim
 bar (event name, Extra Life total, badge and clock), the doors countdown line,
-the hall scene filling the viewport, and a rail of the two plaques with QR codes
-large enough to scan from the room. It needs no other setup: the same timeline,
+and the hall scene filling the rest of the screen, with the two wall plaques and
+their QR codes drawn at projector size. It needs no other setup: the same timeline,
 polling and consent rules as the public page apply, and nothing new about any
 attendee appears. Keep the tab in the foreground (polling and the Extra Life
 total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
@@ -301,7 +301,7 @@ the page also asks for a screen wake lock where the browser allows one. After
 45 seconds without input a moved camera returns to automatic framing, and the
 cursor hides after 3 seconds.
 
-`?sample=50&kiosk=1` is the dress rehearsal (the demo event with the rail);
+`?sample=50&kiosk=1` is the dress rehearsal (the demo event in kiosk chrome);
 `?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
 combines with `?at=` and is kept when the clock rewrites the URL.
 
