@@ -156,7 +156,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-21T17:32:09.797269Z",
+ "generated_at": "2026-09-21T17:32:16.477297Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -284,10 +284,10 @@
   },
   {
    "id": "p6",
-   "name": null,
+   "name": "DrewbeusHagrid",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 886337395,
    "appearance": null,
    "movements": [],
    "presence": {
