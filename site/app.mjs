@@ -162,6 +162,16 @@ if (state.kiosk) {
   if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
   $("hall-explorer").open = true;
 }
+// The footer's kiosk link keeps the page's other query flags (sample, now, at) so it opens the same view as a kiosk.
+{
+  const link = $("kiosk-link");
+  if (link) {
+    const params = new URLSearchParams(location.search);
+    params.set("kiosk", "1");
+    link.href = `?${params}`;
+    link.hidden = state.archive;
+  }
+}
 
 // `?now=` (ISO-8601 or epoch milliseconds) shifts the wall clock for review and tests; time keeps flowing from it.
 function parseNowOverride(value) {

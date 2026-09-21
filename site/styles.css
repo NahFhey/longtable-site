@@ -154,6 +154,8 @@ canvas:active { cursor: grabbing; }
 
 footer { max-width: var(--page-width); margin: auto; border-top: 1px solid var(--line); padding: 1.6rem var(--gutter) 2.5rem; color: var(--muted); font-size: .72rem; }
 footer p { margin: .3rem 0; }
+.kiosk-link { display: inline-block; margin-top: .5rem; padding: .15rem .5rem; border: 1px solid var(--line); border-radius: .3rem; color: var(--muted); font-size: .68rem; text-decoration: none; }
+.kiosk-link:hover, .kiosk-link:focus-visible { color: var(--ink); border-color: var(--muted); }
 .event-navigation { margin-top: 1rem; }
 .archive-page { max-width: 65rem; padding-top: 1rem; padding-bottom: 4rem; }
 .archive-page > p { color: var(--muted); }

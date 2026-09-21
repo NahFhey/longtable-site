@@ -42,7 +42,7 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail", "fundraising-total"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "kiosk-rail", "fundraising-total", "kiosk-link"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   nodes.get("kiosk-rail").hidden = true;
   nodes.get("fundraising-total").hidden = true;
@@ -1401,6 +1401,19 @@ test("the plaque QR images load from the WALL_PLAQUES paths and a missing QR is 
   const archive = await runApp([sample], "plaque-images-archive", { archive: true, search: "" });
   assert.equal(archive.contextCalls.filter((text) => text === "Join the Discord").length, 0, "archives hang no plaques");
   assert.doesNotMatch(archive.nodes.get("canvas-description").textContent, /Two plaques/);
+});
+
+test("the footer kiosk link opens the same view as a kiosk and is not offered on archives", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const live = await runApp([sample], "kiosk-link-live", { search: "" });
+  assert.equal(live.nodes.get("kiosk-link").href, "?kiosk=1");
+  assert.equal(live.nodes.get("kiosk-link").hidden, false);
+  const demo = await runApp([sample], "kiosk-link-demo", { search: "?sample=50&now=2026-11-07T10:00:00-05:00" });
+  assert.equal(demo.nodes.get("kiosk-link").href, "?sample=50&now=2026-11-07T10%3A00%3A00-05%3A00&kiosk=1");
+  const kiosk = await runApp([sample], "kiosk-link-kiosk", { search: "?kiosk=1&sample=1" });
+  assert.equal(kiosk.nodes.get("kiosk-link").href, "?kiosk=1&sample=1");
+  const archive = await runApp([sample], "kiosk-link-archive", { search: "", archive: true });
+  assert.equal(archive.nodes.get("kiosk-link").hidden, true);
 });
 
 test("without ?kiosk the page has no kiosk flag and the rail stays hidden and empty", async () => {
