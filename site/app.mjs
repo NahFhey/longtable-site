@@ -27,6 +27,7 @@ import {
   jukeboxSignBounds,
   personTooltip,
   playbackSpeed,
+  practicePlaces,
   publicActivity,
   reconcileLiveSnapshot,
   resolveLocation,
@@ -40,7 +41,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=2d2625f72f0d";
+} from "./model.mjs?v=80cbc071e954";
 
 const TILE = 16;
 const SCALE = 2;
@@ -152,6 +153,8 @@ const state = {
   stage: null,          // "gathering" | "eve" | "day" | "after" | null (not a live-source, live-phase package)
   pollSeconds: 2,
   gatheringPlaces: new Map(),
+  practicePlaces: new Map(),   // practising people before doors, live feed only
+  practiceSeen: new Set(),     // practice speech keys already shown (or present at load)
   gatheredCount: 0,
   nowOffset: 0,
   nowOverride: false,
@@ -202,7 +205,8 @@ const gatheringScene = () => upcoming() && beforeDoors();
 function updateStage(now) {
   const liveSource = state.clock?.source === "live" && state.data?.phase === "live";
   state.stage = liveSource ? hallStage(state.data, now) : null;
-  state.pollSeconds = beforeDoors() && Date.parse(state.data.event.start) - now > 60 * 60_000 ? 30 : 2;
+  const practising = Object.keys(state.data?.practice?.people ?? {}).length > 0;
+  state.pollSeconds = practising ? 5 : beforeDoors() && Date.parse(state.data.event.start) - now > 60 * 60_000 ? 30 : 2;
 }
 
 function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
@@ -407,6 +411,9 @@ function updatePeople(realSeconds, now, active) {
     // from the moment the eve began, so an open tab and a tab loaded mid-exodus see the same schedule.
     const eveElapsed = state.stage === "eve" ? (wallNow() - (Date.parse(state.data.event.start) - EVE_MS)) / 1000 : -1;
     state.locations = new Map(state.data.people.map(person => {
+      // Practising people stand where they practise and stay through the eve.
+      const practising = state.practicePlaces.get(person.id);
+      if (practising) return [person.id, practising];
       const leaving = state.stage === "eve" && eveElapsed >= (state.people.get(person.id)?.phase ?? 0) * EVE_EXODUS_SECONDS;
       return [person.id, leaving ? ABSENT_PLACE : state.gatheringPlaces.get(person.id) ?? ABSENT_PLACE];
     }));
@@ -1125,7 +1132,8 @@ function drawEvents(active, now) {
   if (active.meal) drawLabel(`${active.meal.text || "MEAL"} — food corner is open`, state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#9fe08a" });
 
   if (state.speech?.phase === "speaking") {
-    const view = speechView(state.data, state.speech.event, state.time, active);
+    const view = speechView(state.data, state.speech.event, state.time, active,
+      state.speech.event.practice ? state.locations.get(state.speech.event.person) ?? null : null);
     let position = state.layout.stageFront;
     const custom = view.kind === "donation";
     if (!custom && !view.stageSide) {
@@ -1523,8 +1531,19 @@ function installTimeline(data, initial = false) {
   renderActions();
   state.adminEvents = indexAdminEvents(data);
   state.gatheringPlaces = gatheringLocations(data);
+  // Practice reaches the page through the live feed alone; archive and sample pages ignore the key.
+  const practiceShown = !state.sample && !state.archive;
+  state.practicePlaces = practiceShown ? practicePlaces(data) : new Map();
   state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;
   syncPeople();
+  // Each practice speech entry becomes one bubble the first time a poll carries it; a load only records what is there.
+  const practiceSpeech = practiceShown ? data.practice?.speech ?? [] : [];
+  const keys = practiceSpeech.map((entry) => `${entry.person}|${entry.at}`);
+  if (!initial && upcoming()) {
+    queueSpeech(practiceSpeech.filter((entry, index) => !state.practiceSeen.has(keys[index]))
+      .map((entry, index) => ({ id: keys[index], kind: "shout", person: entry.person, text: entry.text, at: state.time, practice: true })));
+  }
+  state.practiceSeen = new Set(keys);
   state.activity = publicActivity(data);
   state.activityKey = null;
   state.activitySecond = null;

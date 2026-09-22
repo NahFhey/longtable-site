@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
+import { createRoomLayout, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
 import { DISCORD_INVITE, WALL_PLAQUES } from "../event-config.mjs";
@@ -51,6 +51,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
   if (options.backupFeed) nodes.get("backup-feed").setAttribute("content", options.backupFeed);
   const contextCalls = [];
+  const textCalls = [];
   const imageCalls = [];
   const rectCalls = [];
   const transforms = [];
@@ -58,7 +59,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     setTransform(...args) { transforms.push(args); },
     getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
     measureText(value) { return { width: String(value).length * 5 }; },
-    fillText(value) { contextCalls.push(String(value)); },
+    fillText(value, x, y) { contextCalls.push(String(value)); textCalls.push({ text: String(value), x, y }); },
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
     drawImage(image, ...args) { imageCalls.push({ src: image._src, args }); },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
@@ -135,7 +136,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, imageCalls, imageRequests, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, frames, intervals, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -1624,4 +1625,162 @@ test("the plaques join the automatic frame before doors and on the projector, ne
   const upcomingApp = await runApp([sample], "frame-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
   assert.equal(upcomingApp.nodes.get("mode-badge").textContent, "UPCOMING");
   assert.ok(rightEdge(upcomingApp) >= plaques[1].x + plaques[1].w, "before doors the public page frames the plaques too");
+});
+
+// --- Practice before doors: the live feed's optional `practice` key ---
+const LIVE_FEED = "https://feed.example/timeline.json";
+const drawnKey = (position) => `${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6) * 32)}`;
+/** A diner bobs a few pixels while eating, so the food seat is matched with a small vertical tolerance. */
+const drawnNear = (drawn, position, tolerance = 8) => [...drawn].some((key) => {
+  const [x, y] = key.split(",").map(Number);
+  return x === Math.round((position.x - .5) * 32) && Math.abs(y - (position.y - .6) * 32) <= tolerance;
+});
+const laterStamp = (sample, seconds) => new Date(Date.parse(sample.generated_at) + seconds * 1000).toISOString().replace(".000Z", "Z");
+/** Runs one frame and returns every canvas text drawn in it. */
+function canvasStepper(app, start = performance.now() + 100) {
+  let now = start;
+  const step = (milliseconds = 100) => {
+    now += milliseconds;
+    app.contextCalls.length = 0;
+    app.textCalls.length = 0;
+    app.rectCalls.length = 0;
+    app.transforms.length = 0;
+    app.frames.shift()?.(now);
+    return app.contextCalls.join(" ");
+  };
+  step.at = () => now;
+  return step;
+}
+
+test("practising people are drawn at their practice position before doors and stay through the eve", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  // u_lena is planned at t01 seat 1 and also signed up on t04 (index 3) as its third player; u_tess is lounge-only.
+  const practice = { people: { u_lena: { position: "table", table: "t04" }, u_tess: { position: "food", table: null } }, speech: [] };
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const lenaPractice = seatPositionForPlan(layout, 3, 3);
+  const lenaPlanned = seatPositionForPlan(layout, 0, 1);
+  const tessPractice = foodGeometry(layout, 0, 4).seat;
+  assert.deepEqual(gatheringLocations(sample).get("u_lena"), { ...gatheringLocations(sample).get("u_lena"), tableIndex: 0, seat: 1 });
+
+  const app = await runApp([{ ...sample, practice }], "practice-placement", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  const drawn = spritePositions(app);
+  assert.ok(drawn.has(drawnKey(lenaPractice)), "Lena is drawn at her t04 seat");
+  assert.ok(!drawn.has(drawnKey(lenaPlanned)), "not at her planned t01 seat");
+  assert.ok(drawnNear(drawn, tessPractice), "Tess is drawn at the food seating");
+  assert.match(app.nodes.get("status").textContent, /^44 gathered so far/);
+
+  const eve = await runApp([{ ...sample, practice }], "practice-eve", { search: `?${nowQuery(start - DAY + 120_000)}`, liveFeed: LIVE_FEED });
+  assert.deepEqual(eve.errors, []);
+  assert.equal(eve.nodes.get("scene-event").textContent, "24 hours away");
+  assert.ok(eve.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is dark");
+  const eveDrawn = spritePositions(eve);
+  assert.ok(eveDrawn.has(drawnKey(lenaPractice)), "Lena still practises in the eve");
+  assert.ok(drawnNear(eveDrawn, tessPractice), "Tess still practises in the eve");
+  assert.ok(!eveDrawn.has(drawnKey(seatPositionForPlan(layout, 0, 0))), "Mara, not practising, has left");
+  assert.equal(eveDrawn.size, 2, "only the two practising people remain");
+  eve.frames.shift()?.(performance.now() + 3_000);
+  assert.equal(spritePositions(eve).size, 2);
+});
+
+test("each practice speech entry shows once at the person: never on load, not on repeat, and the next one alone", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const people = { u_lena: { position: "table", table: "t04" } };
+  const old = { person: "u_lena", text: "Old news", at: laterStamp(sample, -30) };
+  const first = { person: "u_lena", text: "Practice huzzah", at: laterStamp(sample, 1) };
+  const second = { person: "u_lena", text: "Second cheer", at: laterStamp(sample, 3) };
+  const base = { ...sample, practice: { people, speech: [old] } };
+  const withSpeech = { ...sample, generated_at: laterStamp(sample, 1), practice: { people, speech: [old, first] } };
+  const withSpeechAgain = { ...sample, generated_at: laterStamp(sample, 2), practice: { people, speech: [old, first] } };
+  const withSpeech2 = { ...sample, generated_at: laterStamp(sample, 3), practice: { people, speech: [old, first, second] } };
+  const app = await runApp([base, withSpeech, withSpeechAgain, withSpeech2], "practice-speech", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.fetchUrls.length, 1);
+  const step = canvasStepper(app);
+  const texts = (frames) => { const seen = []; for (let frame = 0; frame < frames; frame += 1) seen.push(step()); return seen.join("\n"); };
+  assert.doesNotMatch(texts(10), /Old news|Practice huzzah/, "no bubble after the initial load");
+  assert.equal(app.fetchUrls.length, 1);
+
+  step(4_100);                       // past the 5-second practice cadence: the first refresh starts
+  await settle();
+  assert.equal(app.fetchUrls.length, 2);
+  let bubble = null;
+  let camera = null;
+  let shown = 0;
+  for (let frame = 0; frame < 100 && (shown === 0 || app.contextCalls.includes("Practice huzzah")); frame += 1) {
+    if (step().includes("Practice huzzah")) {
+      shown += 1;
+      bubble ??= app.textCalls.find((call) => call.text === "Practice huzzah");
+      // The hall transform is the one that is not a reset to the identity; its scale is zoom over the 32 px tile.
+      const world = app.transforms.find((entry) => entry[0] !== 1 || entry[4] !== 0 || entry[5] !== 0);
+      camera ??= { zoom: world[0] * 32, x: world[4], y: world[5] };
+    }
+  }
+  assert.ok(shown >= 38 && shown <= 42, `the bubble held for ${shown} frames (about four seconds)`);
+  assert.ok(bubble, "the bubble text was drawn");
+  assert.ok(!app.contextCalls.includes("Practice huzzah") && !app.contextCalls.some((text) => /^From /.test(text)), "never labelled stage-side");
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const seat = seatPositionForPlan(layout, 3, 3);
+  // drawBubble writes the text at left + 2·SCALE; the stub measures 5 px per character and pads 4·SCALE.
+  const left = bubble.x - 4;
+  const width = "Practice huzzah".length * 5 + 8;
+  const atPerson = worldToScreen(camera, { x: seat.x, y: seat.y - 1.2 });
+  const atStage = worldToScreen(camera, layout.stageFront);
+  assert.ok(Math.abs(left + width / 2 - atPerson.x) < 1, `the bubble is centred on Lena (${left + width / 2} vs ${atPerson.x})`);
+  assert.ok(Math.abs(left + width / 2 - atStage.x) > 10, "and not on the stage");
+  assert.doesNotMatch(texts(5), /Practice huzzah|Old news/);
+
+  await settle();                    // the repeat carries the same entry under a newer generated_at
+  assert.equal(app.fetchUrls.length, 3);
+  assert.doesNotMatch(texts(30), /Practice huzzah|Old news/, "the same entry is not replayed");
+
+  await settle();                    // the third snapshot adds a second entry
+  assert.equal(app.fetchUrls.length, 4);
+  const later = texts(60);
+  assert.match(later, /Second cheer/, "the new entry appears");
+  assert.doesNotMatch(later, /Practice huzzah|Old news/, "the earlier ones stay quiet");
+  assert.deepEqual(app.errors, []);
+});
+
+test("practice drops polling to 5 seconds and back to 30 when nobody practises; sample pages ignore the key", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const practising = { ...sample, practice: { people: { u_lena: { position: "food", table: "t01" } }, speech: [] } };
+  const nobody = { ...sample, generated_at: laterStamp(sample, 1), practice: { people: {}, speech: [] } };
+  const app = await runApp([practising, nobody, nobody], "practice-cadence", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.fetchUrls.length, 1);
+  assert.match(app.nodes.get("sync-status").textContent, /Checked at .*Checking every 5 seconds\. Data published at Nov 7, 3:09 PM\.$/);
+  const base = performance.now();
+  app.frames.shift()?.(base + 2_100);
+  await settle();
+  assert.equal(app.fetchUrls.length, 1, "no refresh after two seconds");
+  app.frames.shift()?.(base + 5_100);
+  await settle();
+  assert.equal(app.fetchUrls.length, 2, "a refresh after five seconds");
+  app.frames.shift()?.(base + 5_200);
+  assert.match(app.nodes.get("sync-status").textContent, /Checking every 30 seconds\./, "an empty people object restores the sign-up cadence");
+  app.frames.shift()?.(base + 29_000);
+  await settle();
+  assert.equal(app.fetchUrls.length, 2);
+  app.frames.shift()?.(base + 35_300);
+  await settle();
+  assert.equal(app.fetchUrls.length, 3);
+  assert.deepEqual(app.errors, []);
+
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const demo = await runApp([practising], "practice-sample", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
+  assert.deepEqual(demo.errors, []);
+  assert.equal(demo.nodes.get("sync-controls").hidden, true);
+  const drawn = spritePositions(demo);
+  assert.ok(drawn.has(drawnKey(seatPositionForPlan(layout, 0, 1))), "Lena is at her planned seat");
+  assert.ok(!drawnNear(drawn, foodGeometry(layout, 0, 4).seat), "nobody is at a practice place");
+  demo.frames.shift()?.(performance.now() + 6_000);
+  await settle();
+  demo.intervals[0]();
+  await settle();
+  assert.equal(demo.fetchUrls.length, 1, "a sample page never fetches again");
 });

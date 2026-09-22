@@ -28,6 +28,7 @@ import {
   ordinaryLocation,
   personTooltip,
   playbackSpeed,
+  practicePlaces,
   reconcileLiveSnapshot,
   resolveLocation,
   seatOffset,
@@ -684,4 +685,93 @@ test("wall fixtures hang inside the back wall without overlap, plaques flush rig
     assert.equal(wallFixtures(layout, { banner: false }).banner, null);
     assert.deepEqual(wallFixtures(layout, { plaques: 0 }), { banner: { x: 3, y: -4.7, w: Math.min(25, layout.width - 6), h: 3.5 }, plaques: [] });
   }
+});
+
+/** Schema 7 with a second table, a visitor, and two people nobody seats: one planned, one not. */
+function practiceTimeline() {
+  const input = timeline(7);
+  input.people.forEach((entry) => { entry.movements = []; });
+  input.people.push(
+    person("guest", { presence: { planned: null, actual: { here: null, leaving: null } } }),
+    person("loner"),
+    person("visitor"),
+  );
+  input.people.forEach((entry) => { entry.movements ??= []; });
+  input.visitors = { open: true, people: ["visitor"] };
+  input.tables.push({ ...clone(input.tables[0]), pad: 1, id: "table-two", name: "Table Two", dm: "admin", start: 2, end: 6, signups: [] });
+  return input;
+}
+
+test("the practice key validates intact, reads null when absent, and rejects bad references", () => {
+  const input = practiceTimeline();
+  input.practice = {
+    people: { dm: { position: "table", table: "table-key" }, player: { position: "food", table: "table-key" }, visitor: { position: "lounge", table: null } },
+    speech: [
+      { person: "player", text: "Huzzah!", at: "2026-11-07T15:00:30Z" },
+      { person: "visitor", text: "🎲 1d20 = 7", at: "2026-11-07T15:00:31+00:00" },
+    ],
+  };
+  const result = validateTimeline(input);
+  assert.deepEqual(result.practice, input.practice);
+  assert.deepEqual(validateTimeline(result).practice, input.practice, "a validated snapshot re-validates");
+  assert.equal(validateTimeline(practiceTimeline()).practice, null, "absent reads as null");
+  assert.equal(validateTimeline(validateTimeline(practiceTimeline())).practice, null, "null round-trips");
+  for (const schema of [1, 2, 3, 4, 5]) assert.equal(validateTimeline(timeline(schema)).practice, null);
+  const rejected = [
+    [(practice) => { practice.people.ghost = { position: "table", table: "table-key" }; }, /Unknown practice person\./],
+    [(practice) => { practice.people.dm.table = "t99"; }, /Unknown practice table\./],
+    [(practice) => { practice.people.dm.position = "stage"; }, /Invalid practice position\./],
+    [(practice) => { practice.speech[0].text = ""; }, /malformed/],
+    [(practice) => { practice.speech[0].text = "x".repeat(201); }, /malformed/],
+    [(practice) => { practice.speech[0].at = "2026-11-07T10:00:30-05:00"; }, /zero UTC offset/],
+    [(practice) => { practice.speech[0].person = "ghost"; }, /Unknown practice person\./],
+    [(practice) => { delete practice.speech; }, /required/],
+  ];
+  for (const [mutate, message] of rejected) {
+    const broken = clone(input);
+    mutate(broken.practice);
+    assert.throws(() => validateTimeline(broken), (error) => error instanceof TimelineError && message.test(error.message));
+  }
+  assert.throws(() => validateTimeline({ ...input, practice: [] }), TimelineError);
+});
+
+test("practicePlaces seats people where they practise, falls back to plans, and shapes food and lounge", () => {
+  const input = practiceTimeline();
+  input.practice = { people: {
+    dm: { position: "table", table: "table-key" },            // the DM: seat 0
+    "hidden-key": { position: "table", table: "table-key" },  // second signup: seat 2
+    player: { position: "table", table: "table-two" },        // not on that table: planned Table One, seat 1
+    admin: { position: "table", table: "table-key" },         // not on that table: planned as DM of Table Two
+    loner: { position: "table", table: "table-key" },         // no table at all: the lounge
+    guest: { position: "food", table: null },
+    visitor: { position: "lounge", table: null },
+  }, speech: [] };
+  const snapshot = validateTimeline(input);
+  const places = practicePlaces(snapshot);
+  const [one, two] = snapshot.tables;
+  assert.deepEqual(places.get("dm"), { kind: "table", label: "Table One", table: one, tableIndex: 0, seat: 0 });
+  assert.deepEqual(places.get("hidden-key"), { kind: "table", label: "Table One", table: one, tableIndex: 0, seat: 2 });
+  assert.deepEqual(places.get("player"), { kind: "table", label: "Table One", table: one, tableIndex: 0, seat: 1 });
+  assert.deepEqual(places.get("admin"), { kind: "table", label: "Table Two", table: two, tableIndex: 1, seat: 0 });
+  assert.deepEqual(places.get("loner"), { kind: "lounge", label: "the lounge" });
+  assert.deepEqual(places.get("guest"), { kind: "food", label: "the food seating, eating", foodPhase: "eating", plate: true, foodRemaining: 1 });
+  assert.deepEqual(places.get("visitor"), { kind: "lounge", label: "the lounge" });
+  assert.equal(places.size, 7);
+  assert.equal(practicePlaces(validateTimeline(practiceTimeline())).size, 0, "no key, no places");
+});
+
+test("speechView with a place override speaks there, off the stage side, for someone the resolver calls absent", () => {
+  const snapshot = validateTimeline(practiceTimeline());
+  const event = { id: "guest|2026-11-07T15:00:30Z", kind: "shout", person: "guest", text: "Practice!", at: 0, practice: true };
+  const plain = speechView(snapshot, event, 0);
+  assert.equal(plain.stageSide, true);
+  assert.equal(plain.place.kind, "absent");
+  const lounge = { kind: "lounge", label: "the lounge" };
+  const overridden = speechView(snapshot, event, 0, activeEvents(snapshot, 0), lounge);
+  assert.equal(overridden.stageSide, false);
+  assert.equal(overridden.label, null);
+  assert.equal(overridden.place, lounge);
+  assert.equal(overridden.text, "Practice!");
+  assert.equal(overridden.person.id, "guest");
+  assert.equal(overridden.kind, "shout");
 });

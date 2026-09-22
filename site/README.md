@@ -160,6 +160,20 @@ people are the usual anonymous sprites. A visitor opening the page sees
 everyone already in place; walk-ins, moves and walk-outs animate only for
 changes an open tab observes through polling, at walking pace.
 
+Before doors the live feed alone may carry an optional top-level `practice`
+key, `{ "people": { "<id>": { "position", "table" } }, "speech": [{ "person",
+"text", "at" }] }`, for people trying the in-thread controls; the Git fallback,
+archives and the sample never have it, and archive and sample pages ignore it.
+A practising person stands at their practice position instead of their planned
+placement: for `table`, their seat at the named table (the DM at seat 0, a
+signup at its index + 1), else their planned table, else the lounge; `food` is
+the food seating, eating; `lounge` is the lounge. They stay in the hall during
+the eve for as long as they keep practising. Each speech entry (a quick
+reaction or a public roll) is shown once as a bubble at the person, the first
+time a poll carries it; a page load only records what is already there, so a
+reload never replays old bubbles. While anyone is practising the page polls
+every 5 seconds instead of 30.
+
 At the start of the eve an open tab sees everyone leave over about a minute
 (departures spread over 45 seconds), then the caretaker switches the lights off
 at 60 seconds and walks out. After that the hall is dark and empty until doors

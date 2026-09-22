@@ -305,7 +305,36 @@ export function validateTimeline(input) {
     if (table !== null && !/^t[0-9]+$/.test(table)) fail("Invalid activity table.");
     return { id, at, action, actor, person, table };
   });
-  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity };
+
+  // Practice before doors rides the live feed only, as an optional key; every stored snapshot lacks it,
+  // and a validated snapshot carries null, so both read as absent.
+  let practice = null;
+  if (root.practice !== undefined && root.practice !== null) {
+    const raw = object(root.practice, "timeline.practice");
+    const rawPeople = object(required(raw, "people", "timeline.practice"), "timeline.practice.people");
+    const practicePeople = {};
+    for (const [id, rawEntry] of Object.entries(rawPeople)) {
+      if (!personById.has(id)) fail("Unknown practice person.");
+      const label = `timeline.practice.people.${id}`;
+      const entry = object(rawEntry, label);
+      const position = string(required(entry, "position", label), `${label}.position`);
+      if (!["table", "food", "lounge"].includes(position)) fail("Invalid practice position.");
+      const table = string(required(entry, "table", label), `${label}.table`, { nullable: true, min: 1 });
+      if (table !== null && !tableIds.has(table)) fail("Unknown practice table.");
+      practicePeople[id] = { position, table };
+    }
+    const speech = array(required(raw, "speech", "timeline.practice"), "timeline.practice.speech").map((rawEntry, index) => {
+      const label = `timeline.practice.speech[${index}]`;
+      const entry = object(rawEntry, label);
+      const person = string(required(entry, "person", label), `${label}.person`, { min: 1 });
+      if (!personById.has(person)) fail("Unknown practice person.");
+      const text = string(required(entry, "text", label), `${label}.text`, { min: 1, max: 200 });
+      const at = dateString(required(entry, "at", label), `${label}.at`, "zero-offset");
+      return { person, text, at };
+    });
+    practice = { people: practicePeople, speech };
+  }
+  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity, practice };
 }
 
 export function slotToMs(timeline, slot) {
@@ -1036,6 +1065,39 @@ export function gatheringLocations(timeline) {
   return result;
 }
 
+/** Where practising people stand before doors, from the live feed's optional practice key: the seat they
+ * hold on the table whose thread they practised in, else their planned placement, else the lounge. */
+export function practicePlaces(timeline) {
+  const result = new Map();
+  const entries = Object.entries(timeline.practice?.people ?? {});
+  if (entries.length === 0) return result;
+  const planned = gatheringLocations(timeline);
+  for (const [id, entry] of entries) {
+    if (entry.position === "food") {
+      result.set(id, { kind: "food", label: "the food seating, eating", foodPhase: "eating", plate: true, foodRemaining: 1 });
+      continue;
+    }
+    if (entry.position === "lounge") {
+      result.set(id, { kind: "lounge", label: "the lounge" });
+      continue;
+    }
+    const tableIndex = timeline.tables.findIndex((table) => table.id === entry.table);
+    const table = timeline.tables[tableIndex];
+    let place = null;
+    if (table) {
+      const signupIndex = table.signups.findIndex((signup) => signup.person === id);
+      if (table.dm === id) place = { kind: "table", label: table.name, table, tableIndex, seat: 0 };
+      else if (signupIndex >= 0) place = { kind: "table", label: table.name, table, tableIndex, seat: signupIndex + 1 };
+    }
+    if (!place) {
+      const fallback = planned.get(id);
+      place = fallback?.kind === "table" ? fallback : { kind: "lounge", label: "the lounge" };
+    }
+    result.set(id, place);
+  }
+  return result;
+}
+
 /** Food tables, seats and bin share geometry with the rendered furniture. */
 export function foodGeometry(layout, index = 0, count = 1) {
   const { x, y } = layout.food;
@@ -1160,9 +1222,9 @@ export function personTooltip(person, location, moving = false) {
   return `${who} ${moving ? "moving to" : "at"} ${location.label}`;
 }
 
-export function speechView(timeline, speechEvent, slot, active = activeEvents(timeline, slot)) {
+export function speechView(timeline, speechEvent, slot, active = activeEvents(timeline, slot), place = null) {
   const person = timeline.people.find((candidate) => candidate.id === speechEvent.person);
-  const place = person ? resolveLocation(timeline, person, slot, active) : { kind: "absent", label: "outside the hall" };
+  if (!place) place = person ? resolveLocation(timeline, person, slot, active) : { kind: "absent", label: "outside the hall" };
   return {
     kind: speechEvent.kind,
     text: speechEvent.text,
