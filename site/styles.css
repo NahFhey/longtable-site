@@ -181,7 +181,7 @@ footer p { margin: .3rem 0; }
 @media (max-width: 800px) {
   .hall-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 650px) {
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   .site-bar { min-height: 68px; flex-wrap: wrap; gap: .5rem 1rem; }
   .wordmark { font-size: 1.25rem; }
   .wordmark img { width: 27px; height: 27px; }
@@ -205,12 +205,12 @@ footer p { margin: .3rem 0; }
   .timeline-meta { font-size: .65rem; }
   .table-card { padding: 1.1rem; }
 }
-/* Event page on phones (not kiosk; past-events.html shares this sheet and is left alone): a slim bar, the event actions, then the hall filling the first screen above a status strip.
+/* Event page on phones, portrait or landscape (not kiosk; past-events.html shares this sheet and is left alone): a slim bar, the event actions, then the hall filling the first screen above a status strip.
    The bar is a wrapping flex row; its ::before and ::after are line breaks. Line 1: title (never shrinks) + clock (ellipsizes last).
    Line 2: badge + event name + fundraising total (the total ellipsizes first, then the name). Line 3: the actions.
    Heights: .4rem padding + 2.4rem line 1 + 1.5rem line 2 + .4rem padding = 4.7rem; the actions line adds .4rem + 44px.
-   The status strip (3rem) stays on the first screen as a place to start a page scroll, since the canvas takes drag. */
-@media (max-width: 650px) {
+   The status strip (3rem) stays on the first screen as a place to start a page scroll, since the canvas takes drag; the 10rem floor keeps it there on a 375px-tall landscape phone. */
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   html:not([data-kiosk]):has(#hall-content) { --phone-bar: 4.7rem; --phone-actions: calc(44px + .4rem); --phone-strip: 3rem; }
   html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-actions: 0px; }
   html:not([data-kiosk]):has(#hall-content) .site-nav, html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) #scene-event,
@@ -229,10 +229,10 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions:not(:empty) { margin-top: .4rem; }
   html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 .75rem; line-height: 44px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
-  html:not([data-kiosk]):has(#hall-content) .hall-layout { padding: 0; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { grid-template-columns: 1fr; padding: 0; }
   html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0;
-    height: max(16rem, calc(100vh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
-    height: max(16rem, calc(100svh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
+    height: max(10rem, calc(100vh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
+    height: max(10rem, calc(100svh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
   html:not([data-kiosk]):has(#hall-content) #camera-controls { margin-top: .5rem; }
 }

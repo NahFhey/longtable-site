@@ -87,7 +87,8 @@ const canvas = $("hall");
 const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").replace(JUKEBOX_SENTENCE, "").trim();
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
-const mobile = matchMedia("(max-width: 650px)");
+// Phones in either orientation: a phone turned sideways is wider than 650px but short (landscape phones top out near 932px).
+const mobile = matchMedia("(max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px)");
 $("hall-explorer").open = true;
 function arrangeHall() {
   const main = $("hall-content");
