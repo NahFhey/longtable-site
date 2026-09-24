@@ -234,7 +234,8 @@ footer p { margin: .3rem 0; }
     height: max(10rem, calc(100vh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
     height: max(10rem, calc(100svh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
-  html:not([data-kiosk]):has(#hall-content) #camera-controls { margin-top: .5rem; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; left: .5rem; right: .5rem; bottom: .5rem; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
 }
 /* Landscape phones are too short for three bar lines: one row of title, badge, event name, total, clock, then the actions (44px + .8rem padding).
    The total gives up space first, then the event name and clock together. */

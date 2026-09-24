@@ -337,12 +337,13 @@ for (const options of [{ noContext: true }, { contextThrows: true }]) {
   });
 }
 
-test("mobile begins paused with the hall open and its tools, details and tables below it in reading order", async () => {
+test("mobile begins paused with the hall open, camera buttons in the scene, and help, details and tables below it in reading order", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "mobile", { mobile: true });
   assert.equal(app.nodes.get("hall-explorer").open, true, "phones hide the summary, so the hall is always open");
   assert.deepEqual(app.nodes.get("hall-content").children.map((node) => [...app.nodes].find(([, value]) => value === node)?.[0]),
-    ["camera-controls", "camera-help", "timeline-controls", "hall-sidebar", "table-list"]);
+    ["camera-help", "timeline-controls", "hall-sidebar", "table-list"]);
+  assert.equal(app.nodes.get("camera-controls").parentElement, app.nodes.get("hall").parentElement, "phones lay the camera buttons over the canvas");
   assert.equal(app.nodes.get("play").textContent, "Play");
   assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-content"));
   assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));

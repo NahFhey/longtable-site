@@ -95,18 +95,19 @@ function arrangeHall() {
   const explorer = $("hall-explorer");
   const sidebar = $("hall-sidebar") ?? $("detail");
   const scene = canvas.parentElement;
-  const cameraTools = [$("camera-controls"), $("camera-help")].filter(Boolean);
+  const cameraHelp = $("camera-help");
   const timeline = $("timeline-controls");
   if (mobile.matches) {
     // Phones show the hall under a slim bar with its summary hidden, so a hall collapsed at a wider width reopens here.
-    // Below the canvas, in reading order: status, camera tools, timeline, sidebar, table list.
+    // The camera buttons stay in the scene, where styles.css lays them over the bottom of the canvas.
+    // Below the canvas, in reading order: status, camera help, timeline, sidebar, table list.
     // styles.css lifts the explorer above the status; kiosk hides everything moved here.
     explorer.open = true;
-    main.append(...cameraTools, ...(timeline ? [timeline] : []), sidebar, $("table-list"));
+    main.append(...(cameraHelp ? [cameraHelp] : []), ...(timeline ? [timeline] : []), sidebar, $("table-list"));
   } else {
     main.insertBefore($("table-list"), explorer.nextSibling);
     $("hall-layout").append(sidebar);
-    for (const tool of cameraTools) if (tool.parentElement !== scene) scene.insertBefore(tool, $("music-open") ?? canvas);
+    if (cameraHelp && cameraHelp.parentElement !== scene) scene.insertBefore(cameraHelp, $("music-open") ?? canvas);
     if (timeline && timeline.parentElement !== scene) scene.append(timeline);
   }
 }
