@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=0d8a3b6c0801">
+  <link rel="stylesheet" href="./styles.css?v=3083c31a53fa">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
@@ -62,7 +62,7 @@
     <section id="hall-layout" class="hall-layout" aria-labelledby="hall-heading">
       <div class="scene-wrap">
         <h2 id="hall-heading" class="visually-hidden">Animated event hall</h2>
-        <div class="camera-controls" aria-label="Hall camera controls">
+        <div id="camera-controls" class="camera-controls" aria-label="Hall camera controls">
           <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
           <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
           <button id="recenter" type="button">Recenter</button>
@@ -87,7 +87,7 @@
           <output id="music-volume-value" for="music-volume">50%</output>
           <span id="music-status" role="status" aria-live="polite"></span>
         </div>
-        <div class="timeline-controls">
+        <div id="timeline-controls" class="timeline-controls">
           <label for="scrubber">Event time</label>
           <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
           <div class="timeline-meta">
@@ -124,6 +124,6 @@
     </div>
     <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="./app.mjs?v=b2c65d626553"></script>
+  <script type="module" src="./app.mjs?v=3a2f86529a8e"></script>
 </body>
 </html>

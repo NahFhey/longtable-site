@@ -88,17 +88,25 @@ const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTE
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 const mobile = matchMedia("(max-width: 650px)");
-$("hall-explorer").open = !mobile.matches;
+$("hall-explorer").open = true;
 function arrangeHall() {
   const main = $("hall-content");
   const explorer = $("hall-explorer");
   const sidebar = $("hall-sidebar") ?? $("detail");
+  const scene = canvas.parentElement;
+  const cameraTools = [$("camera-controls"), $("camera-help")].filter(Boolean);
+  const timeline = $("timeline-controls");
   if (mobile.matches) {
-    main.insertBefore($("table-list"), explorer);
-    main.insertBefore(sidebar, explorer);
+    // Phones show the hall under a slim bar with its summary hidden, so a hall collapsed at a wider width reopens here.
+    // Below the canvas, in reading order: status, camera tools, timeline, sidebar, table list.
+    // styles.css lifts the explorer above the status; kiosk hides everything moved here.
+    explorer.open = true;
+    main.append(...cameraTools, ...(timeline ? [timeline] : []), sidebar, $("table-list"));
   } else {
     main.insertBefore($("table-list"), explorer.nextSibling);
     $("hall-layout").append(sidebar);
+    for (const tool of cameraTools) if (tool.parentElement !== scene) scene.insertBefore(tool, $("music-open") ?? canvas);
+    if (timeline && timeline.parentElement !== scene) scene.append(timeline);
   }
 }
 arrangeHall();
@@ -1308,7 +1316,9 @@ function updateHeader(active) {
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
   const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
-  const clockText = upcomingNow ? doorsText : formatSlot(state.time, true);
+  // Non-kiosk phones have one short header row for the clock, so the doors time there uses the replay clock's short date.
+  const phoneDoorsText = `${formatDate(start, { weekday: "short", month: "short", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
+  const clockText = upcomingNow ? (mobile.matches && !state.kiosk ? phoneDoorsText : doorsText) : formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
   const clockStamp = upcomingNow ? state.data.event.start : "";
   if ($("clock").dateTime !== clockStamp) $("clock").dateTime = clockStamp;

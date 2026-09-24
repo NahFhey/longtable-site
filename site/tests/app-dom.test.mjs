@@ -43,7 +43,7 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link"];
+  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   nodes.get("fundraising-total").hidden = true;
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
@@ -64,6 +64,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     drawImage(image, ...args) { imageCalls.push({ src: image._src, args }); },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
+  scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"));
   nodes.get("hall").parentElement = scene;
   nodes.get("hall").width = 960;
   nodes.get("hall").height = 480;
@@ -336,15 +337,26 @@ for (const options of [{ noContext: true }, { contextThrows: true }]) {
   });
 }
 
-test("mobile begins paused with a collapsed hall and visible details in the main reading order", async () => {
+test("mobile begins paused with the hall open and its tools, details and tables below it in reading order", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "mobile", { mobile: true });
-  assert.equal(app.nodes.get("hall-explorer").open, false);
+  assert.equal(app.nodes.get("hall-explorer").open, true, "phones hide the summary, so the hall is always open");
+  assert.deepEqual(app.nodes.get("hall-content").children.map((node) => [...app.nodes].find(([, value]) => value === node)?.[0]),
+    ["camera-controls", "camera-help", "timeline-controls", "hall-sidebar", "table-list"]);
   assert.equal(app.nodes.get("play").textContent, "Play");
   assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-content"));
   assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("activity-panel").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("table-list").parentElement, app.nodes.get("hall-content"));
+});
+
+test("desktop keeps the camera tools and timeline inside the scene with the hall open", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "desktop-arrangement");
+  const scene = app.nodes.get("hall").parentElement;
+  for (const id of ["camera-controls", "camera-help", "timeline-controls"]) assert.equal(app.nodes.get(id).parentElement, scene, id);
+  assert.equal(app.nodes.get("hall-explorer").open, true);
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-layout"));
 });
 
 test("one relevant game is selected automatically, while two are framed without a selected game", async () => {
@@ -1219,6 +1231,17 @@ const DAY = 24 * 60 * 60_000;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 const nowQuery = (milliseconds) => `now=${encodeURIComponent(new Date(milliseconds).toISOString())}`;
 const spritePositions = (app) => new Set(app.imageCalls.filter((call) => call.src.includes("roguelikeChar")).map((call) => `${call.args[4]},${call.args[5]}`));
+
+test("before doors a phone header shows the short doors date, while the announced text keeps the long one", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const app = await runApp([sample], "gathering-phone-clock", { search: `?sample=1&${nowQuery(start - 40 * DAY)}`, mobile: true });
+  assert.deepEqual(app.errors, []);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("clock").textContent, "Sat, Nov 7, 10:00 AM");
+  assert.equal(app.nodes.get("clock").dateTime, sample.event.start);
+  assert.equal(app.nodes.get("current-event").textContent, "Doors open Saturday, November 7, 10:00 AM. 40 days away.");
+});
 
 test("before doors the sample with ?now= opens on the settled gathering and previews the planned day on demand", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
