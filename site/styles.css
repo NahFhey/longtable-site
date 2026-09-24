@@ -236,6 +236,21 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
   html:not([data-kiosk]):has(#hall-content) #camera-controls { margin-top: .5rem; }
 }
+/* Landscape phones are too short for three bar lines: one row of title, badge, event name, total, clock, then the actions (44px + .8rem padding).
+   The total gives up space first, then the event name and clock together. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  html:not([data-kiosk]):has(#hall-content) { --phone-bar: calc(44px + .8rem); --phone-actions: 0px; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { flex-wrap: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before, html:not([data-kiosk]):has(#hall-content) .masthead::after { display: none; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 2; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .fundraising-total { order: 4; }
+  html:not([data-kiosk]):has(#hall-content) .readout time { order: 5; margin-left: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 6; flex: none; gap: .5rem; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions:not(:empty) { margin-top: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; padding: 0 1rem; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
