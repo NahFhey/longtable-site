@@ -98,6 +98,9 @@ main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 .camera-help { color: var(--muted); font-size: .7rem; margin: .5rem 0 .8rem; }
 canvas { display: block; width: 100%; height: clamp(320px, 39vw, 540px); touch-action: none; cursor: grab; border: 1px solid #766749; border-radius: .3rem; background: #100f15; image-rendering: pixelated; image-rendering: crisp-edges; }
 canvas:active { cursor: grabbing; }
+/* Off phones and the kiosk the view takes the hall's shape (app.mjs sets --hall-aspect from the room), so each row
+   of tables the hall gains makes the view taller. The cap keeps the whole view on one screen; past it, the camera pans. */
+html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 / 1); min-height: 320px; max-height: max(320px, calc(100vh - 6rem)); }
 .tooltip { position: absolute; z-index: 5; pointer-events: none; max-width: min(24rem, 80vw); padding: .4rem .65rem; border: 1px solid #ffffff52; border-radius: .3rem; background: #070d0beb; color: white; font-size: .82rem; }
 .timeline-controls { margin-top: 1rem; padding: .85rem 1rem; background: #111d17; border: 1px solid var(--line); border-radius: .35rem; }
 .timeline-controls > label { display: block; color: var(--gold); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
@@ -230,7 +233,7 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 .75rem; line-height: 44px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
   html:not([data-kiosk]):has(#hall-content) .hall-layout { grid-template-columns: 1fr; padding: 0; }
-  html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0;
+  html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0; min-height: 0; max-height: none;
     height: max(10rem, calc(100vh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
     height: max(10rem, calc(100svh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }

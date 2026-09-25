@@ -87,24 +87,28 @@ A legacy schema-4 fake day is in `timeline.sample.json`
 
 | field | type | notes |
 |---|---|---|
-| `version` | int | `1`. Unknown versions are rejected. Geometry rules below are immutable for this version. |
+| `version` | int | `1`. Unknown versions are rejected. Geometry rules are below. |
 | `pad_capacity` | int | Positive safe integer. Default 20. All existing table records reserve one pad, including ended tables. |
 | `overflow_capacity` | int | Nonnegative safe integer. Default 120 player seats beyond local seating. |
 
-Version 1 uses world-tile coordinates: ten columns, 6×6 cells, grid origin `(4,8)`.
-Pad `p` has cell origin `(4 + 6*(p%10), 8 + 6*floor(p/10))`. Table rows are
-`max(2, ceil(pad_capacity/10))`, with grid bottom `B = 8 + 6*rows`. The room is
-72 tiles wide. Overflow rows are `R = ceil(overflow_capacity/30)`; room height
-is `H = B + (R ? 2 + 2*R : 0) + 6`. No dimensions depend on table count or signups.
+Version 1 uses world-tile coordinates: five columns, 6×6 cells, grid origin `(4,8)`.
+Pad `p` has cell origin `(4 + 6*(p%5), 8 + 6*floor(p/5))`. Amended 2026-09-25: the
+room is sized by the tables in the package, not by capacity, so a small event does
+not sit in an empty hall. Table rows are `max(2, ceil((P+1)/5))`, where `P` is the
+highest pad in use (`-1` with no tables), with grid bottom `B = 8 + 6*rows`. The
+room is 42 tiles wide. Overflow rows are `R = ceil(S/15)`, where `S` is the sum of
+every table's reserved overflow seats (below); room height is
+`H = B + (R ? 2 + 2*R : 0) + 6`. A new pad past the last row, or a seat-count edit,
+lengthens the hall; signups never change its size. The width never changes.
 
-Fixed landmark rectangles `(x,y,width,height)` are stage `(65,1,6,H-2)`, food
-`(1,1,16,6)`, and lounge `(1,H-6,63,5)`; the entrance is `(0,9)`. Overflow seat
-`i` is `(4.5 + 2*(i%30), B + 2.5 + 2*floor(i/30))`. Occupied overflow chairs
-are assigned by ascending pad then signup order. Their area is fixed; individual
-attendees' overflow chairs can change when rosters change. Ten local positions
-include the DM, so each table reserves `max(0, seats-9)` overflow seats. The sum
-must not exceed `overflow_capacity`, even for non-overlapping table windows.
-This ensures every advertised seat can be filled without growing the room.
+Fixed landmark rectangles `(x,y,width,height)` are stage `(35,1,6,H-2)`, food
+`(1,1,16,6)`, and lounge `(1,H-6,33,5)`; the entrance is `(0,9)`. Overflow seat
+`i` is `(4.5 + 2*(i%15), B + 2.5 + 2*floor(i/15))`. Occupied overflow chairs
+are assigned by ascending pad then signup order. Individual attendees' overflow
+chairs can change when rosters change. Ten local positions include the DM, so
+each table reserves `max(0, seats-9)` overflow seats. The sum must not exceed
+`overflow_capacity`, even for non-overlapping table windows. This ensures every
+advertised seat can be filled in the room drawn for those tables.
 
 Creation allocates the lowest free pad. Edits and early ending retain it. Deletion
 (including the existing cancellation of an upcoming table) releases only that pad;

@@ -41,7 +41,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=80cbc071e954";
+} from "./model.mjs?v=0d18d772771b";
 
 const TILE = 16;
 const SCALE = 2;
@@ -1539,6 +1539,8 @@ function installTimeline(data, initial = false) {
   $("start-label").textContent = formatSlot(0, true);
   $("end-label").textContent = formatSlot(data.event.slots, true);
   state.layout = buildLayout();
+  // The desktop view follows the room's shape, back wall included (styles.css); phones and the kiosk ignore it.
+  canvas.style.setProperty("--hall-aspect", `${state.layout.width} / ${state.layout.height - state.layout.backWall.y}`);
   state.frameKey = null;
   renderActions();
   state.adminEvents = indexAdminEvents(data);

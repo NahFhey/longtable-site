@@ -9,9 +9,10 @@ export const PALETTE_SIZE = 15;
 export const ANNOUNCE_MINUTES = 8;
 export const SPOTLIGHT_MINUTES = 14;
 export const MOVEMENT_PRIORITY = Object.freeze(["spotlight-person", "break", "meal", "ordinary"]);
-export const TABLE_COLUMNS = 10;
+export const TABLE_COLUMNS = 5;
 export const LOCAL_SEAT_COUNT = 10;
-export const OVERFLOW_COLUMNS = 30;
+// Overflow chairs sit two tiles apart across the table grid's width.
+export const OVERFLOW_COLUMNS = TABLE_COLUMNS * 3;
 
 const ACTIVITY_LABELS = Object.freeze({
   set_presence: "updated their event attendance", here: "checked in", leaving: "checked out",
@@ -724,8 +725,10 @@ export function seatOffset(seat) {
 
 /**
  * Allocate occupied seats beyond the per-table cell in one deterministic hall-wide
- * area. Schema 4 freezes its bounds from room capacity; legacy packages retain
- * their original dynamic geometry. Only occupied overflow chairs are drawn.
+ * area. The hall starts with two rows of tables and gains a row whenever a table's
+ * pad (or, in legacy packages, its array index) falls past the last one. In schema 4
+ * the overflow area fits every advertised seat, so signups never move the walls.
+ * Only occupied overflow chairs are drawn.
  */
 export function createSeatingPlan(tables, room = null) {
   if (room) {
@@ -736,7 +739,8 @@ export function createSeatingPlan(tables, room = null) {
   const gridY = 8;
   const cellWidth = 6;
   const cellHeight = 6;
-  const tableRows = Math.max(2, Math.ceil(Math.max(room?.pad_capacity ?? tables.length, 2) / TABLE_COLUMNS));
+  const padsInUse = room ? Math.max(0, ...tables.map((table) => table.pad + 1)) : tables.length;
+  const tableRows = Math.max(2, Math.ceil(padsInUse / TABLE_COLUMNS));
   const tableGridBottom = gridY + tableRows * cellHeight;
   const cells = tables.map((table, index) => ({
     x: gridX + tableGridPosition(room ? table.pad : index).column * cellWidth,
@@ -773,11 +777,15 @@ export function createSeatingPlan(tables, room = null) {
     cells,
     overflowSeats,
     overflowBySeat,
-    overflowRows: Math.ceil((room?.overflow_capacity ?? overflowSeats.length) / OVERFLOW_COLUMNS),
+    overflowRows: Math.ceil(Math.max(overflowSeats.length, room ? reservedOverflow(tables) : 0) / OVERFLOW_COLUMNS),
   };
 }
 
-/** Layout version 1 keeps the original grid origin and freezes all room landmarks. */
+function reservedOverflow(tables) {
+  return tables.reduce((sum, table) => sum + Math.max(0, table.seats - (LOCAL_SEAT_COUNT - 1)), 0);
+}
+
+/** The grid origin and landmark rules are fixed; the room's size follows the tables it holds. */
 export function createRoomLayout(tables, room = null) {
   const layout = { ...createSeatingPlan(tables, room), aisles: [] };
   layout.width = layout.gridX + layout.columns * layout.cellWidth + 8;
@@ -807,8 +815,10 @@ export function wallFixtures(layout, { plaques = 2, banner = true } = {}) {
   for (let index = 0; index < plaques; index += 1) {
     rects.unshift({ x: Number((layout.width - 1 - (index + 1) * plaque.w - index).toFixed(2)), y: plaque.y, w: plaque.w, h: plaque.h });
   }
-  // The banner ends at least two tiles before the first plaque and never shrinks below eight tiles.
-  const bannerWidth = rects.length ? Math.max(8, Math.min(25, rects[0].x - 5)) : Math.min(25, layout.width - 6);
+  // The banner leaves room for the jukebox and its sign before the plaques' place, whether or not they
+  // hang, and never shrinks below eight tiles.
+  const plaquesStart = layout.width - 1 - 2 * plaque.w - 1;
+  const bannerWidth = Math.max(8, Math.min(25, Number((plaquesStart - 10).toFixed(2))));
   return { banner: banner ? { x: 3, y: -4.7, w: bannerWidth, h: 3.5 } : null, plaques: rects };
 }
 

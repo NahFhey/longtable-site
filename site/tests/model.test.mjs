@@ -286,10 +286,10 @@ test("hidden privacy and appearance mapping never use an ID", () => {
   assert.doesNotMatch(tip, /hidden-key|Private Name/);
 });
 
-test("ten-column indexing and local seats stay inside adjacent table cells", () => {
+test("five-column indexing and local seats stay inside adjacent table cells", () => {
   assert.deepEqual(tableGridPosition(0), { column: 0, row: 0 });
-  assert.deepEqual(tableGridPosition(9), { column: 9, row: 0 });
-  assert.deepEqual(tableGridPosition(10), { column: 0, row: 1 });
+  assert.deepEqual(tableGridPosition(4), { column: 4, row: 0 });
+  assert.deepEqual(tableGridPosition(5), { column: 0, row: 1 });
   const offsets = Array.from({ length: 10 }, (_, index) => seatOffset(index));
   assert.deepEqual(offsets[0], { x: 1, y: -1, overflow: false });
   assert.equal(new Set(offsets.map((item) => `${item.x.toFixed(6)},${item.y.toFixed(6)}`)).size, offsets.length);
@@ -305,9 +305,9 @@ test("global occupied overflow seats never overlap each other or adjacent tables
     signups: Array.from({ length: 35 }, (_, signupIndex) => ({ person: `${tableIndex}:${signupIndex}` })),
   }));
   const plan = createSeatingPlan(tables);
-  assert.equal(plan.columns, 10);
-  assert.equal(plan.cells[10].x, plan.cells[0].x);
-  assert.ok(plan.cells[10].y > plan.cells[0].y);
+  assert.equal(plan.columns, 5);
+  assert.equal(plan.cells[5].x, plan.cells[0].x);
+  assert.ok(plan.cells[5].y > plan.cells[0].y);
   assert.equal(plan.overflowSeats.length, 20 * (35 - 9));
   assert.deepEqual(createSeatingPlan(tables).overflowSeats, plan.overflowSeats);
 
@@ -510,22 +510,42 @@ test("saved pads survive deletion, reorder, replacement and fresh-client refresh
   for (const [index, table] of refresh.tables.entries()) {
     assert.deepEqual(next.cells[index], first.cells[table.pad]);
   }
-  const empty = createRoomLayout([], input.room_layout);
   for (const key of ["width", "height", "stage", "food", "lounge", "door", "doorPosition", "stageFront", "tableGridBottom", "overflowRows", "aisles"]) {
     assert.deepEqual(next[key], first[key], key);
-    assert.deepEqual(empty[key], first[key], key);
   }
 });
 
-test("fixed overflow area fits a large roster without moving landmarks or overlapping seats", () => {
+test("the hall starts with two rows of five tables and adds a row when a pad passes the last one", () => {
+  const room = { version: 1, pad_capacity: 20, overflow_capacity: 120 };
+  const withPads = (...pads) => createRoomLayout(pads.map((pad) => ({ id: `t${pad}`, pad, seats: 6, signups: [] })), room);
+  const empty = createRoomLayout([], room);
+  assert.equal(empty.width, 42);
+  assert.equal(empty.tableRows, 2);
+  assert.equal(empty.overflowRows, 0);
+  assert.equal(empty.height, 8 + 2 * 6 + 6);
+  assert.deepEqual(withPads(0, 1, 2).height, empty.height);
+  assert.equal(withPads(...Array.from({ length: 10 }, (_, pad) => pad)).tableRows, 2);
+  const eleven = withPads(...Array.from({ length: 11 }, (_, pad) => pad));
+  assert.equal(eleven.tableRows, 3);
+  assert.equal(eleven.height, empty.height + 6);
+  assert.equal(eleven.width, empty.width, "rows grow the hall's length, never its width");
+  assert.equal(withPads(0, 14).tableRows, 3, "a gap left by a deleted table keeps the row it needs");
+  assert.equal(withPads(15).tableRows, 4);
+  const legacy = createRoomLayout(Array.from({ length: 11 }, (_, index) => ({ id: `l${index}`, signups: [] })));
+  assert.equal(legacy.tableRows, 3);
+});
+
+test("reserved overflow area fits a large roster without moving landmarks or overlapping seats", () => {
   const room = { version: 1, pad_capacity: 20, overflow_capacity: 32 };
   const tables = [
     { id: "a", pad: 19, seats: 26, signups: Array(26).fill({}) },
     { id: "b", pad: 4, seats: 24, signups: Array(24).fill({}) },
   ];
   const layout = createRoomLayout(tables, room);
-  const empty = createRoomLayout([], room);
+  const empty = createRoomLayout(tables.map((table) => ({ ...table, signups: [] })), room);
   assert.equal(layout.overflowSeats.length, 32);
+  assert.equal(empty.overflowRows, layout.overflowRows, "advertised seats, not signups, size the overflow area");
+  assert.equal(createRoomLayout([], room).overflowRows, 0);
   assert.deepEqual(layout.lounge, empty.lounge);
   assert.deepEqual(layout.stage, empty.stage);
   const positions = tables.flatMap((table, index) => Array.from({ length: table.signups.length + 1 }, (_, seat) => seatPositionForPlan(layout, index, seat)));
@@ -683,7 +703,7 @@ test("wall fixtures hang inside the back wall without overlap, plaques flush rig
     assert.equal(edge(plaques[0]), Number((plaques[1].x - 1).toFixed(6)), "the left plaque sits one tile to the left");
     for (const plaque of plaques) assert.deepEqual([plaque.w, plaque.h, plaque.y], [4.6, 5.2, -5.6]);
     assert.equal(wallFixtures(layout, { banner: false }).banner, null);
-    assert.deepEqual(wallFixtures(layout, { plaques: 0 }), { banner: { x: 3, y: -4.7, w: Math.min(25, layout.width - 6), h: 3.5 }, plaques: [] });
+    assert.deepEqual(wallFixtures(layout, { plaques: 0 }), { banner, plaques: [] }, "the banner keeps its size when no plaques hang");
   }
 });
 

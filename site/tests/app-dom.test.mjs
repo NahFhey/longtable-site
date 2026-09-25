@@ -10,7 +10,7 @@ class FakeNode {
   constructor(tag = "div") {
     this.tagName = tag.toUpperCase();
     this.children = [];
-    this.style = {};
+    this.style = { setProperty(name, value) { this[name] = String(value); } };
     this.attributes = new Map();
     this.listeners = new Map();
     this.textContentWrites = 0;
@@ -268,6 +268,11 @@ test("a temporary 30-table/150-person fixture renders including overflow seats",
   const app = await runApp([stress], "stress");
   assert.equal(app.errors.length, 0);
   assert.equal(app.nodes.get("tables").children[0].children.length, 30);
+  // The desktop view takes the hall's shape: thirty tables make six rows, so the view is taller than it is wide.
+  const layout = createRoomLayout(stress.tables, stress.room_layout);
+  assert.equal(layout.tableRows, 6);
+  assert.equal(app.nodes.get("hall").style["--hall-aspect"], `${layout.width} / ${layout.height - layout.backWall.y}`);
+  assert.ok(layout.height - layout.backWall.y > layout.width);
 });
 
 test("canvas event content has a stable, literal, privacy-safe live-region equivalent", async () => {
