@@ -2216,3 +2216,36 @@ test("reduced-motion app frames freeze every lounge sprite position and body tra
   assert.deepEqual(frame(8900),first);
   assert.deepEqual(app.errors,[]);
 });
+
+test("stage draws alternating Indoor boards, crimson pleats and brass edge without old stage props", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "theatre-stage", { search: "?sample=1&at=12" });
+  const { stage } = createRoomLayout(sample.tables, sample.room_layout);
+  const inside = ([x, y, w, h]) => x >= stage.x * 32 && y >= stage.y * 32
+    && x + w <= (stage.x + stage.w) * 32 + 1e-8 && y + h <= (stage.y + stage.h) * 32 + 1e-8;
+  const boards = app.imageCalls.filter(call => call.src.endsWith("roguelikeIndoor_transparent.png")
+    && call.args[0] === 24 * 17 && [0, 2 * 17].includes(call.args[1]) && inside(call.args.slice(4)));
+  assert.equal(boards.length, stage.w * stage.h, "boards cover every stage tile");
+  for (let ty = 0; ty < stage.h; ty += 1) for (let tx = 0; tx < stage.w; tx += 1) {
+    assert.ok(boards.some(call => JSON.stringify(call.args) === JSON.stringify([
+      24 * 17, ((tx + ty) % 2 ? 2 : 0) * 17, 16, 16, (stage.x + tx) * 32, (stage.y + ty) * 32, 32, 32,
+    ])), `plank at ${tx},${ty} has the correct alternating source`);
+  }
+  const pleats = app.rectCalls.filter(call => call.color === "#a8343c" && inside(call.args));
+  assert.equal(pleats.length, stage.h * 4);
+  pleats.forEach((call, index) => assert.deepEqual(call.args,
+    [(stage.x + stage.w - .85) * 32, (stage.y + (index * 4 + 2) / 16) * 32, .85 * 32, 2]));
+  assert.ok(app.rectCalls.some(call => call.color === "#c9a45c" && inside(call.args)
+    && JSON.stringify(call.args) === JSON.stringify([stage.x * 32, stage.y * 32, 2, stage.h * 32])));
+  const oldProps = app.imageCalls.filter(call => {
+    if (!call.src.endsWith("roguelikeSheet_transparent.png")) return false;
+    const [sx, sy, , , x, y] = call.args;
+    // Include the back-wall row where the old banners hung.
+    const atStage = x >= stage.x * 32 && x < (stage.x + stage.w) * 32
+      && y >= 0 && y < (stage.y + stage.h) * 32;
+    return atStage && ((sx === 12 * 17 && sy === 28 * 17)
+      || ([49, 50, 51].includes(sx / 17) && sy === 0) || (sx === 23 * 17 && sy === 0));
+  });
+  assert.deepEqual(oldProps, []);
+  assert.deepEqual(app.errors, []);
+});

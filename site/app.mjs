@@ -6,6 +6,7 @@ import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl 
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
 import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
+import { createStageDrawing } from "./stage-drawing.mjs?v=666f156be0b3";
 import { loungeGeometry } from "./lounge-layout.mjs?v=57da6155641f";
 import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
 import { cornerRoute } from "./food-routing.mjs?v=e52cc41290de";
@@ -75,12 +76,12 @@ class HallDoor {
 }
 
 const RPG = {
-  floor: { wood: [1,26], stage: [12,28], food: [6,28], wall: [15,13] },
+  floor: { wood: [1,26], food: [6,28], wall: [15,13] },
   table: [[23,4],[24,4],[25,4]],
   chairs: { top: [20,3], bottom: [19,3], left: [21,3], right: [22,3] },
-  door: { closed: [36,0], open: [37,0] }, banners: [[49,0],[50,0],[51,0]],
+  door: { closed: [36,0], open: [37,0] },
   food: [[54,15],[55,16],[56,17],[54,13],[55,13],[56,13]],
-  barrel: [23,0], shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
+  shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
   rug: [10,16],
 };
 
@@ -130,6 +131,7 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 foodCorner.bindFoodDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, reduced: () => reducedMotion.matches });
 
 const loungeDrawing = createLoungeDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, indoor: () => state.images?.indoor, reduced: () => reducedMotion.matches });
+const stageDrawing = createStageDrawing({ ctx: () => ctx, indoor: () => state.images?.indoor, reduced: () => reducedMotion.matches });
 
 const state = {
   data: null,
@@ -821,12 +823,8 @@ function drawRoom() {
       ctx.fillRect(x * TILE * SCALE, y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
     }
   }
-  drawNine(layout.stage, RPG.floor.stage, "#554761");
-  drawStageStairs();
+  stageDrawing.drawStageFloor(layout);
   for (const cell of layout.cells) drawNine({ x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 }, RPG.rug, "#3d6b45");
-
-  for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.banners[index], layout.stage.x + 1 + index * 2, 0);
-  drawTile(state.images.rpg, RPG.barrel, layout.stage.x + 3, layout.stage.y + 1);
 
   const drops = [...state.people.values()].filter(runtime => runtime.trashAt != null)
     .map(runtime => (state.animationNow - runtime.trashAt) / 1000);
@@ -844,20 +842,6 @@ function drawRoom() {
     ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
   }
   drawJukebox();
-}
-
-function drawStageStairs() {
-  const { stairs } = stageGeometry(state.layout);
-  const unit = TILE * SCALE;
-  ctx.fillStyle = "#292331";
-  ctx.fillRect(stairs.x * unit, (stairs.y + .12) * unit, stairs.w * unit, stairs.h * unit);
-  for (let step = 0; step < 4; step += 1) {
-    const x = (stairs.x + step * stairs.w / 4) * unit;
-    ctx.fillStyle = ["#756177", "#8d778c", "#a38b9d", "#b9a2b2"][step];
-    ctx.fillRect(x, stairs.y * unit, stairs.w / 4 * unit - 1, stairs.h * unit);
-    ctx.fillStyle = "#dfc8ca";
-    ctx.fillRect(x, stairs.y * unit, 2, stairs.h * unit);
-  }
 }
 
 function drawMicrophone() {
@@ -1304,6 +1288,7 @@ function render(now, active) {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
     }
   });
+  stageDrawing.drawStageLights(state.layout, now);
   drawMicrophone();
   // Dim only the room artwork; controls, table details and speech remain readable.
   const lights = [...state.people.values()].some(person => person.visible) && state.ambience.foodCount === 6

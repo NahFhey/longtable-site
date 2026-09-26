@@ -464,6 +464,9 @@ staff activity. Frozen archives retain their own renderer.
 
 ### Custom messages on stage
 
+The stage runs down the right wall: walnut boards, a crimson curtain, a raised brass
+edge, wooden stairs and warm footlights.
+
 Approved custom table messages (`donation` in the data contract) bring their
 speaker to the stage microphone through the side stairs. Pending speakers form
 an ordered queue below the stairs, with one figure per person even if they have
