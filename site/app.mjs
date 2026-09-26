@@ -136,6 +136,7 @@ const state = {
   selectedId: null,
   manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
+  hoverTable: -1,   // index of the table under the mouse; it shows its name plate like the selected one
   layout: null,
   people: new Map(),
   door: new HallDoor(),
@@ -989,8 +990,9 @@ function drawTableLabels() {
   const dpr = globalThis.devicePixelRatio || 1;
   ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const boxes = [];
-  // Only the selected table carries a name plate; clearing the selection hides it.
-  const indices = state.data.tables.map((_, i) => i).filter((i) => state.data.tables[i].id === state.selectedId);
+  // Only the selected and the hovered table carry a name plate; the hovered one draws on top.
+  const selected = state.data.tables.findIndex((table) => table.id === state.selectedId);
+  const indices = [...new Set([selected, state.hoverTable])].filter((i) => i >= 0 && state.data.tables[i]);
   for (const index of indices) {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
@@ -1006,7 +1008,7 @@ function drawTableLabels() {
     const top = Math.min(point.y, state.viewport.height - height - 4);
     boxes.push({ x: left, y: top, w: width, h: height, index });
     ctx.fillStyle = "#17141feb"; ctx.fillRect(left, top, width, height);
-    ctx.fillStyle = "#ffd27a";
+    ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText(text, left + width / 2, top + 3, width - 8);
     if (height > 23) {
@@ -1693,6 +1695,7 @@ function pointerPoint(event) {
 }
 
 function canvasPoint(event) { return screenToWorld(state.camera, pointerPoint(event)); }
+function tableAt(point) { return state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6); }
 function hideTooltip() { state.hover = null; $("tooltip").hidden = true; }
 function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.cursor = value; }
 const pointers = new Map();
@@ -1748,8 +1751,9 @@ canvas.addEventListener("pointermove", (event) => {
     if (candidate < distance) { best = runtime; distance = candidate; }
   }
   state.hover = best;
+  state.hoverTable = tableAt(point);
   const onJukebox = overJukebox(point);
-  setCursor(onJukebox ? "pointer" : "");
+  setCursor(onJukebox || state.hoverTable >= 0 ? "pointer" : "");
   const tooltip = $("tooltip");
   if (!best && !onJukebox) { tooltip.hidden = true; return; }
   // A person walking in front of the jukebox keeps their tooltip; the jukebox tip stays visible in kiosk mode.
@@ -1768,14 +1772,14 @@ function finishPointer(event) {
 canvas.addEventListener("pointerup", finishPointer);
 canvas.addEventListener("pointercancel", (event) => { suppressClick = true; finishPointer(event); });
 canvas.addEventListener("lostpointercapture", finishPointer);
-canvas.addEventListener("pointerleave", () => { hideTooltip(); setCursor(""); });
+canvas.addEventListener("pointerleave", () => { hideTooltip(); state.hoverTable = -1; setCursor(""); });
 canvas.addEventListener("click", (event) => {
   if (!state.camera || suppressClick) return;
   const point = canvasPoint(event);
   if (overJukebox(point)) { music?.togglePanel(); return; }
   const screen = pointerPoint(event);
-  const label = state.labelBoxes?.find((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
-  const index = label?.index ?? state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
+  const label = state.labelBoxes?.findLast((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
+  const index = label?.index ?? tableAt(point);
   const table = index >= 0 ? state.data.tables[index] : null;
   // Timed here rather than with dblclick so a double tap on a phone zooms too.
   const now = performance.now();

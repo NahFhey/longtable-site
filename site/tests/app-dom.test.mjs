@@ -1840,7 +1840,7 @@ test("practice drops polling to 5 seconds and back to 30 when nobody practises; 
   assert.equal(demo.fetchUrls.length, 1, "a sample page never fetches again");
 });
 
-test("only the selected table shows its name plate", async () => {
+test("only the selected or hovered table shows its name plate", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   sample.events = [];
   sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
@@ -1849,6 +1849,11 @@ test("only the selected table shows its name plate", async () => {
   const plates = () => { app.contextCalls.length = 0; app.frames.shift()?.(performance.now() + 30); return sample.tables.filter((table) => app.contextCalls.some((call) => typeof call === "string" && call.startsWith(table.name.slice(0, 20)))).length; };
   assert.equal(plates(), 0, "no plate while nothing is selected");
   app.nodes.get("fit-active").listeners.get("click")();
+  plates();
+  events.get("pointermove")({ pointerId: 1, clientX: 680, clientY: 240 });
+  assert.equal(plates(), 1, "hovering a table shows its plate");
+  events.get("pointerleave")({});
+  assert.equal(plates(), 0, "leaving the hall hides it again");
   events.get("pointerdown")({ pointerId: 1, clientX: 680, clientY: 240, button: 0 });
   events.get("pointerup")({ pointerId: 1 });
   events.get("click")({ clientX: 680, clientY: 240 });
