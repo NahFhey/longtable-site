@@ -1922,8 +1922,9 @@ test("a game that has ended takes its plate down, and a plate stays between its 
   assert.equal(plates.length, 1, "one plate is drawn");
   const [left, top, width, height] = plates[0].args;
   assert.ok(top >= aboveEnds.y && top + height <= seatTop.y, `the plate (${top}–${top + height}) stays between the table above (${aboveEnds.y}) and its own top seats (${seatTop.y})`);
-  const rowRight = worldToScreen(camera, seatPositionForPlan(layout, 0, 2));
-  assert.ok(left + width / 2 > seatTop.x && left + width / 2 < rowRight.x, "and hangs over its own table's top row");
+  // Seat zero (the DM) sits at the middle of the three-tile tabletop.
+  const middle = worldToScreen(camera, seatPositionForPlan(layout, 0, 0));
+  assert.ok(Math.abs(left + width / 2 - middle.x) < 1, `and is centred on its tabletop (${left + width / 2} vs ${middle.x})`);
 });
 
 

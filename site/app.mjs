@@ -1018,7 +1018,7 @@ function drawTableLabels() {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
     // The plate hangs just above its own table's top row of seats, so it reads as that table's sign.
-    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + .6 });
+    const point = worldToScreen(state.camera, { x: seatPosition(index, 0).tableX + 1.5, y: cell.y + .6 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 18 || point.y > state.viewport.height) continue;
     const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
     // A game that has ended takes its plate down.
