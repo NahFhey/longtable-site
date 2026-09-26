@@ -1,4 +1,4 @@
-import { activeEvents, modeAt, msToSlot, playbackSpeed } from "./model.mjs?v=76cdfa0de69b";
+import { activeEvents, modeAt, msToSlot, playbackSpeed } from "./model.mjs?v=f194ea561d72";
 
 const clampSlot = (timeline, slot) => Math.max(0, Math.min(timeline.event.slots, slot));
 
@@ -33,7 +33,7 @@ export function followNowClock(clock, timeline, now) {
   return { ...clock, mode: "follow-now", slot: clampSlot(timeline, msToSlot(timeline, now)), autoFollow: false };
 }
 
-export function tickViewerClock(clock, timeline, now, elapsedSeconds, requestedSpeed) {
+export function tickViewerClock(clock, timeline, now, elapsedSeconds, requestedSpeed, announcer = null) {
   const canFollow = clock.source === "live" && timeline.phase === "live";
   if (canFollow && (clock.mode === "follow-now" || (clock.autoFollow && now >= Date.parse(timeline.event.start)))) {
     return followNowClock(clock, timeline, now);
@@ -43,7 +43,7 @@ export function tickViewerClock(clock, timeline, now, elapsedSeconds, requestedS
   if (clock.mode === "upcoming") return canFollow ? { ...clock, slot: 0 } : seekViewerClock(clock, timeline, 0);
   const slot = clampSlot(timeline, clock.slot);
   if (clock.mode !== "replay") return { ...clock, slot };
-  const speed = playbackSpeed(requestedSpeed, activeEvents(timeline, slot));
+  const speed = playbackSpeed(requestedSpeed, activeEvents(timeline, slot), announcer);
   const next = clampSlot(timeline, slot + Math.max(0, elapsedSeconds) * speed / (timeline.event.slot_minutes * 60));
   return { ...clock, slot: next, mode: next >= timeline.event.slots ? "paused" : "replay" };
 }

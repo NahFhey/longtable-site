@@ -115,8 +115,9 @@ labels in the overview. Full text remains available in cards and details.
 Normal 30-minute slots use 15 minutes of preparation, 5 minutes ready before play,
 and 10 minutes of cleanup afterward. Durations scale down proportionally for
 shorter slots, and clip to the event boundaries. Phases are scheduled, preparing,
-ready, playing, packing up, and inactive. Tables/chairs appear during preparation;
-props appear when ready and disappear during cleanup. Nothing waits for a prior
+ready, playing, packing up, and inactive. A three-person crew lays the rug first,
+then sets up the table, chairs, and map. Cleanup reverses that order, lifting the
+rug last. Props appear when ready and disappear during cleanup. Nothing waits for a prior
 animation to finish. The list and selected-table details report the same phase
 as a bare status line; before doors (the upcoming clock) every table reads
 "Scheduled" rather than the slot-0 phase.
@@ -295,13 +296,15 @@ shows an empty state; network failures and invalid manifests offer a retry.
 Navigation supports both domain-root and project-prefix hosting. Older frozen
 archives remain playable unchanged; newly preserved archives link back to the index.
 
-`tableScenery` derives furniture delivery, chair placement, map unfolding, stacking,
-and removal directly from the selected slot. Staff use randomly selected character layers, seeded by event start and station
+`tableScenery` derives a three-person crew, rug unrolling, furniture delivery, chair
+placement, map unfolding, stacking, and removal directly from the selected slot.
+Two crew members carry the rug; the third carries the table. The rug goes down
+first and comes up last. Staff use character layers seeded by event start and member station
 so their appearance stays stable across refreshes and replays. They retain their
 STAFF labels and never appear in attendee lists. Staff follow authored aisle
 routes during preparation/cleanup and never enter participant state, rosters, or
 counts. Pause stops them; seek/reload reconstructs the same scene. Reduced motion
-omits moving staff and snaps map unfolding while retaining the same furniture stage.
+omits moving staff and snaps rug and map unfolding while retaining the same furniture stage.
 No new recorded events or history claims are introduced.
 
 ### Recorded dice (Milestone G)
@@ -467,6 +470,11 @@ staff activity. Frozen archives retain their own renderer.
 The stage runs down the right wall: walnut boards, a crimson curtain, a raised brass
 edge, wooden stairs and warm footlights.
 
+For scheduled announcements, a staff announcer walks up the stage stairs to the
+mic, speaks for eight minutes, and walks off along the same route. Nearby messages
+share one stage visit. Automatic framing includes the stage throughout the visit;
+replay caps walking at 30×. Reduced motion shows staff only while speaking.
+
 Approved custom table messages (`donation` in the data contract) bring their
 speaker to the stage microphone through the side stairs. Pending speakers form
 an ordered queue below the stairs, with one figure per person even if they have
@@ -578,9 +586,13 @@ look-around, dish pops, bin squash, card dealing, pip flips and page turns, and 
 steam and the lit hearth static. Cosmetic cycles use real time; seats and
 positions reconstruct from event time.
 
-Scheduled breaks appear in the existing timeline break events. During a break,
-an anonymous staff member announces the return time from the stage, and the
-announcement also appears in the accessible current-event text. Present attendees
+Scheduled breaks appear in the existing timeline break events. A staff announcer
+walks up the stage stairs to the mic, announces the return time for up to eight
+minutes (or the break's duration if shorter), then walks off. Meals get the same
+visit: the announcer reads the meal's text (or "Food is served in the food corner!")
+while the meal banner stays up. The kitchen caretaker
+continues their own schedule. The break banner and accessible current-event text
+remain for the whole break. Present attendees
 move to the lounge, including those with explicit food/table choices; stage
 speakers and spotlights retain their temporary priority. At the end, attendees
 resume their current location rules. Breaks do not extend game end times.

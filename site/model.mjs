@@ -1,5 +1,6 @@
 import { loungeGeometry, seatLounge } from "./lounge-layout.mjs?v=57da6155641f";
 import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
+import { stageGeometry, stagePath } from "./stage.mjs";
 import { CHOICE_COUNTS } from "./characters.mjs";
 import { FOOD_CORNER, atFood, foodSetOut, foodClearAt, SET_OUT_SECONDS, kitchenPath } from "./food-layout.mjs?v=44523bdb9315";
 export { foodGeometry } from "./food-layout.mjs?v=44523bdb9315";
@@ -1293,6 +1294,64 @@ export function activeEvents(timeline, slot, adminEvents = indexAdminEvents(time
   return active;
 }
 
+const ANNOUNCER_ROUTES = new WeakMap();
+// The door-to-microphone route depends only on the layout, so it is built once per layout.
+function announcerRoute(layout, spot) {
+  if (!ANNOUNCER_ROUTES.has(layout)) {
+    const from = { x: layout.door.x + 1.5, y: layout.door.y + .5 };
+    // The stairs come down beside the lounge: follow the hall aisle nearest them that clears the lounge,
+    // then drop straight to the foot of the stairs, rather than cutting through the card tables.
+    const lounge = layout.lounge;
+    const clear = layout.aisles.filter(y => !lounge || y < lounge.y || y > lounge.y + lounge.h);
+    const { foot } = stageGeometry(layout);
+    const row = clear.reduce((best, y) => Math.abs(y - foot.y) < Math.abs(best - foot.y) ? y : best, clear[0] ?? foot.y);
+    const hallPath = (a, b) => hallCorridorPath(layout, { ...a, row: a.y }, { ...b, row });
+    const route = [from, ...stagePath(layout, from, spot, hallPath)];
+    const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
+    ANNOUNCER_ROUTES.set(layout, { route, lengths, length: lengths.reduce((sum, segment) => sum + segment, 0) });
+  }
+  return ANNOUNCER_ROUTES.get(layout);
+}
+
+/** Staff stage visits reconstructed entirely from event time, including the stairs. */
+export function stageAnnouncer(timeline, slot, layout, reducedMotion = false) {
+  if (slot < 0) return null;
+  const announce = ANNOUNCE_MINUTES / timeline.event.slot_minutes;
+  const windows = indexAdminEvents(timeline)
+    .filter(item => item.kind === "break" || item.kind === "meal" || item.kind === "announce")
+    .map(event => ({ event, start: event.at,
+      end: event.at + (event.kind === "announce" ? announce : Math.min(announce, event.duration)) }))
+    .filter(window => window.end > window.start)
+    .sort((a, b) => a.start - b.start);
+  const spot = { x: layout.stageFront.x + 2, y: layout.stageFront.y };
+  const speaking = windows.findLast(window => slot >= window.start && slot < window.end);
+  if (speaking) return { ...spot, speaking: true, event: speaking.event };
+  if (reducedMotion || !windows.length) return null;
+
+  const { route, lengths, length } = announcerRoute(layout, spot);
+  const tilesPerSlot = CARETAKER_TILES_PER_SECOND * timeline.event.slot_minutes * 60;
+  const walk = length / tilesPerSlot;
+  const runs = [];
+  for (const window of windows) {
+    const previous = runs.at(-1);
+    if (previous && window.start <= previous.end + walk) {
+      previous.windows.push(window);
+      previous.end = Math.max(previous.end, window.end);
+    } else runs.push({ start: window.start, end: window.end, windows: [window] });
+  }
+  for (const run of runs) {
+    if (slot < Math.max(0, run.start - walk) || slot >= run.end + walk) continue;
+    // In a gap, wait at the microphone for the next message in this run.
+    const event = (run.windows.find(window => slot < window.start)
+      ?? run.windows.findLast(window => window.end === run.end)).event;
+    if (slot >= run.start && slot < run.end) return { ...spot, speaking: false, event };
+    const distance = slot < run.start ? length - (run.start - slot) * tilesPerSlot
+      : slot >= run.end ? length - (slot - run.end) * tilesPerSlot : length;
+    return { ...crewRoutePoint(route, lengths, Math.max(0, Math.min(length, distance))), speaking: false, event };
+  }
+  return null;
+}
+
 /** Schedule-derived scenery, with half-open phases clipped to the event window.
  * A compressed dry run scales down the normal 15/5/10-minute setup/ready/cleanup.
  * This does not claim whether a table was canceled or ended early.
@@ -1319,41 +1378,46 @@ export function tableLifecycle(timeline, table, slot) {
   };
 }
 
+/** Interpolate a clamped distance along the authored table-crew route. */
+function crewRoutePoint(route, lengths, distance) {
+  for (let i = 0; i < lengths.length; i += 1) {
+    if (distance <= lengths[i] || i === lengths.length - 1) {
+      const fraction = lengths[i] ? distance / lengths[i] : 0;
+      return { x: route[i].x + (route[i + 1].x - route[i].x) * fraction,
+        y: route[i].y + (route[i + 1].y - route[i].y) * fraction };
+    }
+    distance -= lengths[i];
+  }
+}
+
 /** Anonymous scenery reconstructed from selected time, never from attendee state. */
 export function tableScenery(timeline, table, slot, layout, index, reducedMotion = false) {
   const lifecycle = tableLifecycle(timeline, table, slot);
   const between = (value, start, end) => Math.max(0, Math.min(1, (value - start) / (end - start)));
   const seats = chairSeatIndices(table);
   const scene = { furniture: lifecycle.furniture, chairs: seats, map: lifecycle.props ? 1 : 0,
-    props: lifecycle.props, stacked: 0, staff: null };
+    props: lifecycle.props, stacked: 0, crew: [], rug: lifecycle.props ? 1 : 0 };
   if (!lifecycle.furniture) return { ...scene, chairs: [] };
   const preparing = lifecycle.phase === "preparing";
   if (!preparing && lifecycle.phase !== "cleaning") return scene;
   const progress = preparing ? between(slot, lifecycle.prepareAt, lifecycle.readyAt)
     : between(slot, table.end, lifecycle.inactiveAt);
-  let routeProgress;
-  let load = null;
   if (preparing) {
-    scene.furniture = progress >= .3;
+    scene.rug = between(progress, .2, .3);
+    scene.furniture = progress >= .35;
     scene.chairs = seats.slice(0, Math.floor(seats.length * between(progress, .35, .75)));
     scene.map = between(progress, .75, .9);
-    routeProgress = progress < .3 ? progress / .3 : 1 - between(progress, .9, 1);
-    if (progress < .3) load = "table";
-    else if (progress < .75) load = "chairs";
-    else if (progress < .9) load = "map";
   } else {
-    scene.furniture = progress < .7;
-    scene.chairs = seats.slice(0, Math.ceil(seats.length * (1 - between(progress, .3, .65))));
-    scene.stacked = progress >= .3 && progress < .7 ? Math.min(3, seats.length - scene.chairs.length) : 0;
+    scene.furniture = progress < .65;
+    scene.chairs = seats.slice(0, Math.ceil(seats.length * (1 - between(progress, .3, .6))));
+    scene.stacked = progress >= .3 && progress < .65 ? Math.min(3, seats.length - scene.chairs.length) : 0;
     scene.map = progress < .25 ? 1 - between(progress, .15, .25) : 0;
-    routeProgress = progress < .15 ? progress / .15 : 1 - between(progress, .7, 1);
-    if (progress >= .7) load = "table";
-    else if (progress >= .3) load = "chairs";
-    else if (progress >= .15) load = "map";
+    scene.rug = progress < .7 ? 1 : 1 - between(progress, .7, .8);
   }
   if (reducedMotion) {
     scene.map = scene.map > 0 ? 1 : 0;
-    return scene; // Same furniture stage, without a moving porter.
+    scene.rug = scene.rug > 0 ? 1 : 0;
+    return scene;
   }
   const cell = layout.cells[index];
   // Authored route follows the left aisle and the top edge of this pad's row.
@@ -1361,15 +1425,34 @@ export function tableScenery(timeline, table, slot, layout, index, reducedMotion
     { x: 2.5, y: layout.door.y + .5 }, { x: 2.5, y: cell.y + .25 },
     { x: cell.x + .3, y: cell.y + .25 }, { x: cell.x + .3, y: cell.y + 3.5 }];
   const lengths = route.slice(1).map((point, i) => Math.hypot(point.x - route[i].x, point.y - route[i].y));
-  let distance = routeProgress * lengths.reduce((sum, length) => sum + length, 0);
-  for (let i = 0; i < lengths.length; i += 1) {
-    if (distance <= lengths[i] || i === lengths.length - 1) {
-      const fraction = lengths[i] ? distance / lengths[i] : 0;
-      scene.staff = { x: route[i].x + (route[i + 1].x - route[i].x) * fraction,
-        y: route[i].y + (route[i + 1].y - route[i].y) * fraction, load };
-      break;
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  for (let member = 0; member < 3; member += 1) {
+    let r, load = null;
+    if (preparing) {
+      if (member === 2) {
+        if (progress < .1 || progress > .6) continue;
+        r = between(progress, .1, .3) * (1 - between(progress, .45, .6));
+        if (progress < .35) load = "table";
+      } else {
+        r = between(progress, 0, .2) * (1 - between(progress, .9, 1));
+        if (progress < .2) load = "rug";
+        else if (progress >= .35 && progress < .75) load = "chairs";
+        else if (member === 0 && progress >= .75 && progress < .9) load = "map";
+      }
+    } else {
+      if (member === 2) {
+        if (progress > .9) continue;
+        r = between(progress, 0, .15) * (1 - between(progress, .65, .9));
+        if (progress >= .65) load = "table";
+      } else {
+        r = between(progress, 0, .15) * (1 - between(progress, .8, 1));
+        if (progress >= .8) load = "rug";
+        else if (progress >= .3 && progress < .65) load = "chairs";
+        else if (member === 0 && progress >= .15 && progress < .3) load = "map";
+      }
     }
-    distance -= lengths[i];
+    const distance = Math.max(0, Math.min(total, r * total - member * .8));
+    scene.crew.push({ ...crewRoutePoint(route, lengths, distance), load, member });
   }
   return scene;
 }
@@ -1577,7 +1660,8 @@ export function loungeActivities(layout, people) {
   return seatLounge(layout, result);
 }
 
-export function playbackSpeed(requested, active) {
+export function playbackSpeed(requested, active, announcer = null) {
+  if (announcer && !announcer.speaking) return Math.min(requested, 30);
   if (active.announce || active.spotlight) return Math.min(requested, 30);
   if (active.break || active.meal) return Math.min(requested, 120);
   return requested;

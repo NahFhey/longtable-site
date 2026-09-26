@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
-import { practiceKitchenServices, practicePlaces } from "../model.mjs";
+import { createRoomLayout, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, tableLifecycle, tableScenery, wallFixtures } from "../model.mjs";
+import { hallAmbience, practiceKitchenServices, practicePlaces, stageAnnouncer } from "../model.mjs";
 import { queueSpot } from "../food-layout.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
@@ -56,6 +56,8 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   const textCalls = [];
   const imageCalls = [];
   const rectCalls = [];
+  const canvasCalls = [];
+  let path = [];
   const transforms = [];
   // Each drawTile save scope records its own flip; outer body motion must not
   // change assertions about the sprite's underlying hall position.
@@ -67,8 +69,15 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     measureText(value) { return { width: String(value).length * 5 }; },
     fillText(value, x, y) { contextCalls.push(String(value)); textCalls.push({ text: String(value), x, y }); },
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
-    save() { scopes.push({}); },
-    restore() { if (scopes.length > 1) scopes.pop(); },
+    save() { scopes.push({}); canvasCalls.push({ op: "save" }); },
+    restore() { if (scopes.length > 1) scopes.pop(); canvasCalls.push({ op: "restore" }); },
+    beginPath() { path = []; },
+    rect(...args) { path.push(["rect", ...args]); },
+    moveTo(...args) { path.push(["moveTo", ...args]); },
+    lineTo(...args) { path.push(["lineTo", ...args]); },
+    clip() { canvasCalls.push({ op: "clip", path: structuredClone(path) }); },
+    stroke() { canvasCalls.push({ op: "stroke", path: structuredClone(path), color: this.strokeStyle,
+      width: this.lineWidth, cap: this.lineCap }); },
     translate(x, y) { scopes.at(-1).translation = [x, y]; recordMotion("translate",[x,y]); },
     scale(x, y) { scopes.at(-1).flip = x === -1 && y === 1; recordMotion("scale",[x,y]); },
     rotate(angle) { recordMotion("rotate",[angle]); },
@@ -78,6 +87,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
         logicalArgs[4] = local.translation[0] - args[6];
         logicalArgs[5] = local.translation[1];
       }
+      canvasCalls.push({ op: "image", src: image._src, args });
       imageCalls.push({ src: image._src, args, logicalArgs, ...(options.trackSpriteTransforms ? {motion:scopes.flatMap(s=>s.motion??[])} : {}) });
     },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
@@ -156,7 +166,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, frames, intervals, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -170,6 +180,7 @@ async function runApp(dataSequence, label, options = {}) {
     const frame = harness.frames.shift();
     harness.imageCalls.length = 0;
     harness.rectCalls.length = 0;
+    harness.canvasCalls.length = 0;
     if (frame) frame(performance.now() + 20);
     await new Promise((resolve) => setTimeout(resolve, 10));
   } finally {
@@ -582,7 +593,7 @@ test("schema 4 live deletion and fresh load draw retained tables at the same wor
   assert.deepEqual(tableOrigins(reload), after);
 });
 
-test("each real table stands on a green rug drawn under its furniture, and empty grid spots stay bare", async () => {
+test("each active table stands on a green rug drawn under its furniture, and empty grid spots stay bare", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
   data.generated_at = new Date(Date.now() - 10_000).toISOString();
@@ -609,6 +620,78 @@ test("each real table stands on a green rug drawn under its furniture, and empty
   const empty = { x: layout.gridX + layout.cellWidth, y: layout.gridY };
   assert.ok(!layout.cells.some((cell) => cell.x === empty.x && cell.y === empty.y));
   assert.ok(!rugCorners.some(([x, y]) => x === rugAt(empty)[0] && y === rugAt(empty)[1]));
+});
+
+function hallRugTile(call, layout) {
+  return call.src?.endsWith("roguelikeSheet_transparent.png")
+    && [10, 11, 12].includes(call.args[0] / 17) && [16, 17, 18].includes(call.args[1] / 17)
+    && call.args[5] >= layout.gridY * 32 && call.args[5] < layout.tableGridBottom * 32;
+}
+
+async function rugFixture() {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.slot_minutes = 30;
+  data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
+  data.events = [];
+  data.people.forEach(person => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
+  const table = data.tables[0], layout = createRoomLayout(data.tables, data.room_layout);
+  return { data, table, layout, ...tableLifecycle(data, table, 0) };
+}
+
+test("scheduled tables after doors have no hall rug", async () => {
+  const { data, table, layout, prepareAt } = await rugFixture();
+  const slot = prepareAt / 2;
+  const app = await runApp([data], "scheduled-rug", { search: `?sample=1&at=${slot}` });
+  assert.equal(tableLifecycle(data, table, slot).phase, "scheduled");
+  assert.equal(app.imageCalls.filter(call => hallRugTile(call, layout)).length, 0);
+  assert.deepEqual(app.errors, []);
+});
+
+test("partial rugs clip before drawing tiles and put the roll at the leading edge", async () => {
+  const { data, table, layout, prepareAt, readyAt, inactiveAt } = await rugFixture();
+  for (const slot of [prepareAt + .25 * (readyAt - prepareAt), table.end + .75 * (inactiveAt - table.end)]) {
+    const app = await runApp([data], `partial-rug-${slot}`, { search: `?sample=1&at=${slot}` });
+    const rug = tableScenery(data, table, slot, layout, 0).rug;
+    const cell = layout.cells[0], x = (cell.x - .5) * 32, y = (cell.y + .5) * 32;
+    const clipIndex = app.canvasCalls.findIndex(call => call.op === "clip" && call.path[0]?.[1] === x && call.path[0]?.[2] === y);
+    assert.ok(clipIndex >= 0);
+    assert.deepEqual(app.canvasCalls[clipIndex].path, [["rect", x, y, 6 * rug * 32, 4 * 32]]);
+    const firstRug = app.canvasCalls.findIndex(call => call.op === "image" && hallRugTile(call, layout));
+    const lastRug = app.canvasCalls.findLastIndex(call => call.op === "image" && hallRugTile(call, layout));
+    assert.ok(clipIndex < firstRug);
+    assert.equal(app.imageCalls.filter(call => hallRugTile(call, layout)).length, 24);
+    assert.equal(app.canvasCalls[lastRug + 2].op, "restore", "the rug clip ends after the last tile's save scope");
+    const roll = app.rectCalls.filter(call => call.color === "#2f5537");
+    assert.equal(roll.length, 1);
+    assert.deepEqual(roll[0].args, [(cell.x - .5 + 6 * rug - .225) * 32, y, .45 * 32, 4 * 32]);
+    assert.ok(app.rectCalls.some(call => call.color === "#5f8f5f"
+      && call.args[0] === (cell.x - .5 + 6 * rug - .06) * 32
+      && call.args[2] === .12 * 32 && call.args[3] === 4 * 32));
+    assert.deepEqual(app.errors, []);
+    const reduced = await runApp([data], `partial-rug-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
+    assert.equal(reduced.imageCalls.filter(call => hallRugTile(call, layout)).length, 24);
+    assert.equal(reduced.rectCalls.filter(call => call.color === "#2f5537").length, 0);
+  }
+});
+
+test("two rug carriers draw one shared roll with one stripe at their hands", async () => {
+  const { data, table, layout, prepareAt, readyAt, inactiveAt } = await rugFixture();
+  for (const slot of [prepareAt + .15 * (readyAt - prepareAt), table.end + .85 * (inactiveAt - table.end)]) {
+    const app = await runApp([data], `carried-rug-${slot}`, { search: `?sample=1&at=${slot}` });
+    const carriers = tableScenery(data, table, slot, layout, 0).crew.filter(person => person.load === "rug");
+    assert.equal(carriers.length, 2);
+    const rolls = app.canvasCalls.filter(call => call.op === "stroke" && call.color === "#3d6b45");
+    assert.equal(rolls.length, 1);
+    assert.equal(rolls[0].width, 7);
+    assert.equal(rolls[0].cap, "round");
+    assert.deepEqual(rolls[0].path, carriers.map((person, i) => [i ? "lineTo" : "moveTo", person.x * 32, person.y * 32 - 8]));
+    const stripes = app.canvasCalls.filter(call => call.op === "stroke" && call.color === "#5f8f5f");
+    assert.equal(stripes.length, 1);
+    assert.equal(stripes[0].width, 2);
+    assert.deepEqual(stripes[0].path, rolls[0].path);
+    assert.equal(app.rectCalls.filter(call => call.color === "#3d6b45").length, 0);
+    assert.deepEqual(app.errors, []);
+  }
 });
 
 test("pad collisions in a refresh keep the last good hall and table list", async () => {
@@ -675,13 +758,15 @@ test("staff scenery renders identically after seeking and reload without changin
     seek.imageCalls.length = 0;
     seek.frames.shift()?.(performance.now() + 100);
     const expected = staff(seek);
-    assert.equal(expected.length, 3, "the table porter uses three character layers; the caretaker has gone home from a hall nobody entered");
+    const layout = createRoomLayout(data.tables, data.room_layout);
+    const crew = tableScenery(data, data.tables[0], slot, layout, 0).crew;
+    assert.equal(expected.length, crew.length * 3, "each crew member uses three character layers; the caretaker has gone home");
     assert.match(allText(seek.nodes.get("tables")), /0\/5/);
     assert.doesNotMatch(roster, /STAFF/);
     const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
     assert.deepEqual(staff(fresh), expected);
     const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
-    assert.equal(staff(reduced).length, 0, "reduced motion omits the porter, and the caretaker has gone home");
+    assert.equal(staff(reduced).length, 0, "reduced motion omits the crew, and the caretaker has gone home");
   }
 });
 
@@ -705,7 +790,7 @@ test("lifecycle scenery and accessible status match direct seek, fresh load and 
     tables: app.imageCalls.filter((call) => call.src.endsWith("roguelikeSheet_transparent.png") && call.args[0] === 23 * 17 && call.args[1] === 4 * 17 && call.args[5] >= 10 * 32).map((call) => call.args.slice(4, 6)),
     maps: app.rectCalls.filter((call) => call.color === "#eee0b9").map((call) => call.args),
   });
-  for (const [slot, phase, furniture, props] of [[0, "Scheduled", false, false], [1.5, "Preparing", true, false], [1.9, "Ready", true, true], [3, "Playing", true, true], [4.1, "Packing up", true, false], [4.5, "Inactive", false, false]]) {
+  for (const [slot, phase, furniture, props] of [[0, "Scheduled", false, false], [1.5, "Preparing", false, false], [1.55, "Preparing", true, false], [1.9, "Ready", true, true], [3, "Playing", true, true], [4.1, "Packing up", true, false], [4.5, "Inactive", false, false]]) {
     const seek = await runApp([data], `lifecycle-seek-${slot}`, { mobile: true });
     seek.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
     seek.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
@@ -1737,7 +1822,7 @@ test("kiosk toggles fullscreen on f only outside inputs and ignores a missing or
   assert.deepEqual(app.errors, []);
 });
 
-test("the plaques join the automatic frame before doors and on the projector, never in a live view of the public page", async () => {
+test("the plaques join the automatic frame before doors and on the projector; ordinary live views frame tables", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const layout = createRoomLayout(sample.tables, sample.room_layout);
   const { plaques } = wallFixtures(layout);
@@ -1749,6 +1834,7 @@ test("the plaques join the automatic frame before doors and on the projector, ne
     return (960 - x) / (scale * 32);
   };
   const live = structuredClone(sample);
+  live.events = []; // Test ordinary framing with no announcer or other stage visit.
   live.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
   live.generated_at = new Date(Date.now() - 10_000).toISOString();
   // Only the first two tables are relevant now, so a live frame zooms to the left of the hall.
@@ -2140,21 +2226,46 @@ test("practice food advances per frame using corrected wall time, without anothe
   } finally { Date.now = originalNow; }
 });
 
-test("the host's break bubble draws above the table labels, like the other speech bubbles", async () => {
+test("the staff break bubble draws above the announcer and table labels, with the stage framed", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const brk = sample.events.find((event) => event.kind === "break");
-  const app = await runApp([sample], "break-layer", { search: `?sample=1&kiosk=1&at=${brk.at + .2}` });
-  const text = stageStepper(app)();
-  assert.match(text, /Break time/);
-  const bubble = app.contextCalls.findIndex((value) => value.includes("Break time!"));
-  // The projector plates every table; a plate's title may wrap or end in an ellipsis, so any piece of a name counts.
-  const labels = app.contextCalls.map((value) => value.replace(/…$/u, ""))
-    .map((value, index) => value.length > 3 && sample.tables.some((table) => table.name.includes(value)) ? index : -1)
-    .filter((index) => index >= 0);
-  assert.ok(bubble >= 0, "the break bubble is drawn");
-  assert.ok(labels.length > 0, "table labels are drawn");
-  assert.ok(bubble > Math.max(...labels), `the bubble (call ${bubble}) follows every table label (last at ${Math.max(...labels)})`);
-  assert.deepEqual(app.errors, []);
+  const slot = brk.at + .1;
+  for (const kiosk of [true, false]) {
+    const app = await runApp([sample], `break-layer-${kiosk}`, { search: `?sample=1&kiosk=${kiosk ? 1 : 0}&at=${slot}` });
+    const text = stageStepper(app)();
+    assert.match(text, /Break time/);
+    const bubble = app.contextCalls.findIndex((value) => value.includes("Break time!"));
+    // A plate's title may wrap or end in an ellipsis, so any piece of a name counts.
+    const labels = app.contextCalls.map((value) => value.replace(/…$/u, ""))
+      .map((value, index) => value.length > 3 && sample.tables.some((table) => table.name.includes(value)) ? index : -1)
+      .filter((index) => index >= 0);
+    assert.ok(bubble >= 0, "the break bubble is drawn");
+    if (kiosk) assert.ok(labels.length > 0, "table labels are drawn");
+    assert.ok(bubble > Math.max(...labels), `the bubble (call ${bubble}) follows every table label (last at ${Math.max(...labels)})`);
+    const layout = createRoomLayout(sample.tables, sample.room_layout);
+    const announcer = stageAnnouncer(sample, slot, layout);
+    const caretaker = hallAmbience(sample, slot, layout).staff;
+    const atPosition = ({ x, y }) => app.imageCalls.filter(call => call.src.includes("roguelikeChar")
+      && call.logicalArgs[4] === Math.round((x - .5) * 32) && call.logicalArgs[5] === Math.round((y - .6) * 32));
+    assert.equal(atPosition(announcer).length, 3, "one announcer's three sprite layers at the mic");
+    assert.ok(caretaker && Math.hypot(caretaker.x - announcer.x, caretaker.y - announcer.y) > 1);
+    assert.equal(atPosition(caretaker).length, 3, "caretaker follows its own schedule away from the mic");
+    const world = app.transforms.find(t => t[0] !== 1 || t[4] !== 0 || t[5] !== 0);
+    const camera = { zoom: world[0] * 32, x: world[4], y: world[5] };
+    for (const point of [{ x: layout.stage.x, y: layout.stage.y },
+      { x: layout.stage.x + layout.stage.w, y: layout.stage.y + layout.stage.h }]) {
+      const screen = worldToScreen(camera, point);
+      assert.ok(screen.x >= 0 && screen.x <= 960 && screen.y >= 0 && screen.y <= 480, "stage is in frame");
+    }
+    const line = app.textCalls.find(call => call.text.includes("Break time!"));
+    assert.match(line.text, /^Staff: /);
+    const anchor = worldToScreen(camera, { x: announcer.x, y: announcer.y - 1.3 });
+    const width = line.text.length * 5 + 8;
+    const left = Math.max(4, Math.min(960 - width - 4, anchor.x - width / 2));
+    assert.ok(Math.abs(line.x - (left + 4)) < 1e-8, "bubble is horizontally anchored to announcer");
+    assert.ok(Math.abs(line.y - (anchor.y - 21 + 3)) < 1e-8, "bubble is vertically anchored above announcer");
+    assert.deepEqual(app.errors, []);
+  }
 });
 
 // Detects a reader quota, stale accessibility counts, or standing labels that disagree with sprites.
@@ -2248,4 +2359,57 @@ test("stage draws alternating Indoor boards, crimson pleats and brass edge witho
   });
   assert.deepEqual(oldProps, []);
   assert.deepEqual(app.errors, []);
+});
+
+test("announcer visits frame the stage on both walks and stop break speech after eight minutes", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const brk = sample.events.find(event => event.kind === "break");
+  sample.events = [brk, { ...sample.events.find(event => event.kind === "announce"), at: 9, text: "Please listen." }];
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const app = await runApp([sample], "announcer-visits", { search: "?sample=1&at=7.99" });
+  const step = stageStepper(app);
+  for (const slot of [7.99, 8.1, 8 + 8 / 30 + .001, 8.5, 9]) {
+    app.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
+    app.textCalls.length = 0;
+    app.transforms.length = 0;
+    step();
+    const staff = stageAnnouncer(sample, slot, layout);
+    const drawn = spritePositions(app);
+    if (staff) {
+      assert.ok(drawn.has(`${Math.round((staff.x - .5) * 32)},${Math.round((staff.y - .6) * 32)}`), `announcer drawn at slot ${slot}`);
+      const world = app.transforms.find(t => t[0] !== 1 || t[4] !== 0 || t[5] !== 0);
+      const camera = { zoom: world[0] * 32, x: world[4], y: world[5] };
+      const screen = worldToScreen(camera, { x: layout.stage.x + layout.stage.w, y: layout.stage.y });
+      assert.ok(screen.x <= 960 && screen.y >= 0, "both walks keep the stage in frame");
+    }
+    assert.equal(app.contextCalls.some(text => text.includes("Break time!")), slot === 8.1);
+    assert.equal(app.contextCalls.includes("BREAK — everyone to the lounge"), slot >= 8 && slot < 9);
+    assert.equal(app.contextCalls.includes("Staff: Please listen."), slot === 9);
+    if (slot === 9) {
+      const bubble = app.textCalls.find(call => call.text === "Staff: Please listen.");
+      const world = app.transforms.find(t => t[0] !== 1 || t[4] !== 0 || t[5] !== 0);
+      const anchor = worldToScreen({ zoom: world[0] * 32, x: world[4], y: world[5] }, { x: staff.x, y: staff.y - 2.2 });
+      assert.ok(Math.abs(bubble.y - (anchor.y - 18)) < 1e-8);
+    }
+  }
+  assert.deepEqual(app.errors, []);
+});
+
+test("live break speech has an announcer while upcoming slot-zero announcements remain suppressed", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const spot = { x: layout.stageFront.x + 2, y: layout.stageFront.y };
+  const sprite = `${Math.round((spot.x - .5) * 32)},${Math.round((spot.y - .6) * 32)}`;
+  const start = Date.parse(sample.event.start);
+  const live = await runApp([sample], "announcer-live", { search: `?sample=1&${nowQuery(start + 8.1 * 30 * 60000)}` });
+  assert.equal(live.nodes.get("mode-badge").textContent, "LIVE");
+  assert.ok(spritePositions(live).has(sprite));
+  assert.ok(live.contextCalls.some(text => text.startsWith("Staff: Break time!")));
+  assert.deepEqual(live.errors, []);
+  sample.events = [{ ...sample.events.find(event => event.kind === "announce"), at: 0, text: "Doors announcement." }];
+  const upcoming = await runApp([sample], "announcer-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
+  assert.equal(upcoming.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.ok(!spritePositions(upcoming).has(sprite));
+  assert.ok(!upcoming.contextCalls.some(text => text.includes("Doors announcement.")));
+  assert.deepEqual(upcoming.errors, []);
 });

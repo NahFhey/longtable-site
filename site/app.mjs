@@ -1,6 +1,6 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=5759573680fe";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=2e69d47f35bc";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
 import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
@@ -43,6 +43,7 @@ import {
   seatPositionForPlan,
   shiftSpeechQueue,
   slotToMs,
+  stageAnnouncer,
   speechView,
   tableView,
   tableLifecycle,
@@ -50,7 +51,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=76cdfa0de69b";
+} from "./model.mjs?v=f194ea561d72";
 
 const TILE = 16;
 const SCALE = 2;
@@ -299,7 +300,7 @@ function frameTables(indices, manual = false) {
   hideTooltip();
 }
 
-function updateCamera() {
+function updateCamera(announcer) {
   const size = viewport();
   if (state.camera && state.viewport && (size.width !== state.viewport.width || size.height !== state.viewport.height)) {
     const center = screenToWorld(state.camera, { x: state.viewport.width / 2, y: state.viewport.height / 2 });
@@ -309,7 +310,7 @@ function updateCamera() {
   state.viewport = size;
   // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
   const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
-  const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
+  const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0 || announcer != null;
   // With no game in play (before doors, a replay's opening minutes, a gap between games) the view shows the whole room.
   const wholeRoom = upcoming() || !state.data.tables.some((table) => state.time >= table.start && state.time < table.end);
   const key = wholeRoom ? "room" : indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
@@ -824,7 +825,27 @@ function drawRoom() {
     }
   }
   stageDrawing.drawStageFloor(layout);
-  for (const cell of layout.cells) drawNine({ x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 }, RPG.rug, "#3d6b45");
+  state.data.tables.forEach((table, index) => {
+    const rug = tableScenery(state.data, table, scenerySlot(table), layout, index, reducedMotion.matches).rug;
+    if (!rug) return;
+    const cell = layout.cells[index];
+    const rect = { x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 };
+    if (rug < 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rect.x * unit, rect.y * unit, rect.w * rug * unit, rect.h * unit);
+      ctx.clip();
+    }
+    drawNine(rect, RPG.rug, "#3d6b45");
+    if (rug < 1) {
+      ctx.restore();
+      const edge = rect.x + rect.w * rug;
+      ctx.fillStyle = "#2f5537";
+      ctx.fillRect((edge - .225) * unit, rect.y * unit, .45 * unit, rect.h * unit);
+      ctx.fillStyle = "#5f8f5f";
+      ctx.fillRect((edge - .06) * unit, rect.y * unit, .12 * unit, rect.h * unit);
+    }
+  });
 
   const drops = [...state.people.values()].filter(runtime => runtime.trashAt != null)
     .map(runtime => (state.animationNow - runtime.trashAt) / 1000);
@@ -866,7 +887,7 @@ function chairFor(offset) {
 }
 
 
-// Before doors every table is shown ready for its game (furniture and props, no porter): people wait at them.
+// Before doors every table is shown ready for its game (furniture and props, no crew): people wait at them.
 function scenerySlot(table) { return upcoming() ? table.start : state.time; }
 
 function drawTables() {
@@ -880,7 +901,28 @@ function drawTables() {
       ctx.fillStyle = "rgba(255,210,122,.25)";
       ctx.fillRect(cell.x * TILE * SCALE, cell.y * TILE * SCALE, state.layout.cellWidth * TILE * SCALE, state.layout.cellHeight * TILE * SCALE);
     }
-    if (scenery.staff) drawStaff(scenery.staff, `table-${cell.x}-${cell.y}`);
+    for (const member of scenery.crew) drawStaff(member, `table-${cell.x}-${cell.y}-${member.member}`);
+    const rugCarriers = scenery.crew.filter(member => member.load === "rug");
+    const unit = TILE * SCALE;
+    if (rugCarriers.length === 2) {
+      const [a, b] = rugCarriers;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(a.x * unit, a.y * unit - 8);
+      ctx.lineTo(b.x * unit, b.y * unit - 8);
+      ctx.lineCap = "round";
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = "#3d6b45";
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#5f8f5f";
+      ctx.stroke();
+      ctx.restore();
+    } else if (rugCarriers.length === 1) {
+      const [carrier] = rugCarriers;
+      ctx.fillStyle = "#3d6b45";
+      ctx.fillRect(carrier.x * unit + 7, carrier.y * unit - 8, 22, 7);
+    }
     if (!scenery.furniture) return;
     for (let column = 0; column < 3; column += 1) {
       if (!drawTile(state.images.rpg, RPG.table[column], firstSeat.tableX + column, firstSeat.tableY, false, open ? 1 : 0.45)) {
@@ -957,7 +999,7 @@ function drawStaff(staff, station = "caretaker") {
     ctx.fillRect(x - 7, y - 11, 14, 14);
     ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
   }
-  if (staff.load && staff.load !== "food") {
+  if (staff.load && staff.load !== "food" && staff.load !== "rug") {
     ctx.fillStyle = staff.load === "map" ? "#d8c99f" : "#bd955c";
     ctx.fillRect(x + 7, y - 8, staff.load === "table" ? 22 : 10, staff.load === "chairs" ? 15 : 7);
   }
@@ -1182,11 +1224,14 @@ function drawBubble(value, x, y, color, label = "") {
   ctx.restore();
 }
 
-function drawEvents(active, now) {
+function drawEvents(active, now, announcer) {
   const front = state.layout.stageFront;
-  // The host's break bubble shares the speech layer, above the table plates.
-  if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
-    front.x + 2, front.y - 1.3, "#b6e0df", "Staff");
+  // Staff speech shares the speech layer, above the table plates.
+  if (announcer?.speaking && announcer.event.kind === "break") {
+    const item = announcer.event;
+    drawBubble(`Break time! Back at ${formatSlot(item.at + item.duration)}.`,
+      announcer.x, announcer.y - 1.3, "#b6e0df", "Staff");
+  }
   if (active.spotlight) {
     ctx.save();
     ctx.globalAlpha = .28;
@@ -1200,7 +1245,12 @@ function drawEvents(active, now) {
     const reason = active.spotlight.text ? ` ${active.spotlight.text}` : "";
     drawBubble(`${displayName(person)} in the spotlight!${reason}`, front.x, front.y - 2.2, "#fff3c4");
   }
-  if (active.announce) drawBubble(active.announce.text, front.x, front.y - 2.2, "#fff");
+  if (announcer?.speaking && announcer.event.kind === "announce") {
+    drawBubble(announcer.event.text, announcer.x, announcer.y - 2.2, "#fff", "Staff");
+  }
+  if (announcer?.speaking && announcer.event.kind === "meal") {
+    drawBubble(announcer.event.text || "Food is served in the food corner!", announcer.x, announcer.y - 1.3, "#d6f5c9", "Staff");
+  }
   if (active.break) drawLabel("BREAK — everyone to the lounge", state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#ffd27a" });
   if (active.meal) drawLabel(`${active.meal.text || "MEAL"} — food service`, state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#9fe08a" });
 
@@ -1246,7 +1296,12 @@ function caretakerForFrame() {
   return staff;
 }
 
+function announcerForFrame() {
+  return upcoming() ? null : stageAnnouncer(state.data, state.time, state.layout, reducedMotion.matches);
+}
+
 function render(now, active) {
+  const announcer = announcerForFrame();
   const gathering = gatheringScene();
   if (gathering) {
     state.ambience = gatheringAmbience(state.practiceData, state.layout,
@@ -1257,7 +1312,7 @@ function render(now, active) {
     state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
   }
   updateFoodScene(now);
-  updateCamera();
+  updateCamera(announcer);
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
   const width = Math.round(state.viewport.width * dpr);
@@ -1276,11 +1331,12 @@ function render(now, active) {
     .map(person => ({ y: !person.moving && person.place.kind === "lounge" ? person.place.position?.depth ?? person.position.y : person.position.y, draw: () => drawPerson(person, now, active) }));
   drawables.push(...loungeDrawing.loungeDepthItems(state.layout, now, state.leisure));
   drawables.push(...foodCorner.foodDepthItems(state.layout, now, state.foodScene.count, state.clock.mode === "replay" || state.clock.mode === "follow-now"));
-  const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : caretakerForFrame();
+  const caretaker = caretakerForFrame();
   const food = state.layout.food;
-  const caretakerInFood = caretaker && !active.break && caretaker.x >= food.x && caretaker.x < food.x + food.w
+  const caretakerInFood = caretaker && caretaker.x >= food.x && caretaker.x < food.x + food.w
     && caretaker.y >= food.y - 1 && caretaker.y < food.y + food.h + .5;
   if (caretakerInFood) drawables.push({ y: caretaker.y, draw: () => drawStaff(caretaker) });
+  if (announcer) drawables.push({ y: announcer.y, draw: () => drawStaff(announcer, "announcer") });
   drawables.sort((a, b) => a.y - b.y).forEach(item => item.draw());
   state.foodPlates.forEach(draw => draw());
   if (!gathering) state.data.tables.forEach((table, index) => {
@@ -1301,7 +1357,7 @@ function render(now, active) {
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
   drawHoverName();
-  drawEvents(active, now);
+  drawEvents(active, now, announcer);
   placeMusicPanel();
 }
 
@@ -1517,7 +1573,7 @@ function queueSpeech(events) {
 
 // Speech holds the stage for its scripted seconds at 1× and while paused; faster replay shortens it to a one-second floor.
 function speechDurationMs(kind, active) {
-  const factor = state.clock.mode === "replay" ? playbackSpeed(state.speed, active) : 1;
+  const factor = state.clock.mode === "replay" ? playbackSpeed(state.speed, active, announcerForFrame()) : 1;
   return Math.max(MIN_SPEECH_REAL_SECONDS, SPEECH_SECONDS[kind] / factor) * 1000;
 }
 
@@ -2003,7 +2059,7 @@ function loop(now) {
   state.lastTime = now;
   const wall = wallNow();
   const previous = state.clock;
-  state.clock = tickViewerClock(previous, state.data, wall, realSeconds, state.speed);
+  state.clock = tickViewerClock(previous, state.data, wall, realSeconds, state.speed, announcerForFrame());
   state.time = state.clock.slot;
   updateStage(wall);
   if (previous.mode === "replay" && state.clock.mode !== "follow-now") queueSpeech(crossedSpeechEvents(state.data, previous.slot, state.time));
