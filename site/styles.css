@@ -254,7 +254,8 @@ footer p { margin: .3rem 0; }
 /* Event page off phones (not kiosk; past-events.html is left alone): the phone layout's shape on a wide screen.
    One slim bar, then the hall filling the rest of the first screen with the sidebar beside it and the status strip under it.
    Bar, in order: title, badge, event name, total, scene event (these three ellipsize), nav, actions, clock, time controls.
-   Under 1100px the nav and actions drop to a second bar line. The camera buttons and help float over the canvas. */
+   Under 1100px the nav and actions drop to a second bar line. The camera buttons and help float over the canvas's bottom corners
+   (the scene is a grid: canvas and both overlays share row 1, the timeline takes row 2), clear of the back-wall banner and plaques. */
 @media not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px))) {
   html:not([data-kiosk]):has(#hall-content) { --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
   html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) .site-nav a:first-child:not(:last-child) { display: none; }
@@ -280,13 +281,14 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) .scene-wrap, html:not([data-kiosk]):has(#hall-content) .hall-sidebar {
     height: max(20rem, calc(100vh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
     height: max(20rem, calc(100svh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
-  html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: flex; flex-direction: column; }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); }
   html:not([data-kiosk]):has(#hall-content) .hall-sidebar { overflow-y: auto; }
-  html:not([data-kiosk]):has(#hall-content) #hall { flex: 1 1 0; min-height: 0; max-height: none; aspect-ratio: auto; }
-  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; top: .5rem; left: .5rem; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #hall { grid-area: 1 / 1; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { grid-area: 1 / 1; align-self: end; justify-self: start; z-index: 1; margin: .5rem; pointer-events: none; }
   html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
-  html:not([data-kiosk]):has(#hall-content) #camera-help { position: absolute; top: .5rem; right: .5rem; z-index: 1; margin: 0; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
-  html:not([data-kiosk]):has(#hall-content) .timeline-controls { flex: none; margin-top: .6rem; padding: .45rem .85rem; }
+  html:not([data-kiosk]):has(#hall-content) #camera-help { grid-area: 1 / 1; align-self: end; justify-self: end; z-index: 1; margin: .5rem; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) .jukebox-key:focus { grid-area: 1 / 1; align-self: start; justify-self: start; z-index: 1; margin: .5rem; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-controls { grid-row: 2; margin-top: .6rem; padding: .45rem .85rem; }
   html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
 }
