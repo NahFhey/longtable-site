@@ -549,7 +549,7 @@ test("the hall starts with two rows of five tables and adds a row when a pad pas
   assert.equal(empty.width, 42);
   assert.equal(empty.tableRows, 2);
   assert.equal(empty.overflowRows, 0);
-  assert.equal(empty.height, 8 + 2 * 6 + 6);
+  assert.equal(empty.height, 28, "two grid rows plus the seven-tile lounge and bottom wall");
   assert.deepEqual(withPads(0, 1, 2).height, empty.height);
   assert.equal(withPads(...Array.from({ length: 10 }, (_, pad) => pad)).tableRows, 2);
   const eleven = withPads(...Array.from({ length: 11 }, (_, pad) => pad));

@@ -60,6 +60,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   // Each drawTile save scope records its own flip; outer body motion must not
   // change assertions about the sprite's underlying hall position.
   const scopes = [{}];
+  const recordMotion=(op,args)=>{if(options.trackSpriteTransforms)(scopes.at(-1).motion??=[]).push([op,...args]);};
   const context = new Proxy({
     setTransform(...args) { transforms.push(args); },
     getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
@@ -68,22 +69,24 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
     save() { scopes.push({}); },
     restore() { if (scopes.length > 1) scopes.pop(); },
-    translate(x, y) { scopes.at(-1).translation = [x, y]; },
-    scale(x, y) { scopes.at(-1).flip = x === -1 && y === 1; },
+    translate(x, y) { scopes.at(-1).translation = [x, y]; recordMotion("translate",[x,y]); },
+    scale(x, y) { scopes.at(-1).flip = x === -1 && y === 1; recordMotion("scale",[x,y]); },
+    rotate(angle) { recordMotion("rotate",[angle]); },
     drawImage(image, ...args) {
       const local = scopes.at(-1), logicalArgs = [...args];
       if (local.flip && local.translation) {
         logicalArgs[4] = local.translation[0] - args[6];
         logicalArgs[5] = local.translation[1];
       }
-      imageCalls.push({ src: image._src, args, logicalArgs });
+      imageCalls.push({ src: image._src, args, logicalArgs, ...(options.trackSpriteTransforms ? {motion:scopes.flatMap(s=>s.motion??[])} : {}) });
     },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
   scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"));
   nodes.get("hall").parentElement = scene;
-  nodes.get("hall").width = 960;
-  nodes.get("hall").height = 480;
+  nodes.get("hall").width = options.viewport?.width ?? 960;
+  nodes.get("hall").height = options.viewport?.height ?? 480;
+  if (options.viewport) nodes.get("hall").getBoundingClientRect = () => ({left:0,top:0,...options.viewport});
   nodes.get("hall").getContext = () => { if (options.contextThrows) throw new Error("Canvas disabled"); return options.noContext ? null : context; };
   nodes.get("hall").setPointerCapture = () => {};
   // The jukebox player is optional in the harness: without it setupHallMusic returns null and clicks are no-ops.
@@ -587,7 +590,10 @@ test("each real table stands on a green rug drawn under its furniture, and empty
   const app = await runApp([data], "table-rugs", { search: "" });
   assert.equal(app.errors.length, 0);
   const sheet = (call) => call.src.endsWith("roguelikeSheet_transparent.png");
-  const isRug = (call) => sheet(call) && [10, 11, 12].includes(call.args[0] / 17) && [16, 17, 18].includes(call.args[1] / 17);
+  // The nook now uses the same green rug tiles. Hall rugs are drawn in grid coordinates;
+  // lounge helpers draw through a local tile transform, so they are outside this floor band.
+  const isRug = (call) => sheet(call) && [10, 11, 12].includes(call.args[0] / 17) && [16, 17, 18].includes(call.args[1] / 17)
+    && call.args[5] >= layout.gridY * 32 && call.args[5] < layout.tableGridBottom * 32;
   const isTable = (call) => sheet(call) && [23, 24, 25].includes(call.args[0] / 17) && call.args[1] === 4 * 17;
   const layout = createRoomLayout(data.tables, data.room_layout);
   const rugAt = (spot) => [Math.round((spot.x - .5) * 32), Math.round((spot.y + .5) * 32)];
@@ -1369,7 +1375,7 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   for (const person of sample.people) {
     const place = places.get(person.id);
     const position = place.kind === "table" ? seatPositionForPlan(layout, place.tableIndex, place.seat) : leisure.get(person.id).position;
-    assert.ok(drawn.has(`${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6) * 32)}`), `${person.id} is drawn at ${place.label}`);
+    assert.ok(drawn.has(`${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6 + (position.seated ? .1 : 0)) * 32)}`), `${person.id} is drawn at ${place.label}`);
   }
   assert.ok(app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0)"), "the lights are on");
   assert.equal(app.rectCalls.filter((call) => call.color === "#f7efd8").length, 0, "no dice");
@@ -1761,7 +1767,7 @@ test("the plaques join the automatic frame before doors and on the projector, ne
 
 // --- Practice before doors: the live feed's optional `practice` key ---
 const LIVE_FEED = "https://feed.example/timeline.json";
-const drawnKey = (position) => `${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6) * 32)}`;
+const drawnKey = (position) => `${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6 + (position.seated ? .1 : 0)) * 32)}`;
 /** The seated pose lowers a diner a few pixels from their logical stool anchor. */
 const drawnNear = (drawn, position, tolerance = 8) => [...drawn].some((key) => {
   const [x, y] = key.split(",").map(Number);
@@ -1999,6 +2005,7 @@ test("a game that has ended takes its plate down, and a plate stays between its 
   // The wall plaques share the wood colour but are drawn in world units, a few pixels wide.
   const plates = kiosk.rectCalls.filter((call) => call.color === "#4a3524" && call.args[2] > 20);
   assert.equal(plates.length, 1, "one plate is drawn");
+  assert.ok(plates[0].args[0] >= 0 && plates[0].args[0] + plates[0].args[2] <= kiosk.nodes.get("hall").width, "the taller whole-room frame keeps the plate within the viewport");
   const [left, top, width, height] = plates[0].args;
   assert.ok(top >= aboveEnds.y && top + height <= seatTop.y, `the plate (${top}–${top + height}) stays between the table above (${aboveEnds.y}) and its own top seats (${seatTop.y})`);
   // Seat zero (the DM) sits at the middle of the three-tile tabletop.
@@ -2148,4 +2155,64 @@ test("the host's break bubble draws above the table labels, like the other speec
   assert.ok(labels.length > 0, "table labels are drawn");
   assert.ok(bubble > Math.max(...labels), `the bubble (call ${bubble}) follows every table label (last at ${Math.max(...labels)})`);
   assert.deepEqual(app.errors, []);
+});
+
+// Detects a reader quota, stale accessibility counts, or standing labels that disagree with sprites.
+test("a full sample break draws 40 seated and four standing with matching accessible activity counts", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.people.forEach(person => { person.presence = {planned:[0,sample.event.slots],actual:{here:0,leaving:null}}; });
+  sample.events = [{...sample.events.find(event=>event.kind==="break"),at:8,duration:1}];
+  const app = await runApp([sample], "lounge-accessible-break", {search:"?sample=1&kiosk=1&at=8.2",reducedMotion:true});
+  assert.deepEqual(app.errors,[]);
+  const leisure = loungeActivities(createRoomLayout(sample.tables,sample.room_layout),sample.people);
+  const drawn = spritePositions(app);
+  let seated=0,standing=0;
+  const counts={reading:0,chatting:0,cards:0};
+  for(const a of leisure.values()) {
+    const p=a.position;
+    assert.ok(drawn.has(`${Math.round((p.x-.5)*32)},${Math.round((p.y-.6+(p.seated ? .1 : 0))*32)}`), JSON.stringify({p, description:app.nodes.get("canvas-description").textContent, drawn:[...drawn].slice(-10)}));
+    if(p.seated)seated++;else standing++;
+    counts[a.activity]++;
+  }
+  assert.deepEqual([counts.reading,counts.chatting,counts.cards,seated,standing],[0,20,24,40,4]);
+  assert.match(app.nodes.get("canvas-description").textContent,/Lounge: 0 reading, 20 chatting, 24 playing cards; 40 seated, 4 standing\./);
+  assert.ok(app.imageRequests.some(url=>url.endsWith("roguelikeIndoor_transparent.png")));
+});
+
+// Detects a whole-room frame still based on the old five-row lounge, on either viewport shape.
+test("the taller lounge and wall signs fit desktop and phone kiosk and pre-game frames", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const layout = createRoomLayout(sample.tables,sample.room_layout);
+  for (const [mobile,viewport] of [[false,{width:960,height:480}],[true,{width:360,height:640}]]) {
+    for (const kiosk of [false,true]) {
+      const search=kiosk ? "?sample=1&kiosk=1&at=8.2" : `?sample=1&${nowQuery(Date.parse(sample.event.start)-40*DAY)}`;
+      const app=await runApp([sample],`lounge-frame-${mobile}-${kiosk}`,{search,mobile,viewport,reducedMotion:true});
+      assert.deepEqual(app.errors,[]);
+      const world=app.transforms.find(t=>t[0]!==1||t[4]!==0||t[5]!==0);
+      const camera={zoom:world[0]*32,x:world[4],y:world[5]};
+      for(const p of [{x:0,y:-6},{x:layout.width,y:layout.height},
+        {x:layout.lounge.x,y:layout.lounge.y+layout.lounge.h}]) {
+        const screen=worldToScreen(camera,p);
+        assert.ok(screen.x>=-1e-8&&screen.x<=viewport.width+1e-8);
+        assert.ok(screen.y>=-1e-8&&screen.y<=viewport.height+1e-8);
+      }
+    }
+  }
+});
+
+
+test("reduced-motion app frames freeze every lounge sprite position and body transform", async()=>{
+  const sample=JSON.parse(await readFile(new URL("../data/timeline.sample.json",import.meta.url),"utf8"));
+  sample.people.forEach(p=>{p.presence={planned:[0,sample.event.slots],actual:{here:0,leaving:null}};});
+  sample.events=[{...sample.events.find(e=>e.kind==='break'),at:8,duration:1}];
+  const app=await runApp([sample],"lounge-reduced-frames",{search:"?sample=1&kiosk=1&at=8.2",reducedMotion:true,trackSpriteTransforms:true});
+  const l=createRoomLayout(sample.tables,sample.room_layout);
+  const frame=now=>{
+    app.imageCalls.length=0;app.frames.shift()(now);
+    return app.imageCalls.filter(c=>c.src.includes('roguelikeChar')&&c.logicalArgs[5]>=(l.lounge.y-.6)*32);
+  };
+  const first=frame(400);
+  assert.ok(first.length>=sample.people.length,'all lounge sprites are inspected');
+  assert.deepEqual(frame(8900),first);
+  assert.deepEqual(app.errors,[]);
 });

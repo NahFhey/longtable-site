@@ -1,3 +1,5 @@
+import { loungeGeometry, seatLounge } from "./lounge-layout.mjs?v=57da6155641f";
+import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
 import { CHOICE_COUNTS } from "./characters.mjs";
 import { FOOD_CORNER, atFood, foodSetOut, foodClearAt, SET_OUT_SECONDS, kitchenPath } from "./food-layout.mjs?v=44523bdb9315";
 export { foodGeometry } from "./food-layout.mjs?v=44523bdb9315";
@@ -464,7 +466,7 @@ function seededRandom(seed) {
 function caretakerWaypoints(layout) {
   const nearestAisle = y => layout.aisles.reduce((best, aisle) => Math.abs(aisle - y) < Math.abs(best - y) ? aisle : best);
   const point = (x, y, row = y) => ({ x, y, row });
-  const loungeY = layout.lounge.y + 2;
+  const lounge = loungeGeometry(layout);
   const stairsX = layout.stage.x - .8;
   const points = [point(1.3, layout.door.y - .8)];
   for (const aisle of layout.aisles) {
@@ -475,7 +477,7 @@ function caretakerWaypoints(layout) {
     const p = atFood(layout, spot);
     points.push(point(p.x, p.y, layout.aisles[0]));
   }
-  for (const x of [layout.lounge.x + 1.5, layout.lounge.x + layout.lounge.w - 1.5]) points.push(point(x, loungeY));
+  for (const p of lounge.staffStops) points.push(point(p.x, p.y, layout.lounge.y - .5));
   for (const offset of [-3, 0, 3]) {
     const y = Math.max(layout.aisles[0], Math.min(layout.aisles.at(-1), layout.stageFront.y + offset));
     points.push(point(stairsX, y, nearestAisle(y)));
@@ -484,8 +486,14 @@ function caretakerWaypoints(layout) {
   return points;
 }
 
-// Manhattan legs: out to the stop's corridor, along it to the trunk, down the trunk, and in again.
-function corridorPath(layout, from, to) {
+// Lounge legs use the furniture graph; other legs retain the hall's corridor routing.
+function corridorPath(layout, from, to, lounge = loungeGeometry(layout)) {
+  const hallPath = (a, b) => hallCorridorPath(layout, {...a, row: a.row ?? a.y}, {...b, row: b.row ?? b.y});
+  return loungeRoute(layout, from, to, hallPath, [], lounge) ?? hallPath(from, to);
+}
+
+// Out to the stop's corridor, along it to the trunk, down the trunk, and in again.
+function hallCorridorPath(layout, from, to) {
   const path = [];
   const push = ({ x, y }) => {
     const last = path.at(-1) ?? from;
@@ -506,6 +514,7 @@ export function caretakerTour(timeline, layout) {
   const cached = CARETAKER_TOURS.get(timeline);
   if (cached?.layout === layout) return cached.tour;
   const points = caretakerWaypoints(layout);
+  const lounge = loungeGeometry(layout);
   const random = seededRandom(String(timeline.event.start ?? ''));
   const pick = exclude => {
     const options = points.filter(point => !exclude.includes(point));
@@ -525,7 +534,7 @@ export function caretakerTour(timeline, layout) {
     const here = { x: stops[index].x, y: stops[index].y };
     segments.push({ from: here, to: here, seconds: dwell[index] });
     let from = here;
-    for (const to of corridorPath(layout, stops[index], stops[index + 1])) {
+    for (const to of corridorPath(layout, stops[index], stops[index + 1], lounge)) {
       segments.push({ from, to, seconds: Math.hypot(to.x - from.x, to.y - from.y) / CARETAKER_TILES_PER_SECOND });
       from = to;
     }
@@ -1188,11 +1197,11 @@ export function createRoomLayout(tables, room = null) {
   const layout = { ...createSeatingPlan(tables, room), aisles: [] };
   layout.width = layout.gridX + layout.columns * layout.cellWidth + 8;
   const overflowHeight = layout.overflowRows ? 2 + layout.overflowRows * 2 : 0;
-  layout.height = layout.tableGridBottom + overflowHeight + 6;
+  layout.height = layout.tableGridBottom + overflowHeight + 8;
   layout.backWall = { x: 0, y: -6, w: layout.width, h: 6 };
   layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
   layout.food = { x: 1, y: 1, w: 23, h: 6 };
-  layout.lounge = { x: 1, y: layout.height - 6, w: layout.width - 9, h: 5 };
+  layout.lounge = { x: 1, y: layout.height - 8, w: layout.width - 9, h: 7 };
   layout.door = { x: 0, y: layout.gridY + 1 };
   layout.doorPosition = { x: 1.2, y: layout.door.y + 0.5 };
   layout.stageFront = { x: layout.stage.x + 1.5, y: layout.stage.y + layout.stage.h / 2 };
@@ -1549,30 +1558,23 @@ export function practicePlaces(timeline, milliseconds = Date.parse(timeline.gene
   return result;
 }
 
-/** Allocate activities once for the people actually in the lounge, excluding speakers and diners. */
+/** Keep the activity groups and labels stable, placing their members in lounge seats
+ * or unique standing spots. Assignment depends only on these people and the layout. */
 export function loungeActivities(layout, people) {
   const result = new Map();
   const ordered = [...people].sort((a, b) => a.id.localeCompare(b.id));
   const count = ordered.length;
   const groups = count <= 6 ? 1 : Math.ceil(count / 4);
-  const columns = Math.max(1, Math.min(groups, Math.floor((layout.lounge.w - 6) / 5)));
-  const rows = Math.ceil(groups / columns);
   let index = 0;
   for (let group = 0; group < groups; group += 1) {
     const size = Math.floor(count / groups) + (group < count % groups ? 1 : 0);
     const activity = count === 1 ? "reading" : count === 2 ? "chatting"
       : count <= 6 || group % 2 === 0 ? "cards" : "chatting";
-    const center = { x: layout.lounge.x + 5 + (group % columns) * (layout.lounge.w - 8) / columns,
-      y: layout.lounge.y + 2.5 + (Math.floor(group / columns) - (rows - 1) / 2) * 2 / rows };
-    for (let member = 0; member < size; member += 1) {
-      const angle = member * Math.PI * 2 / size;
-      result.set(ordered[index++].id, { activity, group, center,
-        label: `the lounge, ${activity === "cards" ? "playing cards" : activity}`,
-        position: { x: center.x + (size === 1 ? 0 : Math.cos(angle) * 1.2),
-          y: center.y + (size === 1 ? 0 : Math.sin(angle) * .65) } });
-    }
+    for (let member = 0; member < size; member += 1) result.set(ordered[index++].id, {
+      activity, group, label: `the lounge, ${activity === "cards" ? "playing cards" : activity}`,
+    });
   }
-  return result;
+  return seatLounge(layout, result);
 }
 
 export function playbackSpeed(requested, active) {

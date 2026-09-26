@@ -1,10 +1,13 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=9aeaa5dd2f21";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=5759573680fe";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
 import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
-import * as foodCorner from "./food-corner.mjs?v=a9890a3c9660";
+import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
+import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
+import { loungeGeometry } from "./lounge-layout.mjs?v=57da6155641f";
+import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
 import { cornerRoute } from "./food-routing.mjs?v=e52cc41290de";
 import { queueSpot } from "./food-layout.mjs?v=44523bdb9315";
 import {
@@ -46,7 +49,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=beda39f7e247";
+} from "./model.mjs?v=76cdfa0de69b";
 
 const TILE = 16;
 const SCALE = 2;
@@ -72,7 +75,7 @@ class HallDoor {
 }
 
 const RPG = {
-  floor: { wood: [1,26], lounge: [15,28], stage: [12,28], food: [6,28], wall: [15,13] },
+  floor: { wood: [1,26], stage: [12,28], food: [6,28], wall: [15,13] },
   table: [[23,4],[24,4],[25,4]],
   chairs: { top: [20,3], bottom: [19,3], left: [21,3], right: [22,3] },
   door: { closed: [36,0], open: [37,0] }, banners: [[49,0],[50,0],[51,0]],
@@ -125,6 +128,8 @@ $("music-open")?.addEventListener("click", () => music?.togglePanel());
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 foodCorner.bindFoodDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, reduced: () => reducedMotion.matches });
+
+const loungeDrawing = createLoungeDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, indoor: () => state.images?.indoor, reduced: () => reducedMotion.matches });
 
 const state = {
   data: null,
@@ -407,7 +412,10 @@ function outsideTableGrid(point) {
 
 function pathBetween(from, to, remaining = []) {
   const hallPath = (a, b) => stagePath(state.layout, a, b, hallPathBetween);
-  return cornerRoute(state.layout, from, to, hallPath, remaining, state.diners.length) ?? hallPath(from, to);
+  const cornerPath = (a, b) => cornerRoute(state.layout, a, b, hallPath, [], state.diners.length) ?? hallPath(a, b);
+  state.loungeGeometry ??= loungeGeometry(state.layout);
+  return loungeRoute(state.layout, from, to, cornerPath, remaining, state.loungeGeometry)
+    ?? cornerRoute(state.layout, from, to, hallPath, remaining, state.diners.length) ?? hallPath(from, to);
 }
 
 function hallPathBetween(from, to) {
@@ -813,7 +821,6 @@ function drawRoom() {
       ctx.fillRect(x * TILE * SCALE, y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
     }
   }
-  drawNine(layout.lounge, RPG.floor.lounge, "#4b4656");
   drawNine(layout.stage, RPG.floor.stage, "#554761");
   drawStageStairs();
   for (const cell of layout.cells) drawNine({ x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 }, RPG.rug, "#3d6b45");
@@ -825,23 +832,7 @@ function drawRoom() {
     .map(runtime => (state.animationNow - runtime.trashAt) / 1000);
   foodCorner.drawFoodArea(layout, state.animationNow ?? 0, drops.length ? Math.min(...drops) : null);
 
-  drawTile(state.images.rpg, RPG.shelf[0], layout.lounge.x, layout.lounge.y);
-  drawTile(state.images.rpg, RPG.shelf[1], layout.lounge.x, layout.lounge.y + 1);
-  drawTile(state.images.rpg, RPG.plant, layout.lounge.x + layout.lounge.w - 1, layout.lounge.y);
-  drawTile(state.images.rpg, RPG.plant, layout.lounge.x, layout.lounge.y + layout.lounge.h - 1);
-  drawTile(state.images.rpg, RPG.couch[0], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 2);
-  drawTile(state.images.rpg, RPG.couch[1], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 1);
-
-  const drawnGroups = new Set();
-  for (const activity of state.leisure.values()) {
-    if (drawnGroups.has(activity.group)) continue;
-    drawnGroups.add(activity.group);
-    if (activity.activity === "cards") {
-      ctx.fillStyle = "#326b54";
-      ctx.fillRect((activity.center.x - .6) * TILE * SCALE, (activity.center.y - .35) * TILE * SCALE, 1.2 * TILE * SCALE, .7 * TILE * SCALE);
-      drawLabel("♠ ♥", activity.center.x, activity.center.y, { size: 3, color: "#fff4da", background: false });
-    }
-  }
+  loungeDrawing.drawLoungeFloor(layout);
 
   if (layout.overflowSeats.length) {
     drawLabel("OVERFLOW SEATING", layout.width / 2, layout.tableGridBottom + 0.7, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.55)" });
@@ -1050,8 +1041,9 @@ function drawTableLabels() {
     const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
     const details = [status];
     if (state.camera.zoom >= 25) details.push(`${formatSlot(table.start)}–${formatSlot(table.end)}`);
-    // The projector keeps every plate inside its own table's width; elsewhere a lone plate may be wider.
-    const maxWidth = Math.min(state.viewport.width - 8, Math.max(state.kiosk ? 60 : 160, Math.min(260, state.layout.cellWidth * state.camera.zoom - 8)));
+    // The taller whole-room frame needs the full cell band for projector plates, with
+    // a two-pixel gap between neighbours. Elsewhere a lone plate may be wider.
+    const maxWidth = Math.min(state.viewport.width - 8, Math.max(state.kiosk ? 60 : 160, Math.min(260, state.layout.cellWidth * state.camera.zoom - (state.kiosk ? 2 : 8))));
     // A plate too tall for the band sheds the times, the third title line, the status, the second title
     // line, then shrinks its lettering; one that still does not fit is left off.
     let lines = 3, size = 13, title, height;
@@ -1097,8 +1089,9 @@ function drawPerson(runtime, now, active) {
   const person = runtime.person;
   const place = runtime.place;
   let x = runtime.position.x - 0.5;
-  let y = runtime.position.y - 0.6 + (place.foodPhase === "eating" && !runtime.moving && !place.position?.standing ? .15 : 0);
-  const seated = (place.foodPhase === "eating" || place.foodPhase === "seating") && !runtime.moving;
+  const loungeSeat = place.kind === "lounge" && !runtime.moving && place.position?.seated;
+  let y = runtime.position.y - 0.6 + (loungeSeat ? .1 : 0) + (place.foodPhase === "eating" && !runtime.moving && !place.position?.standing ? .15 : 0);
+  const seated = ((place.foodPhase === "eating" || place.foodPhase === "seating") && !runtime.moving) || loungeSeat;
   const motion = foodCorner.bodyMotion(runtime.phase, runtime.moving, now, seated || place.kind === "table");
   const cheering = active.spotlight && place.kind !== "spotlight" && !place.kind.startsWith("stage-") && !reducedMotion.matches;
   const social = place.activity === "chatting" || place.activity === "cards";
@@ -1106,7 +1099,7 @@ function drawPerson(runtime, now, active) {
   const talk = (place.kind === "table" || social) && !runtime.moving && !reducedMotion.matches && ((talkTime + runtime.phase * 6) % 6) < 0.5;
   y -= (cheering ? Math.abs(Math.sin(now / 160 + runtime.phase * 8)) * 0.25 : 0);
   let facing = runtime.facing;
-  if (seated && place.position?.facing) facing = place.position.facing;
+  if ((seated || (place.kind === "lounge" && !runtime.moving)) && place.position?.facing) facing = place.position.facing;
   const plateFacing = facing;
   if (motion.look && !active.announce && !cheering) facing = -facing;
   if (active.announce && !runtime.moving) facing = state.layout.stageFront.x < runtime.position.x ? -1 : 1;
@@ -1133,6 +1126,7 @@ function drawPerson(runtime, now, active) {
     if (person.dm) drawTile(state.images.characters, SPRITES.hats[appearance.hat], x, y - 0.15, flip);
   }
   ctx.restore();
+  if (loungeSeat) loungeDrawing.drawSeatFront(place.position.front);
   if (place.plate) {
     const plate = foodCorner.realPlate(place, runtime.ordinal, runtime.moving);
     runtime.dishPops ??= [];
@@ -1150,10 +1144,7 @@ function drawPerson(runtime, now, active) {
     if (plate.mode === "table") state.foodPlates.push(drawPlate);
     else drawPlate();
   } else runtime.dishPops = [];
-  if (place.activity === "reading" && !runtime.moving) {
-    ctx.fillStyle = "#e9d5aa";
-    ctx.fillRect((x + .35) * TILE * SCALE, (y + .55) * TILE * SCALE, .5 * TILE * SCALE, .3 * TILE * SCALE);
-  }
+  if (place.activity === "reading" && !runtime.moving) loungeDrawing.drawBook(runtime.position.x, y + .6, plateFacing, now, runtime.phase);
   if (place.kind === "spotlight" && !runtime.moving) drawLabel("★", x + 0.5, y - 0.55, { size: 6, color: "#ffd84a", background: false });
   if (cheering && ((now / 400 + runtime.phase * 3) % 3) < 1) drawLabel("♥", x + 0.5 + runtime.phase * 0.4, y - 0.6, { size: 4, color: "#ff7a9a", background: false });
   if (active.announce && !runtime.moving && ((runtime.phase * 7) % 1) < 0.35) drawLabel("!", x + 0.9, y - 0.35, { size: 4, color: "#ffe066", background: false });
@@ -1298,7 +1289,8 @@ function render(now, active) {
   state.hoverName = null;
   state.foodPlates = [];
   const drawables = [...state.people.values()].filter(person => person.visible && !person.entering)
-    .map(person => ({ y: person.position.y, draw: () => drawPerson(person, now, active) }));
+    .map(person => ({ y: !person.moving && person.place.kind === "lounge" ? person.place.position?.depth ?? person.position.y : person.position.y, draw: () => drawPerson(person, now, active) }));
+  drawables.push(...loungeDrawing.loungeDepthItems(state.layout, now, state.leisure));
   drawables.push(...foodCorner.foodDepthItems(state.layout, now, state.foodScene.count, state.clock.mode === "replay" || state.clock.mode === "follow-now"));
   const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : caretakerForFrame();
   const food = state.layout.food;
@@ -1429,7 +1421,9 @@ function renderTableList() {
 function updateHeader(active) {
   const activityCounts = { reading: 0, chatting: 0, cards: 0 };
   for (const person of state.leisure.values()) activityCounts[person.activity] += 1;
-  const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards. Food: ${state.diners.length} collecting, eating or clearing plates.`;
+  const seatedCount = [...state.leisure.values()].filter(a => a.position.seated).length;
+  const standingCount = state.leisure.size - seatedCount;
+  const loungeDescription = `Lounge: ${activityCounts.reading} reading, ${activityCounts.chatting} chatting, ${activityCounts.cards} playing cards; ${seatedCount} seated, ${standingCount} standing. Food: ${state.diners.length} collecting, eating or clearing plates.`;
   const staffAction = active.break ? "Staff are announcing the break from the stage." : state.ambience?.action ?? "";
   const hostSuffix = state.data.event.host_name ? ` Hosted by ${state.data.event.host_name}.` : "";
   const upcomingNow = upcoming();
@@ -1673,6 +1667,7 @@ function installTimeline(data, initial = false) {
   $("start-label").textContent = formatSlot(0, true);
   $("end-label").textContent = formatSlot(data.event.slots, true);
   state.layout = buildLayout();
+  state.loungeGeometry = null;
   // The desktop view follows the room's shape, back wall included (styles.css); phones and the kiosk ignore it.
   canvas.style.setProperty("--hall-aspect", `${state.layout.width} / ${state.layout.height - state.layout.backWall.y}`);
   state.frameKey = null;
@@ -2004,6 +1999,7 @@ async function loadAssets() {
   const results = await Promise.allSettled([
     loadImage(new URL("./assets/roguelikeChar_transparent.png", import.meta.url).href),
     loadImage(new URL("./assets/roguelikeSheet_transparent.png", import.meta.url).href),
+    loadImage(new URL("./assets/roguelikeIndoor_transparent.png", import.meta.url).href),
     // Archives hang no plaques, so they never request the QR images (frozen bundles do not carry them).
     ...(state.archive ? [] : WALL_PLAQUES.map((plaque) => loadImage(new URL(plaque.qr, import.meta.url).href))),
   ]);
@@ -2011,8 +2007,9 @@ async function loadAssets() {
   state.images.characters = loaded(results[0]);
   state.images.rpg = loaded(results[1]);
   // A missing QR leaves its plaque as wood and text; only the sprite atlases count as failed assets.
-  state.images.plaques = WALL_PLAQUES.map((_, index) => state.archive ? null : loaded(results[2 + index]));
+  state.images.plaques = WALL_PLAQUES.map((_, index) => state.archive ? null : loaded(results[3 + index]));
   state.assetsFailed = results.slice(0, 2).some((result) => result.status === "rejected");
+  state.images.indoor = loaded(results[2]);
 }
 
 function loop(now) {

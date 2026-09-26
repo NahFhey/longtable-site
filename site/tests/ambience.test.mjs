@@ -1,5 +1,6 @@
+import { loungeGeometry } from "../lounge-layout.mjs";
 import { checkContinuity } from './kitchen-helpers.mjs';
-import { FOOD_CORNER, atFood } from "../food-layout.mjs";
+import { FOOD_CORNER, atFood, SET_OUT_SECONDS } from "../food-layout.mjs";
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -94,7 +95,9 @@ test('a later arrival brings the caretaker back in from the door before the ligh
   assert.equal(at(data,arrival+12).lights,1);
   // Someone returning while the caretaker is still walking out starts the return from mid-walk, not the door.
   const outboundData=timeline([person([0,2])]);
-  const returnAt=switchTime(outboundData,2*1800)+5;
+  const fade=switchTime(outboundData,2*1800);
+  const returnAt=fade+4+1; // Four-second fade, then one second into the two-second exit.
+  assert.equal(at(outboundData,returnAt).lights,0);
   const quick=timeline([person([0,2]),{presence:{planned:[0,8],actual:{here:returnAt/1800,leaving:null}}}]);
   const midway=at(quick,returnAt);
   const outbound=at(outboundData,returnAt).staff;
@@ -128,11 +131,11 @@ test('the caretaker tours many walkable stops with no back-and-forth legs',()=>{
   }
   for (const dwell of tour.dwell) assert.ok(dwell>=3&&dwell<=10);
   const near=(a,b)=>Math.abs(a-b)<1e-6;
-  const foodStops=FOOD_CORNER.staffSpots.map(p=>atFood(layout,p)), loungeY=layout.lounge.y+2, stairsX=layout.stage.x-.8;
-  const walkable=({x,y})=>near(x,layout.trunkX)
+  const foodStops=FOOD_CORNER.staffSpots.map(p=>atFood(layout,p)), stairsX=layout.stage.x-.8;
+  const lounge = loungeGeometry(layout);
+  const walkable=({x,y})=> (x>=layout.lounge.x && x<=layout.lounge.x+layout.lounge.w && y>=layout.lounge.y-.5 && y<layout.lounge.y+layout.lounge.h && !lounge.foot.some(r=>x>r.x&&x<r.x+r.w&&y>r.y&&y<r.y+r.h)) || near(x,layout.trunkX)
     ||layout.aisles.some(aisle=>near(y,aisle)&&x>=layout.trunkX-1e-6&&x<=stairsX+1e-6)
     ||foodStops.some(p=>near(x,p.x)&&y>=p.y-1e-6&&y<=layout.aisles[0]+1e-6)
-    ||(near(y,loungeY)&&x>=layout.lounge.x+1.5-1e-6&&x<=layout.lounge.x+layout.lounge.w-1.5+1e-6)
     ||(near(x,stairsX)&&y>=layout.aisles[0]-1e-6&&y<=layout.aisles.at(-1)+1e-6)
     ||(x<=layout.trunkX+1e-6&&y>=layout.door.y-.8-1e-6&&y<=layout.doorPosition.y+1e-6);
   const stops=new Set(tour.stops.map(key));
@@ -363,13 +366,15 @@ test('gate 6: a dark Get Food opens before kitchen service and queues without a 
   const first = receive(snapshot(70, false));
   const data = receive(snapshot(100, true, moves), first).timeline;
   const [service] = practiceKitchenServices(data, eveRoom);
-  const lit = receive(snapshot(100, true, moves), receive(snapshot(-100, true))).timeline;
-  const [litService] = practiceKitchenServices(lit, eveRoom);
   assert.deepEqual(xy(eveAt(data, 100).staff), eveRoom.doorPosition);
   assert.deepEqual(xy(eveAt(data, 108).staff), eveAt(data, 108).lightSwitch);
   assert.match(eveAt(data, 112).action, /heading to the kitchen/);
-  assert.ok(service.setOutStart >= eveStart + 112);
-  assert.ok(service.readyTime > litService.readyTime);
+  const openedAt=eveStart+100+8+4; // Door-to-switch walk, then the unchanged four-second fade.
+  assert.ok(service.setOutStart >= openedAt);
+  assert.equal(eveAt(data, openedAt-eveStart).lights, 1);
+  // Kitchen travel now starts at a different tour position in an already-lit hall.
+  // Check the required opening delay directly, independent of that travel distance.
+  assert.ok(service.readyTime >= openedAt + SET_OUT_SECONDS);
   const place = time => practicePlaces(data, time * 1000, eveRoom).get('u_lena');
   for (const time of [eveStart + 100, eveStart + 112, service.setOutStart, service.readyTime - .001]) {
     assert.equal(place(time).foodPhase, 'waiting');
@@ -553,7 +558,9 @@ test('round 2 gate 3: D5 mid-fade interruption preserves light level and four-se
   checkMidFadeReopen(seconds => eveAt(data, seconds), arrival, eveAt(closed.timeline, arrival).lights);
   eveFixtures.push({ data, start: 99, end: arrival + 20 });
   const event = timeline([person([0, 2])]);
-  const eventArrival = switchTime(event, 3600) + 2;
+  const eventFade = switchTime(event, 3600);
+  const eventArrival = eventFade + 4 / 2;
+  near(at(event, eventArrival).lights, .5);
   const reopened = timeline([person([0, 2]), person([0, 8], { here: eventArrival / 1800, leaving: null })]);
   checkMidFadeReopen(seconds => at(reopened, seconds), eventArrival, at(event, eventArrival).lights);
 });

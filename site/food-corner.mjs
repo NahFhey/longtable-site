@@ -11,7 +11,7 @@ export function bindFoodDrawing(options) {
 }
 
 // Draw a sheet tile with its bottom-centre at (cx, bottom) in tile units; transforms pivot there.
-function tileB(coord, cx, bottom, s = 1, o = {}) {
+export function tileB(coord, cx, bottom, s = 1, o = {}) {
   const ctx = getCtx(), img = getRpg();
   if (!ctx || !img || s <= 0) return;
   ctx.save();
@@ -24,9 +24,9 @@ function tileB(coord, cx, bottom, s = 1, o = {}) {
   ctx.restore();
 }
 // Top-left placement, like app.mjs drawTile, but scalable.
-function tileTL(coord, x, y, s = 1, o = {}) { tileB(coord, x + s / 2, y + s, s, o); }
+export function tileTL(coord, x, y, s = 1, o = {}) { tileB(coord, x + s / 2, y + s, s, o); }
 
-function nine(rect, base) {
+export function nine(rect, base) {
   for (let y = 0; y < rect.h; y += 1) for (let x = 0; x < rect.w; x += 1) {
     const coordinate = [base[0] + (x === 0 ? 0 : x === rect.w - 1 ? 2 : 1), base[1] + (y === 0 ? 0 : y === rect.h - 1 ? 2 : 1)];
     tileTL(coordinate, rect.x + x, rect.y + y);
@@ -37,7 +37,7 @@ function fill(rect, coord) {
   for (let y = 0; y < rect.h; y += 1) for (let x = 0; x < rect.w; x += 1) tileTL(coord, rect.x + x, rect.y + y);
 }
 
-function glow(cx, cy, r, now, seed) {
+export function glow(cx, cy, r, now, seed) {
   const ctx = getCtx();
   if (!ctx) return;
   const live = !isReduced();

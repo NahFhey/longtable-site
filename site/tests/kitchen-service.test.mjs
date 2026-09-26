@@ -226,7 +226,8 @@ test('reduced motion uses identical service times, pins staff, and changes all d
     assert.equal(reduced.foodCount, time >= service.readyTime && time < service.cleanupStart ? 6 : 0);
   }
   const time = service.setOutStart + 8;
-  assert.deepEqual(point(state(sample, time).staff), foodSetOut(layout, 8 / SET_OUT_SECONDS * 6).staff);
+  const actual=state(sample,time).staff,expected=foodSetOut(layout,8/SET_OUT_SECONDS*6).staff;
+  near(actual.x,expected.x);near(actual.y,expected.y);
 });
 
 test('first demo-50 service schedule call takes under 150 ms', t => {

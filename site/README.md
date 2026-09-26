@@ -545,14 +545,35 @@ than keeping them at the buffet for the whole event meal window. A visit ends
 quiet window. Serving dishes pop only when their count rises during playback,
 shrink over 0.2 seconds during clearing, and appear full-size on load or seek.
 
+The lounge is seven tiles deep, making the hall two rows taller. Dark, desaturated
+planks and a brass edge surround a centred stone hearth, an orange rug, a coffee
+table, two short sofas and inward-facing armchairs. A green reading nook with
+shelves and a candelabra stays at the left; six oval card tables and three armchair
+pairs fill the ends. Empty card tables tuck their chairs in. Readers hold open
+books; occupied card tables show one central card fan and chip stack.
+
+The lounge has 43 seats: 24 for cards, 16 for conversation and three for reading.
+A full 44-person break seats 40 and leaves four standing, because nobody is
+reassigned to reading just to fill the nook. Chat overflow takes spots around the
+hearth, card overflow watches nearby tables, and further overflow uses free floor.
+Attendees and the caretaker choose the shortest hall-plus-lounge route through a
+gap between clusters. The entry lane joins the hall at both the trunk and stage
+ends when overflow chairs intervene. Full drawn furniture bounds stay solid;
+only a seat’s owner uses its final approach leg (or first leg when leaving).
+Paths keep at least 0.3 tile from the chimney. Retargeting finishes the current
+forward leg, including ordinary hall walks. The whole room, including its taller lounge and wall signs,
+stays framed in kiosk and pre-game views on desktop and phones.
+
 A lone lounge attendee reads, two chat, and three to six play cards. Larger crowds
 split into groups of up to four alternating cards and conversation. Speakers and
 food diners are excluded from the lounge population. Activity labels, props, and
 hover descriptions reflect these activities; the canvas description includes
-population counts. Food stages and lounge groups reconstruct from the selected
+activity counts and seated/standing totals. Food stages and lounge groups reconstruct from the selected
 time and roster on refresh or rewind. Reduced motion shows the same activities
 without walking or eating animation. Reduced motion also disables breathing,
-look-around, dish pops and bin squash, and keeps steam and light flicker static.
+look-around, dish pops, bin squash, card dealing, pip flips and page turns, and keeps
+steam and the lit hearth static. Cosmetic cycles use real time; seats and
+positions reconstruct from event time.
 
 Scheduled breaks appear in the existing timeline break events. During a break,
 an anonymous staff member announces the return time from the stage, and the
