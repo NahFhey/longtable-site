@@ -579,6 +579,32 @@ test("schema 4 live deletion and fresh load draw retained tables at the same wor
   assert.deepEqual(tableOrigins(reload), after);
 });
 
+test("each real table stands on a green rug drawn under its furniture, and empty grid spots stay bare", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");
+  data.generated_at = new Date(Date.now() - 10_000).toISOString();
+  data.tables = data.tables.slice(0, 2).map((table, index) => ({ ...table, pad: index * 2, start: 0, end: data.event.slots }));
+  const app = await runApp([data], "table-rugs", { search: "" });
+  assert.equal(app.errors.length, 0);
+  const sheet = (call) => call.src.endsWith("roguelikeSheet_transparent.png");
+  const isRug = (call) => sheet(call) && [10, 11, 12].includes(call.args[0] / 17) && [16, 17, 18].includes(call.args[1] / 17);
+  const isTable = (call) => sheet(call) && [23, 24, 25].includes(call.args[0] / 17) && call.args[1] === 4 * 17;
+  const layout = createRoomLayout(data.tables, data.room_layout);
+  const rugAt = (spot) => [Math.round((spot.x - .5) * 32), Math.round((spot.y + .5) * 32)];
+  const rugCorners = app.imageCalls.filter((call) => isRug(call) && call.args[0] === 10 * 17 && call.args[1] === 16 * 17)
+    .map((call) => call.args.slice(4, 6));
+  assert.deepEqual(rugCorners, layout.cells.map(rugAt));
+  // Six by four tiles per rug, all of them drawn before the first table tile.
+  assert.equal(app.imageCalls.filter(isRug).length, 2 * 24);
+  const lastRug = app.imageCalls.findLastIndex(isRug);
+  const firstTable = app.imageCalls.findIndex(isTable);
+  assert.ok(firstTable > lastRug, "tables draw on top of the rugs");
+  // Pad 1 sits between the two tables with nothing on it.
+  const empty = { x: layout.gridX + layout.cellWidth, y: layout.gridY };
+  assert.ok(!layout.cells.some((cell) => cell.x === empty.x && cell.y === empty.y));
+  assert.ok(!rugCorners.some(([x, y]) => x === rugAt(empty)[0] && y === rugAt(empty)[1]));
+});
+
 test("pad collisions in a refresh keep the last good hall and table list", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   data.event.start = new Date(Date.now() - 30 * 60_000).toISOString().replace("Z", "+00:00");

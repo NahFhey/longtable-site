@@ -78,6 +78,7 @@ const RPG = {
   door: { closed: [36,0], open: [37,0] }, banners: [[49,0],[50,0],[51,0]],
   food: [[54,15],[55,16],[56,17],[54,13],[55,13],[56,13]],
   barrel: [23,0], shelf: [[44,12],[44,13]], plant: [18,9], couch: [[13,2],[13,3]],
+  rug: [10,16],
 };
 
 const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
@@ -815,6 +816,7 @@ function drawRoom() {
   drawNine(layout.lounge, RPG.floor.lounge, "#4b4656");
   drawNine(layout.stage, RPG.floor.stage, "#554761");
   drawStageStairs();
+  for (const cell of layout.cells) drawNine({ x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 }, RPG.rug, "#3d6b45");
 
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.banners[index], layout.stage.x + 1 + index * 2, 0);
   drawTile(state.images.rpg, RPG.barrel, layout.stage.x + 3, layout.stage.y + 1);
