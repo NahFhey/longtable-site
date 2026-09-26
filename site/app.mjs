@@ -1207,6 +1207,9 @@ function drawBubble(value, x, y, color, label = "") {
 
 function drawEvents(active, now) {
   const front = state.layout.stageFront;
+  // The host's break bubble shares the speech layer, above the table plates.
+  if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
+    front.x + 2, front.y - 1.3, "#b6e0df", "Staff");
   if (active.spotlight) {
     ctx.save();
     ctx.globalAlpha = .28;
@@ -1314,8 +1317,6 @@ function render(now, active) {
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
   if (caretaker && !caretakerInFood) drawStaff(caretaker);
-  if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
-    state.layout.stageFront.x + 2, state.layout.stageFront.y - 1.3, "#b6e0df", "Staff");
   const lightSwitch = state.ambience.lightSwitch;
   ctx.fillStyle = lights > .5 ? "#fff3ac" : "#697a9d";
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);

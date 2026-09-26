@@ -2106,3 +2106,20 @@ test("practice food advances per frame using corrected wall time, without anothe
     assert.equal(app.fetchUrls.length, 1, "all phases advanced between polls");
   } finally { Date.now = originalNow; }
 });
+
+test("the host's break bubble draws above the table labels, like the other speech bubbles", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const brk = sample.events.find((event) => event.kind === "break");
+  const app = await runApp([sample], "break-layer", { search: `?sample=1&kiosk=1&at=${brk.at + .2}` });
+  const text = stageStepper(app)();
+  assert.match(text, /Break time/);
+  const bubble = app.contextCalls.findIndex((value) => value.includes("Break time!"));
+  // The projector plates every table; a plate's title may wrap or end in an ellipsis, so any piece of a name counts.
+  const labels = app.contextCalls.map((value) => value.replace(/…$/u, ""))
+    .map((value, index) => value.length > 3 && sample.tables.some((table) => table.name.includes(value)) ? index : -1)
+    .filter((index) => index >= 0);
+  assert.ok(bubble >= 0, "the break bubble is drawn");
+  assert.ok(labels.length > 0, "table labels are drawn");
+  assert.ok(bubble > Math.max(...labels), `the bubble (call ${bubble}) follows every table label (last at ${Math.max(...labels)})`);
+  assert.deepEqual(app.errors, []);
+});
