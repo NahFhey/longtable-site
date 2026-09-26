@@ -513,6 +513,9 @@ test("failed sprite assets retain simplified rendering and the table list", asyn
   assert.equal(app.errors.length, 0);
   assert.equal(app.nodes.get("tables").children[0].children.length, 12);
   assert.match(app.nodes.get("status").textContent, /simplified graphics/);
+  // The selected table's plate still draws in simplified mode.
+  app.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 30);
   assert.ok(app.contextCalls.some((text) => text.includes("Scheduled")));
 });
 
@@ -1835,4 +1838,19 @@ test("practice drops polling to 5 seconds and back to 30 when nobody practises; 
   demo.intervals[0]();
   await settle();
   assert.equal(demo.fetchUrls.length, 1, "a sample page never fetches again");
+});
+
+test("only the selected table shows its name plate", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
+  const app = await runApp([sample], "name-plates");
+  const events = app.nodes.get("hall").listeners;
+  const plates = () => { app.contextCalls.length = 0; app.frames.shift()?.(performance.now() + 30); return sample.tables.filter((table) => app.contextCalls.some((call) => typeof call === "string" && call.startsWith(table.name.slice(0, 20)))).length; };
+  assert.equal(plates(), 0, "no plate while nothing is selected");
+  app.nodes.get("fit-active").listeners.get("click")();
+  events.get("pointerdown")({ pointerId: 1, clientX: 680, clientY: 240, button: 0 });
+  events.get("pointerup")({ pointerId: 1 });
+  events.get("click")({ clientX: 680, clientY: 240 });
+  assert.equal(plates(), 1, "the selected table gets its plate");
 });

@@ -989,8 +989,8 @@ function drawTableLabels() {
   const dpr = globalThis.devicePixelRatio || 1;
   ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const boxes = [];
-  // Selected labels take priority when the overview is crowded.
-  const indices = state.data.tables.map((_, i) => i).sort((a, b) => Number(state.data.tables[b].id === state.selectedId) - Number(state.data.tables[a].id === state.selectedId));
+  // Only the selected table carries a name plate; clearing the selection hides it.
+  const indices = state.data.tables.map((_, i) => i).filter((i) => state.data.tables[i].id === state.selectedId);
   for (const index of indices) {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
@@ -1004,10 +1004,9 @@ function drawTableLabels() {
     const height = state.camera.zoom >= 25 ? 40 : 23;
     const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
     const top = Math.min(point.y, state.viewport.height - height - 4);
-    if (boxes.some((box) => left < box.x + box.w && left + width > box.x && top < box.y + box.h && top + height > box.y)) continue;
     boxes.push({ x: left, y: top, w: width, h: height, index });
     ctx.fillStyle = "#17141feb"; ctx.fillRect(left, top, width, height);
-    ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
+    ctx.fillStyle = "#ffd27a";
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText(text, left + width / 2, top + 3, width - 8);
     if (height > 23) {
