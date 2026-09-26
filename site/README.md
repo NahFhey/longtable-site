@@ -162,24 +162,68 @@ changes an open tab observes through polling, at walking pace.
 
 Before doors the live feed alone may carry an optional top-level `practice`
 key, `{ "people": { "<id>": { "position", "table" } }, "speech": [{ "person",
-"text", "at" }] }`, for people trying the in-thread controls; the Git fallback,
+"text", "at" }], "moves": [{ "person", "at", "destination", "table" }] }`,
+for people trying the in-thread controls; the Git fallback,
 archives and the sample never have it, and archive and sample pages ignore it.
 A practising person stands at their practice position instead of their planned
 placement: for `table`, their seat at the named table (the DM at seat 0, a
-signup at its index + 1), else their planned table, else the lounge; `food` is
-the food seating, eating; `lounge` is the lounge. They stay in the hall during
-the eve for as long as they keep practising. Each speech entry (a quick
+signup at its index + 1), else their planned table, else the lounge; `lounge` is
+the lounge. Get Food walks them empty-handed to the queue. The caretaker leaves
+the tour, sets out all six dishes, then diners plate up, sit, eat and clear their
+plates. After 400 seconds from readiness (or their click, if food was already out),
+they return to their previous practice destination, defaulting to their practice thread seat, planned
+seat or lounge. A repeat Get Food starts a new visit and keeps the return place;
+a table/lounge move or Roll Dice ends the visit immediately. The kitchen carries
+on until five quiet minutes after the last visit ends, then clears and returns.
+
+Practice phases update each frame using clock offset bounds: the lower bound is
+the greatest `generated_at` minus the viewer's receipt time seen this session.
+A snapshot newer than the previous successful live poll supplies an upper bound
+of `generated_at` minus that poll's receipt time plus two seconds for PUT latency;
+the session keeps the smallest upper bound, with none from the first snapshot.
+The offset clamps zero between the bounds, so stale snapshots leave a correct
+clock alone, slow clocks correct immediately from a fresh snapshot, and fast
+clocks correct when a new snapshot arrives after a successful poll.
+The bot retains every move until doors, including after the 30-minute idle reset;
+the site caches the resulting schedule per snapshot. Old bots without timed moves
+use a sticky first-seen snapshot time per food visit, preserved across polls.
+A bot restart loses the history and resets the tour; doors wipe practice with no
+handover to event service. Practising people stay in the hall through the eve. Each speech entry (a quick
 reaction or a public roll) is shown once as a bubble at the person, the first
 time a poll carries it; a page load only records what is already there, so a
 reload never replays old bubbles. While anyone is practising the page polls
 every 5 seconds instead of 30.
 
-At the start of the eve an open tab sees everyone leave over about a minute
-(departures spread over 45 seconds), then the caretaker switches the lights off
-at 60 seconds and walks out. After that the hall is dark and empty until doors
-open, the caption reads "The hall is dark. Doors open Saturday at 10:00 AM.",
-and sign-ups during the eve still count in the table cards without anyone
-walking in. Doors open is a hard cut into the event-day rules.
+At the start of the eve an open tab sees non-practising attendees leave over
+about a minute (departures spread over 45 seconds). If nobody is practising,
+the caretaker tours for 48 seconds, walks to the switch over eight seconds,
+fades the lights over four seconds and leaves through the door by 62 seconds.
+The dark hall says “The hall is dark. Doors open Saturday at 10:00 AM.”, using
+the event's weekday, time and time zone. If anyone appears in `practice.people`,
+the hall stays lit and practice, including kitchen service, continues.
+
+During the eve, the first snapshot with empty `practice.people` starts closing
+at its `generated_at` time, using the practice clock offset. The site cannot
+work that time out from the move list, because rolls and reactions also renew
+the bot's 30-minute idle timer, and moves stay in the list after a person is
+dropped. Food cleanup is requested immediately when the hall empties, then
+the caretaker switches off and leaves. A new move reopens at its click time;
+if someone returns through a roll or reaction without a new move, reopening
+uses the first non-empty snapshot's `generated_at`. Those first empty and
+non-empty times are remembered across polls. The caretaker enters from the
+door, walks to the switch and fades the lights up over four seconds, then
+tours from the first stop or goes to the kitchen for Get Food. Diners wait
+empty-handed until food is ready, so opening a dark hall adds a delay.
+A move while the caretaker is closing reopens from where they are and keeps the
+lights at the level they had reached, fading up from there; a move during the
+first 48 seconds of the eve, before the walk to the switch, just keeps the tour
+going. The hall can open and close repeatedly. Lit captions stay the same.
+
+A viewer whose first eve snapshot is empty sees the dark hall immediately,
+without replaying earlier activity or closing; a viewer who arrives during
+practice sees the current service or tour. Before the eve, the gathering stays
+lit regardless of practice. Sign-ups during the eve still count in table cards
+without anyone walking in. Doors open is a hard cut into the event-day rules.
 
 The header shows the full event date (`Saturday, November 7, 10:00 AM`) and a
 countdown ("40 days away", "3 hours away", "12 minutes away", "Doors open any
@@ -201,7 +245,7 @@ turns on the live-source behaviour so the stages can be seen on demand:
 
 - `/?sample=1&now=2026-09-25T12:00:00-04:00` — the gathering
 - `/?sample=1&now=2026-11-06T09:59:50-05:00` — watch the exodus begin ten seconds later (the eve starts at 10:00 AM the day before doors)
-- `/?sample=1&now=2026-11-06T10:30:00-05:00` — the eve, dark and empty
+- `/?sample=1&now=2026-11-06T10:30:00-05:00` — the eve, with the caretaker and any practising people
 - `/?sample=1&now=2026-11-07T09:59:30-05:00` — watch the doors-open handover
 
 Seeking clears transient speech in either direction. Sequential playback still
@@ -378,7 +422,7 @@ Deploy the schema-7 reader before the writer; schemas 1–6 still render.
 
 ### Hall caretaker
 
-Before the doors open (until a minute before the first arrival) the hall is dark
+In event replay, before the opening lead (a minute before the first arrival), the hall is dark
 and nobody is drawn. The caretaker enters through the door, switches on the lights
 in the first eight seconds, and starts rounds at the switch. No food is set out at
 opening. The seeded tour visits corridors, table aisles, the food front, lounge,
@@ -405,7 +449,14 @@ A returning attendee brings the caretaker back from their actual closing positio
 or the door. After reaching the switch and relighting, rounds restart at tour clock
 zero. Staff never count as attendees; occupancy uses effective attendance overrides.
 
-Everything follows event time, so pause, seek and reload reproduce the scene.
+Event service follows event time, so pause, seek and reload reproduce the scene.
+Practice uses the same schedule engine and phase table with wall seconds and an
+always-occupied hall. Before doors the tour keeps its Unix-epoch origin and
+multiplies dwells by 4.6; the clock subtracts every earlier excursion, including
+walk-in, set-out, cooking, cleanup and walk-back. Completing an interrupted tour
+segment still counts as tour time. The caretaker resumes at exactly the departure
+point, also after consecutive services. There is no opening or empty-hall closing
+in practice, including during the eve.
 Reduced motion pins staff at the pickup during service and the switch otherwise;
 all six dishes appear at readiness and disappear at cleanup start, using the same
 times as normal motion. Lights change immediately. The canvas description reports

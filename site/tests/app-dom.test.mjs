@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRoomLayout, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, wallFixtures } from "../model.mjs";
+import { practiceKitchenServices, practicePlaces } from "../model.mjs";
+import { queueSpot } from "../food-layout.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
 import { DISCORD_INVITE, WALL_PLAQUES } from "../event-config.mjs";
@@ -1373,19 +1375,33 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   assert.deepEqual(app.errors, []);
 });
 
-test("in the eve the hall is dark and empty, the caption names the doors, and the status keeps the gathered count", async () => {
+test("at the start of the eve the caretaker stays in the lit hall while attendees leave and the gathered count stays", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const start = Date.parse(sample.event.start);
-  const app = await runApp([sample], "eve-sample", { search: `?sample=1&${nowQuery(start - DAY + 120_000)}` });
+  const app = await runApp([sample], "eve-sample", { search: `?sample=1&${nowQuery(start - DAY + 46_000)}` });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
   assert.equal(app.nodes.get("scene-event").textContent, "24 hours away");
-  assert.equal(spritePositions(app).size, 0, "nobody, not even the caretaker, is drawn");
-  assert.ok(app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is fully dark");
-  assert.match(app.nodes.get("canvas-description").textContent, /^The hall is dark\. Doors open Saturday at 10:00 AM\. 44 people have gathered so far\./);
+  assert.equal(spritePositions(app).size, 1, "only the caretaker is drawn");
+  assert.ok(!app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the caretaker keeps the hall lit");
+  assert.match(app.nodes.get("canvas-description").textContent, /Staff are circulating.*44 people have gathered so far/);
   assert.match(app.nodes.get("status").textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
+  app.imageCalls.length = 0;
   app.frames.shift()?.(performance.now() + 3_000);
+  assert.equal(spritePositions(app).size, 1);
+  assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+});
+
+test("after the empty eve closes the hall is dark with its dated caption and gathered count", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(sample.event.start);
+  const app = await runApp([sample], "eve-dark-sample", { search: `?sample=1&${nowQuery(start - DAY + 120_000)}` });
+  assert.deepEqual(app.errors, []);
   assert.equal(spritePositions(app).size, 0);
+  assert.ok(app.rectCalls.some(call => call.color === "rgba(4, 7, 20, 0.76)"));
+  assert.match(app.nodes.get("canvas-description").textContent,
+    /The hall is dark\. Doors open Saturday at 10:00 AM\..*44 people have gathered so far/);
+  assert.match(app.nodes.get("status").textContent, /^44 gathered so far/);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
 });
 
@@ -1750,10 +1766,7 @@ test("practising people are drawn at their practice position before doors and st
   const layout = createRoomLayout(sample.tables, sample.room_layout);
   const lenaPractice = seatPositionForPlan(layout, 3, 3);
   const lenaPlanned = seatPositionForPlan(layout, 0, 1);
-  const tessPractice = foodGeometry(layout, 0, 4).seat;
-  assert.deepEqual({ x: tessPractice.x, y: tessPractice.y, facing: tessPractice.facing },
-    { x: layout.food.x + 12.5, y: layout.food.y + .75, facing: 1 }, "practice uses the first of the 20 stools");
-  assert.deepEqual(tessPractice.plate, { x: layout.food.x + 13.5, y: layout.food.y + .95 });
+  const tessPractice = queueSpot(layout, "first", 0);
   assert.deepEqual(gatheringLocations(sample).get("u_lena"), { ...gatheringLocations(sample).get("u_lena"), tableIndex: 0, seat: 1 });
 
   const app = await runApp([{ ...sample, practice }], "practice-placement", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });
@@ -1762,20 +1775,21 @@ test("practising people are drawn at their practice position before doors and st
   const drawn = spritePositions(app);
   assert.ok(drawn.has(drawnKey(lenaPractice)), "Lena is drawn at her t04 seat");
   assert.ok(!drawn.has(drawnKey(lenaPlanned)), "not at her planned t01 seat");
-  assert.ok(drawnNear(drawn, tessPractice), "Tess is drawn at the food seating");
+  assert.ok(drawnNear(drawn, tessPractice), "Tess waits in the food queue");
   assert.match(app.nodes.get("status").textContent, /^44 gathered so far/);
 
   const eve = await runApp([{ ...sample, practice }], "practice-eve", { search: `?${nowQuery(start - DAY + 120_000)}`, liveFeed: LIVE_FEED });
   assert.deepEqual(eve.errors, []);
   assert.equal(eve.nodes.get("scene-event").textContent, "24 hours away");
-  assert.ok(eve.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is dark");
+  assert.ok(!eve.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the caretaker keeps the hall lit");
   const eveDrawn = spritePositions(eve);
   assert.ok(eveDrawn.has(drawnKey(lenaPractice)), "Lena still practises in the eve");
   assert.ok(drawnNear(eveDrawn, tessPractice), "Tess still practises in the eve");
   assert.ok(!eveDrawn.has(drawnKey(seatPositionForPlan(layout, 0, 0))), "Mara, not practising, has left");
-  assert.equal(eveDrawn.size, 2, "only the two practising people remain");
+  assert.equal(eveDrawn.size, 3, "the two practising people and caretaker remain");
+  eve.imageCalls.length = 0;
   eve.frames.shift()?.(performance.now() + 3_000);
-  assert.equal(spritePositions(eve).size, 2);
+  assert.equal(spritePositions(eve).size, 3);
 });
 
 test("each practice speech entry shows once at the person: never on load, not on repeat, and the next one alone", async () => {
@@ -1870,7 +1884,8 @@ test("practice drops polling to 5 seconds and back to 30 when nobody practises; 
   assert.equal(demo.nodes.get("sync-controls").hidden, true);
   const drawn = spritePositions(demo);
   assert.ok(drawn.has(drawnKey(seatPositionForPlan(layout, 0, 1))), "Lena is at her planned seat");
-  assert.ok(!drawnNear(drawn, foodGeometry(layout, 0, 4).seat), "nobody is at a practice place");
+  assert.ok(!drawnNear(drawn, foodGeometry(layout, 0, 4).seat), "nobody is eating in practice");
+  assert.ok(!drawnNear(drawn, queueSpot(layout, "first", 0)), "nobody queues in practice on a sample page");
   demo.frames.shift()?.(performance.now() + 6_000);
   await settle();
   demo.intervals[0]();
@@ -1986,4 +2001,108 @@ test("a hovered player's name draws on top of their table's plate", async () => 
   const name = texts.findIndex((text) => text.startsWith("DM "));
   assert.ok(plate >= 0, "hovering the DM shows their table's plate");
   assert.ok(name > plate, "and the DM's name is drawn after it, on top");
+});
+
+
+test("a stale practice snapshot loads at the correct wall-clock position", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const click = Date.parse(data.event.start) - 40 * DAY;
+  data.generated_at = new Date(click + 300).toISOString();
+  data.practice = { people: { u_lena: { position: "food", table: "t01" } }, speech: [],
+    moves: [{ person: "u_lena", at: new Date(click).toISOString(), destination: "food", table: null }] };
+  const originalNow = Date.now;
+  Date.now = () => click + 180300;
+  try {
+    const app = await runApp([data], "practice-stale-load", { search: "?nocache=practice", liveFeed: LIVE_FEED });
+    const layout = createRoomLayout(data.tables, data.room_layout);
+    const expected = practicePlaces(data, Date.now(), layout).get("u_lena");
+    assert.equal(expected.foodPhase, "eating");
+    assert.ok(drawnNear(spritePositions(app), foodGeometry(layout, 0, 4).seat));
+    assert.deepEqual(app.errors, []);
+  } finally { Date.now = originalNow; }
+});
+
+test("practice clock uses the unchanged successful live poll and ignores failed polls and backups", async () => {
+  const stale = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const start = Date.parse(stale.event.start) - 40 * DAY;
+  stale.generated_at = new Date(start - 180000).toISOString();
+  stale.practice = { people: { u_lena: { position: "table", table: "t01" } }, speech: [], moves: [] };
+  const click = start + 8000;
+  const changed = { ...stale, generated_at: new Date(click).toISOString(), practice: {
+    people: { u_lena: { position: "food", table: "t01" } }, speech: [],
+    moves: [{ person: "u_lena", at: new Date(click).toISOString(), destination: "food", table: null }],
+  } };
+  const layout = createRoomLayout(changed.tables, changed.room_layout);
+  const [service] = practiceKitchenServices(changed, layout);
+  const originalNow = Date.now;
+  let wall = start + 90000;
+  Date.now = () => wall;
+  try {
+    const app = await runApp([stale, stale, new Error("live unavailable"), stale, changed], "practice-poll-bound",
+      { search: "?nocache=practice", liveFeed: LIVE_FEED });
+    const refreshAt = async time => {
+      wall = time;
+      app.nodes.get("refresh-now").listeners.get("click")();
+      await settle();
+    };
+    await refreshAt(start + 95000); // Unchanged successful poll: the next upper bound must use this time.
+    assert.equal(app.fetchUrls.length, 2);
+    await refreshAt(start + 97000); // Failed live poll followed by a successful stale backup.
+    assert.equal(app.fetchUrls.length, 4);
+    await refreshAt(click + 91000); // New snapshot received one server second after generation.
+    assert.equal(app.fetchUrls.length, 5);
+    document.hidden = true;
+    let frame = performance.now() + 100;
+    // hi = (start + 8 s) - (start + 95 s) + 2 s = -85 s: five seconds ahead of true time.
+    // These positions straddle a phase boundary: using the load or failed poll time moves it.
+    for (const [elapsed, phase, position] of [
+      [19, "serving-first", queueSpot(layout, "first", 0)],
+      [21, "serving-second", queueSpot(layout, "second", 0)],
+      [100, "eating", foodGeometry(layout, 0, 4).seat],
+      [401, undefined, seatPositionForPlan(layout, 0, 1)],
+    ]) {
+      const seconds = service.readyTime + elapsed;
+      wall = seconds * 1000 + 85000;
+      for (let i = 0; i < 400; i++) {
+        app.imageCalls.length = 0;
+        app.frames.shift()?.(frame += 100);
+      }
+      const expected = practicePlaces(changed, wall - 85000, layout).get("u_lena");
+      assert.equal(expected.foodPhase, phase);
+      assert.ok(drawnNear(spritePositions(app), position), `position at ${elapsed} s after readiness`);
+    }
+    assert.equal(app.fetchUrls.length, 5);
+    assert.deepEqual(app.errors, []);
+  } finally { Date.now = originalNow; }
+});
+
+test("practice food advances per frame using corrected wall time, without another poll", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const click = Date.parse(data.event.start) - 40 * DAY;
+  data.generated_at = new Date(click + 1000).toISOString();
+  data.practice = { people: { u_lena: { position: "food", table: "t01" } }, speech: [],
+    moves: [{ person: "u_lena", at: new Date(click).toISOString(), destination: "food", table: null }] };
+  const layout = createRoomLayout(data.tables, data.room_layout), [service] = practiceKitchenServices(data, layout);
+  const originalNow = Date.now;
+  let wall = click - 89000; // This viewer's clock is 90 seconds slow.
+  Date.now = () => wall;
+  try {
+    const app = await runApp([data], "practice-per-frame", { search: "?nocache=practice", liveFeed: LIVE_FEED });
+    assert.deepEqual(app.errors, []);
+    globalThis.document.hidden = true; // Frames keep running; no refresh can advance the phase for us.
+    assert.ok(drawnNear(spritePositions(app), queueSpot(layout, "first", 0)));
+    let frame = performance.now() + 100;
+    const settleAt = seconds => {
+      wall = seconds * 1000 - 90000;
+      for (let i = 0; i < 400; i++) {
+        app.imageCalls.length = 0;
+        app.frames.shift()?.(frame += 100);
+      }
+      return spritePositions(app);
+    };
+    assert.ok(drawnNear(settleAt(service.readyTime + 1), queueSpot(layout, "first", 0)), "plating at the first queue");
+    assert.ok(drawnNear(settleAt(service.readyTime + 100), foodGeometry(layout, 0, 4).seat), "eating at a stool");
+    assert.ok(drawnNear(settleAt(service.readyTime + 401), seatPositionForPlan(layout, 0, 1)), "auto-return to the seat");
+    assert.equal(app.fetchUrls.length, 1, "all phases advanced between polls");
+  } finally { Date.now = originalNow; }
 });

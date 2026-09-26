@@ -1,6 +1,6 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=158a441e7699";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=9aeaa5dd2f21";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
 import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
@@ -31,6 +31,8 @@ import {
   personTooltip,
   playbackSpeed,
   practicePlaces,
+  receivePracticeSnapshot,
+  practiceNow,
   publicActivity,
   reconcileLiveSnapshot,
   resolveLocation,
@@ -44,7 +46,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=f43c39fa71ff";
+} from "./model.mjs?v=beda39f7e247";
 
 const TILE = 16;
 const SCALE = 2;
@@ -171,6 +173,8 @@ const state = {
   stage: null,          // "gathering" | "eve" | "day" | "after" | null (not a live-source, live-phase package)
   pollSeconds: 2,
   gatheringPlaces: new Map(),
+  practiceData: null,
+  practiceSession: null,      // clock offset bounds and legacy first-seen moves
   practicePlaces: new Map(),   // practising people before doors, live feed only
   practiceSeen: new Set(),     // practice speech keys already shown (or present at load)
   gatheredCount: 0,
@@ -435,6 +439,8 @@ function updatePeople(realSeconds, now, active) {
   if (state.snap || reducedMotion.matches) state.door.reset();
   const gathering = gatheringScene();
   if (gathering) {
+    state.practicePlaces = state.practiceSession
+      ? practicePlaces(state.practiceSession.timeline, practiceNow(state.practiceSession, wallNow()), state.layout) : new Map();
     // Planned placement, not the per-slot resolver. In the eve everyone leaves, staggered by runtime.phase
     // from the moment the eve began, so an open tab and a tab loaded mid-exodus see the same schedule.
     const eveElapsed = state.stage === "eve" ? (wallNow() - (Date.parse(state.data.event.start) - EVE_MS)) / 1000 : -1;
@@ -1263,7 +1269,8 @@ function caretakerForFrame() {
 function render(now, active) {
   const gathering = gatheringScene();
   if (gathering) {
-    state.ambience = gatheringAmbience(state.data, state.layout, wallNow(), reducedMotion.matches);
+    state.ambience = gatheringAmbience(state.practiceData, state.layout,
+      practiceNow(state.practiceSession, wallNow()), reducedMotion.matches);
   } else {
     const ambienceSlot = state.clock.mode === "follow-now" ? Math.max(state.time,
       (wallNow() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
@@ -1568,13 +1575,23 @@ function settleStageSpeech(now, active) {
   }
 }
 
-async function readTimeline(url) {
+const timelineArrivals = new WeakMap();
+let previousLivePoll = null;
+
+async function readTimeline(url, livePoll = false) {
   const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error("fetch");
   let input;
   try { input = await response.json(); }
   catch { throw new Error("json"); }
-  return validateTimeline(input);
+  const data = validateTimeline(input);
+  const receivedAt = wallNow();
+  const previousPollAt = livePoll && previousLivePoll && Date.parse(data.generated_at) > previousLivePoll.generatedAt
+    ? previousLivePoll.receivedAt : null;
+  timelineArrivals.set(data, { receivedAt, previousPollAt });
+  // Every successful live poll counts, even when reconciliation keeps the installed snapshot.
+  if (livePoll) previousLivePoll = { receivedAt, generatedAt: Date.parse(data.generated_at) };
+  return data;
 }
 
 async function fetchTimeline() {
@@ -1584,14 +1601,14 @@ async function fetchTimeline() {
   }
   const liveFeed = $("live-feed")?.getAttribute("content");
   state.feedDelayed = false;
-  if (!liveFeed) return readTimeline("./data/timeline.json");
+  if (!liveFeed) return readTimeline("./data/timeline.json", true);
   const freshUrl = (value) => {
     const url = new URL(value, location.href);
     url.searchParams.set("check", String(Date.now()));
     return url.href;
   };
   // The live service reads the primary database and forbids intermediary caching.
-  try { return await readTimeline(freshUrl(liveFeed)); }
+  try { return await readTimeline(freshUrl(liveFeed), true); }
   catch { state.feedDelayed = true; }
   const backups = ["./data/timeline.json", $("backup-feed")?.getAttribute("content")].filter(Boolean);
   const results = await Promise.allSettled(backups.map(url => readTimeline(freshUrl(url))));
@@ -1661,7 +1678,10 @@ function installTimeline(data, initial = false) {
   state.gatheringPlaces = gatheringLocations(data);
   // Practice reaches the page through the live feed alone; archive and sample pages ignore the key.
   const practiceShown = !state.sample && !state.archive;
-  state.practicePlaces = practiceShown ? practicePlaces(data) : new Map();
+  const arrival = timelineArrivals.get(data);
+  state.practiceSession = practiceShown ? receivePracticeSnapshot(data, state.practiceSession,
+    arrival?.receivedAt ?? wallNow(), arrival?.previousPollAt ?? null) : null;
+  state.practiceData = state.practiceSession?.timeline ?? { ...data, practice: null };
   state.gatheredCount = [...state.gatheringPlaces.values()].filter((place) => place.kind !== "absent").length;
   syncPeople();
   // Each practice speech entry becomes one bubble the first time a poll carries it; a load only records what is there.
@@ -1694,6 +1714,11 @@ async function refresh() {
     state.live = state.clock.mode === "follow-now" ? result : { ...result, speechQueue: [] };
     if (result.changed) {
       installTimeline(result.snapshot);
+    } else if (state.practiceSession) {
+      const arrival = timelineArrivals.get(next);
+      const { offset, lo, hi } = receivePracticeSnapshot(next, state.practiceSession,
+        arrival.receivedAt, arrival.previousPollAt);
+      state.practiceSession = { ...state.practiceSession, offset, lo, hi };
     }
     state.staleMessage = "";
     state.lastChecked = Date.now();

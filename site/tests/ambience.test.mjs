@@ -1,8 +1,9 @@
 import { checkContinuity } from './kitchen-helpers.mjs';
 import { FOOD_CORNER, atFood } from "../food-layout.mjs";
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { EVE_EXIT_SECONDS, EVE_MS, GATHERING_DWELL_FACTOR, caretakerTour, createRoomLayout, gatheringAmbience, hallAmbience } from '../model.mjs';
+import { EVE_EXIT_SECONDS, EVE_MS, GATHERING_DWELL_FACTOR, caretakerTour, createRoomLayout, gatheringAmbience, hallAmbience, receivePracticeSnapshot, practiceNow, practiceKitchenServices, practicePlaces } from '../model.mjs';
 const layout=createRoomLayout([]);
 const person=(planned, actual={here:null,leaving:null})=>({presence:{planned,actual}});
 const fixtures = new Set();
@@ -237,5 +238,401 @@ test('whole-event continuity for every ambience timeline fixture', async t => {
   let index = 0;
   for (const data of fixtures) {
     await t.test(`ambience fixture ${++index}`, child => checkContinuity(data, layout, child));
+  }
+});
+
+const practiceSample = JSON.parse(readFileSync(new URL('../data/timeline.sample.json', import.meta.url)));
+const eveStart = Date.parse('2026-11-06T15:00:00Z') / 1000;
+const stamp = seconds => new Date((eveStart + seconds) * 1000).toISOString();
+const practiceMove = (seconds, destination = 'table') => ({ person: 'u_lena', at: stamp(seconds),
+  destination, table: destination === 'table' ? 't01' : null });
+const snapshot = (seconds, occupied, moves = []) => ({ ...structuredClone(practiceSample),
+  event: { ...practiceSample.event, start: '2026-11-07T15:00:00Z', tz: 'America/New_York' },
+  generated_at: stamp(seconds), practice: { moves, speech: [], people: occupied
+    ? { u_lena: { position: moves.at(-1)?.destination ?? 'table', table: 't01' } } : {} } });
+const receive = (data, previous = null, receipt = Date.parse(data.generated_at)) =>
+  receivePracticeSnapshot(data, previous, receipt);
+const eveRoom = createRoomLayout(practiceSample.tables, practiceSample.room_layout);
+const eveAt = (data, seconds, reduced = false) => gatheringAmbience(data, eveRoom, (eveStart + seconds) * 1000, reduced);
+const xy = p => ({ x: p.x, y: p.y });
+const near = (a, b, tolerance = 1e-6) => assert.ok(Math.abs(a - b) < tolerance, `${a} != ${b}`);
+const datedCaption = 'The hall is dark. Doors open Saturday at 10:00 AM.';
+const dark = state => {
+  assert.equal(state.staff, null);
+  assert.equal(state.lights, 0);
+  assert.equal(state.foodCount, 0);
+  assert.equal(state.occupied, false);
+  assert.equal(state.action, datedCaption);
+};
+const eveFixtures = [];
+const closingFade = (data, close) => {
+  for (let t = close; t < close + 180; t += .05) {
+    const a = eveAt(data, t);
+    if (a.lights < 1) return t - (1 - a.lights) * 4;
+  }
+  assert.fail('close never reached the fade');
+};
+
+test('gate 2: footprints keep the eve lit and touring, including reaction-only practice', () => {
+  const data = receive(snapshot(-100, true)).timeline;
+  for (const seconds of [0, 48, 62, 3600]) {
+    const state = eveAt(data, seconds);
+    assert.equal(state.lights, 1);
+    assert.equal(state.occupied, true);
+    assert.equal(state.foodCount, 0);
+    assert.match(state.action, /circulating/);
+    assert.notDeepEqual(xy(state.staff), xy(eveAt(data, seconds + 50).staff));
+    assert.deepEqual(xy(eveAt(data, seconds, true).staff), state.lightSwitch);
+  }
+});
+
+test('gate 3: the first empty generated_at closes the hall and stays fixed across polls', () => {
+  const first = receive(snapshot(-100, true));
+  const closed = receive(snapshot(100, false), first);
+  const later = receive(snapshot(120, false), closed);
+  assert.equal(later.occupancy.changes.length, 2);
+  assert.equal(later.occupancy.changes[1].at, Date.parse(stamp(100)));
+  const data = later.timeline, fade = closingFade(data, 100);
+  assert.match(eveAt(data, 100.001).action, /switching off/);
+  assert.equal(eveAt(data, 100.001).occupied, false);
+  near(eveAt(data, fade + 2).lights, .5);
+  assert.deepEqual(xy(eveAt(data, fade + 2).staff), eveAt(data, fade).lightSwitch);
+  const exit = eveAt(data, fade + 5);
+  assert.equal(exit.lights, 0);
+  assert.match(exit.action, /heading home/);
+  assert.notDeepEqual(xy(exit.staff), exit.lightSwitch);
+  for (const time of [fade + 6.001, 500, 3600]) for (const reduced of [false, true]) dark(eveAt(data, time, reduced));
+  assert.deepEqual(eveAt(data, 101), eveAt(closed.timeline, 101));
+  eveFixtures.push({ data, start: 99, end: fade + 8 });
+});
+
+test('gate 4: food cleanup is requested at the empty snapshot, then switch-off follows', () => {
+  const moves = [practiceMove(100, 'food')];
+  const first = receive(snapshot(-100, true));
+  const fed = receive(snapshot(100, true, moves), first);
+  const [original] = practiceKitchenServices(fed.timeline, eveRoom);
+  const close = Math.ceil(original.readyTime - eveStart + 30);
+  const closed = receive(snapshot(close, false, moves), fed);
+  const [service] = practiceKitchenServices(closed.timeline, eveRoom);
+  assert.equal(service.cleanupRequested, eveStart + close);
+  assert.ok(service.cleanupRequested < original.cleanupRequested);
+  assert.equal(service.emptied, true);
+  assert.ok(service.cleanupStart >= service.cleanupRequested);
+  assert.ok(service.cleanupStart - service.cleanupRequested < 30, 'only the kitchen return precedes clearing');
+  assert.equal(eveAt(closed.timeline, close).foodCount, 6);
+  assert.match(eveAt(closed.timeline, service.cleanupStart - eveStart + .001).action, /clearing/);
+  assert.match(eveAt(closed.timeline, service.backEnd - eveStart + .001).action, /switching off/);
+  dark(eveAt(closed.timeline, service.backEnd - eveStart + 7));
+  eveFixtures.push({ data: closed.timeline, start: 99, end: service.backEnd - eveStart + 8 });
+});
+
+test('gate 5: a table click opens from the door and starts the tour at stop zero', () => {
+  const first = receive(snapshot(70, false));
+  const opened = receive(snapshot(105, true, [practiceMove(100)]), first);
+  const data = opened.timeline;
+  dark(eveAt(data, 99.999));
+  assert.deepEqual(xy(eveAt(data, 100).staff), eveRoom.doorPosition);
+  assert.equal(eveAt(data, 100).lights, 0);
+  assert.match(eveAt(data, 100).action, /back on/);
+  assert.deepEqual(xy(eveAt(data, 108).staff), eveAt(data, 108).lightSwitch);
+  near(eveAt(data, 110).lights, .5);
+  assert.equal(eveAt(data, 112).lights, 1);
+  assert.deepEqual(xy(eveAt(data, 112).staff), eveAt(data, 112).lightSwitch);
+  assert.match(eveAt(data, 112).action, /circulating/);
+  const tour = caretakerTour(data, eveRoom);
+  const firstDwell = tour.dwell[0] * GATHERING_DWELL_FACTOR;
+  assert.deepEqual(xy(eveAt(data, 112 + firstDwell - .001).staff), tour.stops[0]);
+  assert.notDeepEqual(xy(eveAt(data, 113 + firstDwell).staff), tour.stops[0]);
+  eveFixtures.push({ data, start: 99, end: 170 });
+});
+
+test('gate 5: reaction-only opening keeps its first nonempty generated_at across polls', () => {
+  const staleMoves = [practiceMove(20)];
+  const first = receive(snapshot(70, false, staleMoves));
+  const opened = receive(snapshot(100, true, staleMoves), first);
+  const polled = receive(snapshot(110, true, staleMoves), opened);
+  assert.equal(polled.occupancy.changes.length, 2);
+  assert.equal(polled.occupancy.changes[1].opening, Date.parse(stamp(100)));
+  assert.deepEqual(xy(eveAt(polled.timeline, 100).staff), eveRoom.doorPosition);
+  assert.equal(eveAt(polled.timeline, 110).lights, .5);
+  assert.deepEqual(eveAt(polled.timeline, 111), eveAt(opened.timeline, 111));
+});
+
+test('gate 6: a dark Get Food opens before kitchen service and queues without a plate', () => {
+  const moves = [practiceMove(100, 'food')];
+  const first = receive(snapshot(70, false));
+  const data = receive(snapshot(100, true, moves), first).timeline;
+  const [service] = practiceKitchenServices(data, eveRoom);
+  const lit = receive(snapshot(100, true, moves), receive(snapshot(-100, true))).timeline;
+  const [litService] = practiceKitchenServices(lit, eveRoom);
+  assert.deepEqual(xy(eveAt(data, 100).staff), eveRoom.doorPosition);
+  assert.deepEqual(xy(eveAt(data, 108).staff), eveAt(data, 108).lightSwitch);
+  assert.match(eveAt(data, 112).action, /heading to the kitchen/);
+  assert.ok(service.setOutStart >= eveStart + 112);
+  assert.ok(service.readyTime > litService.readyTime);
+  const place = time => practicePlaces(data, time * 1000, eveRoom).get('u_lena');
+  for (const time of [eveStart + 100, eveStart + 112, service.setOutStart, service.readyTime - .001]) {
+    assert.equal(place(time).foodPhase, 'waiting');
+    assert.equal(place(time).plate, false);
+  }
+  assert.equal(place(service.readyTime + 1).foodPhase, 'serving-first');
+  assert.equal(eveAt(data, service.readyTime - eveStart).foodCount, 6);
+  eveFixtures.push({ data, start: 99, end: service.backEnd - eveStart + 2 });
+});
+
+test('gate 7: movement interrupts both fixed eve closing and D5 from the actual staff position', () => {
+  const beforeEve = receive(snapshot(-100, false));
+  const lit = receive(snapshot(-100, true));
+  const closed = receive(snapshot(100, false), lit);
+  const fade = closingFade(closed.timeline, 100);
+  for (const [base, arrivals] of [[beforeEve, [30, 52, 58, 61]], [closed, [101, fade + 2, fade + 5]]]) {
+    for (const time of arrivals) {
+      const arrival = Math.round(time * 1000) / 1000;
+      const opened = receive(snapshot(arrival, true, [practiceMove(arrival)]), base);
+      const state = eveAt(opened.timeline, arrival);
+      assert.deepEqual(xy(state.staff), xy(eveAt(base.timeline, arrival).staff));
+      assert.match(state.action, base === beforeEve && arrival < 48 ? /circulating/ : /back on/);
+      if (base === beforeEve && arrival < 48) assert.equal(state.lights, 1);
+      assert.equal(eveAt(opened.timeline, arrival + 150).lights, 1);
+      eveFixtures.push({ data: opened.timeline, start: arrival - 1, end: arrival + 150 });
+    }
+  }
+});
+
+test('gate 8: two snapshot-driven open-close cycles render deterministically', () => {
+  let session = receive(snapshot(70, false));
+  const sequence = [[100, true], [200, false], [400, true], [500, false]];
+  const moves = [];
+  for (const [seconds, occupied] of sequence) {
+    if (occupied) moves.push(practiceMove(seconds));
+    session = receive(snapshot(seconds, occupied, [...moves]), session);
+  }
+  const data = session.timeline;
+  for (const start of [100, 400]) {
+    assert.deepEqual(xy(eveAt(data, start).staff), eveRoom.doorPosition);
+    assert.equal(eveAt(data, start + 12).lights, 1);
+  }
+  for (const end of [200, 500]) {
+    assert.match(eveAt(data, end + .001).action, /switching off/);
+    dark(eveAt(data, end + 150));
+  }
+  for (const seconds of [99, 100, 110, 112, 201, 350, 400, 410, 412, 501, 650]) {
+    assert.deepEqual(eveAt(data, seconds), eveAt(structuredClone(data), seconds));
+  }
+  eveFixtures.push({ data, start: 70, end: 660 });
+});
+
+test('gate 9: an empty first eve snapshot is dark immediately despite retained old moves', () => {
+  for (const generated of [-100, 1, 300]) {
+    const raw = snapshot(generated, false, [practiceMove(-300, 'food'), practiceMove(-200)]);
+    const before = structuredClone(raw);
+    const session = receive(raw, null, (eveStart + Math.max(1, generated)) * 1000);
+    for (const reduced of [false, true]) dark(eveAt(session.timeline, Math.max(1, generated), reduced));
+    assert.deepEqual(raw, before);
+    assert.equal(practiceKitchenServices(session.timeline, eveRoom).length, 0);
+  }
+  const first = receive(snapshot(1, false, [practiceMove(.5, 'food')]));
+  const opened = receive(snapshot(2, true, [practiceMove(.5, 'food'), practiceMove(2)]), first);
+  assert.deepEqual(xy(eveAt(opened.timeline, 2).staff), eveRoom.doorPosition);
+});
+
+test('gate 10: viewers with different receipt clocks agree at the same bot-clock instant', () => {
+  let regular = null, slow = null;
+  for (const [seconds, occupied] of [[-100, true], [100, false], [300, true], [500, false]]) {
+    const raw = snapshot(seconds, occupied); // no-move reopening also uses bot time
+    regular = receive(raw, regular, (eveStart + seconds + 1) * 1000);
+    slow = receive(raw, slow, (eveStart + seconds - 90) * 1000);
+  }
+  assert.equal(regular.offset, 0);
+  assert.equal(slow.offset, 90000);
+  assert.deepEqual(regular.occupancy, slow.occupancy);
+  for (const seconds of [99, 100, 101, 200, 300, 304, 310, 312, 501, 650]) {
+    const a = gatheringAmbience(regular.timeline, eveRoom, practiceNow(regular, (eveStart + seconds) * 1000));
+    const b = gatheringAmbience(slow.timeline, eveRoom, practiceNow(slow, (eveStart + seconds - 90) * 1000));
+    assert.deepEqual(a, b);
+  }
+});
+
+test('gate 11: empty gathering stays lit and doors discard practice state', () => {
+  const first = receive(snapshot(-1000, true, [practiceMove(-1100)]));
+  const empty = receive(snapshot(-900, false, [practiceMove(-1100)]), first);
+  for (const seconds of [-900, -100, -1]) {
+    const state = eveAt(empty.timeline, seconds);
+    assert.equal(state.lights, 1);
+    assert.equal(state.occupied, true);
+    assert.match(state.action, /circulating/);
+    assert.ok(state.staff);
+  }
+  const event = { ...snapshot(86400, false), practice: null };
+  const doors = receive(event, empty);
+  assert.equal(doors.timeline, event);
+  assert.equal(doors.occupancy, undefined);
+  assert.equal(doors.moves.length, 0);
+  assert.equal(doors.seen.size, 0);
+  assert.deepEqual(hallAmbience(doors.timeline, 0, eveRoom), hallAmbience(event, 0, eveRoom));
+});
+
+// Keep the sample's event-start spelling: it seeds the tour used in the reported fixtures.
+const round2Snapshot = (...args) => {
+  const data = snapshot(...args);
+  data.event.start = practiceSample.event.start;
+  return data;
+};
+const clickDuringFixedClose = arrival => {
+  const move = { ...practiceMove(arrival), table: 't04' };
+  const raw = round2Snapshot(arrival + .3, true, [move]);
+  raw.practice.people.u_lena.table = 't04';
+  return receive(raw, receive(round2Snapshot(-600, false))).timeline;
+};
+
+test('round 2 gate 1: E+30 keeps lights on and the same uninterrupted tour, then closes by D5', () => {
+  const data = clickDuringFixedClose(30), touring = receive(round2Snapshot(-600, true)).timeline;
+  for (let i = 0; i <= (120 - 29) * 20; i++) {
+    const seconds = 29 + i / 20;
+    for (const reduced of [false, true]) {
+      const state = eveAt(data, seconds, reduced);
+      assert.equal(state.lights, 1);
+      assert.ok(state.staff);
+      assert.match(state.action, /circulating/);
+      near(state.staff.x, eveAt(touring, seconds, reduced).staff.x);
+      near(state.staff.y, eveAt(touring, seconds, reduced).staff.y);
+    }
+  }
+  const opened = receive(round2Snapshot(30.3, true, data.practice.moves), receive(round2Snapshot(-600, false)));
+  const closed = receive(round2Snapshot(130, false, data.practice.moves), opened).timeline;
+  assert.match(eveAt(closed, 130).action, /switching off/);
+  dark(eveAt(closed, closingFade(closed, 130) + 6.001));
+  eveFixtures.push({ data, start: 29, end: 120 });
+});
+
+test('round 2 gate 2: E+50 holds full light on the remaining switch walk and resets only after reopening', () => {
+  const data = clickDuringFixedClose(50), base = receive(round2Snapshot(-600, false)).timeline;
+  const initial = eveAt(base, 50).staff, lightSwitch = eveAt(base, 50).lightSwitch;
+  const walkSeconds = Math.max(8, Math.hypot(initial.x - lightSwitch.x, initial.y - lightSwitch.y) / 2);
+  const fadeStart = 50 + walkSeconds, tourStart = fadeStart + 4;
+  assert.deepEqual(xy(eveAt(data, 50).staff), xy(initial));
+  for (let i = 0; i <= (120 - 49) * 20; i++) {
+    const seconds = 49 + i / 20, state = eveAt(data, seconds);
+    assert.equal(state.lights, 1);
+    assert.ok(state.staff);
+    if (seconds >= 50 && seconds < fadeStart) {
+      const fraction = (seconds - 50) / walkSeconds;
+      near(state.staff.x, initial.x + (lightSwitch.x - initial.x) * fraction);
+      near(state.staff.y, initial.y + (lightSwitch.y - initial.y) * fraction);
+    }
+  }
+  assert.deepEqual(xy(eveAt(data, fadeStart).staff), lightSwitch);
+  assert.match(eveAt(data, tourStart - .001).action, /back on/);
+  assert.match(eveAt(data, tourStart).action, /circulating/);
+  const dwell = caretakerTour(data, eveRoom).dwell[0] * GATHERING_DWELL_FACTOR;
+  assert.deepEqual(xy(eveAt(data, tourStart + dwell - .001).staff), lightSwitch);
+  assert.notDeepEqual(xy(eveAt(data, tourStart + dwell + 1).staff), lightSwitch);
+  eveFixtures.push({ data, start: 49, end: 120 });
+});
+
+const checkMidFadeReopen = (render, arrival, level) => {
+  near(level, .5, .0002);
+  const initial = render(arrival);
+  assert.deepEqual(xy(initial.staff), initial.lightSwitch, 'mid-fade arrival is already at the switch: no return walk');
+  near(initial.lights, level);
+  for (let i = 0; i <= 80; i++) {
+    const elapsed = i / 20, state = render(arrival + elapsed);
+    assert.ok(state.lights >= level - 1e-7, 'reopening cannot lower the interrupted level');
+    near(state.lights, level + (1 - level) * elapsed / 4);
+    assert.deepEqual(xy(state.staff), state.lightSwitch);
+    assert.match(state.action, elapsed < 4 ? /back on/ : /circulating/);
+  }
+  assert.equal(render(arrival + 4).lights, 1, 'unchanged four-second fade after the zero-length switch walk');
+  for (let i = 81; i <= 400; i++) assert.equal(render(arrival + i / 20).lights, 1);
+};
+
+test('round 2 gate 3: D5 mid-fade interruption preserves light level and four-second timing in the eve and event', () => {
+  const closed = receive(round2Snapshot(100, false), receive(round2Snapshot(-600, true)));
+  const arrival = Math.round((closingFade(closed.timeline, 100) + 2) * 1000) / 1000;
+  const data = receive(round2Snapshot(arrival + .3, true, [practiceMove(arrival)]), closed).timeline;
+  checkMidFadeReopen(seconds => eveAt(data, seconds), arrival, eveAt(closed.timeline, arrival).lights);
+  eveFixtures.push({ data, start: 99, end: arrival + 20 });
+  const event = timeline([person([0, 2])]);
+  const eventArrival = switchTime(event, 3600) + 2;
+  const reopened = timeline([person([0, 2]), person([0, 8], { here: eventArrival / 1800, leaving: null })]);
+  checkMidFadeReopen(seconds => at(reopened, seconds), eventArrival, at(event, eventArrival).lights);
+});
+
+test('round 2 gate 4: a completed pre-eve meal preserves the tour across E and the fixed close timings', () => {
+  const moves = [practiceMove(-2400, 'food')];
+  const first = receive(round2Snapshot(-2399.7, true, moves));
+  const data = receive(round2Snapshot(-600, false, moves), first).timeline;
+  assert.ok(practiceKitchenServices(data, eveRoom)[0].backEnd < eveStart - 600);
+  for (let i = 0; i < (48 + 5) * 20; i++) {
+    const seconds = -5 + i / 20, state = eveAt(data, seconds);
+    assert.match(state.action, /circulating/);
+    near(state.staff.x, eveAt(first.timeline, seconds).staff.x);
+    near(state.staff.y, eveAt(first.timeline, seconds).staff.y);
+  }
+  assert.match(eveAt(data, 48).action, /switching off/);
+  assert.equal(eveAt(data, 56).lights, 1);
+  near(eveAt(data, 58).lights, .5);
+  assert.equal(eveAt(data, 60).lights, 0);
+  for (const seconds of [62, 70, 3600]) dark(eveAt(data, seconds));
+  eveFixtures.push({ data, start: -5, end: 70 });
+});
+
+test('round 2 gate 5: a service running at E requests immediate D5 cleanup and closes without teleporting', () => {
+  const moves = [practiceMove(-120, 'food')];
+  const first = receive(round2Snapshot(-120, true, moves));
+  const empty = receive(round2Snapshot(-1, false, moves), first), data = empty.timeline;
+  const [service] = practiceKitchenServices(data, eveRoom);
+  assert.ok(service.readyTime < eveStart);
+  assert.equal(service.cleanupRequested, eveStart);
+  assert.equal(service.emptied, true);
+  assert.ok(service.cleanupStart >= eveStart && service.cleanupStart < eveStart + 30);
+  assert.equal(eveAt(data, 0).foodCount, 6);
+  assert.deepEqual(eveAt(data, -2), eveAt(first.timeline, -2));
+  assert.deepEqual(xy(eveAt(data, 0).staff), xy(eveAt(first.timeline, 0).staff));
+  assert.match(eveAt(data, service.cleanupStart - eveStart).action, /clearing/);
+  assert.match(eveAt(data, service.backEnd - eveStart).action, /switching off/);
+  near(eveAt(data, service.backEnd - eveStart + 2).lights, .5);
+  const end = service.backEnd - eveStart + 6;
+  for (const reduced of [false, true]) dark(eveAt(data, end + .001, reduced));
+  eveFixtures.push({ data, start: -5, end: end + 1 });
+});
+
+test('gates 11 and 12: eve fixtures stay continuous at 0.05 seconds through dark load, openings and closes', () => {
+  for (const { data, start, end } of eveFixtures) {
+    // E3 keeps the old fixed eight-second walk to the switch, whatever its length.
+    const walkFrom = eveAt(data, 48);
+    const fixedWalk = /switching off/.test(walkFrom.action) && walkFrom.staff
+      ? Math.hypot(walkFrom.lightSwitch.x - walkFrom.staff.x, walkFrom.lightSwitch.y - walkFrom.staff.y) / 8 : 0;
+    let previous = eveAt(data, start);
+    for (let seconds = start + .05; seconds <= end; seconds += .05) {
+      const current = eveAt(data, seconds);
+      assert.ok(current.lights >= 0 && current.lights <= 1);
+      assert.ok(Math.abs(current.lights - previous.lights) <= .05 / 4 + 1e-6,
+        `light step ${current.lights - previous.lights} at E+${seconds}`);
+      if (previous.staff && current.staff) {
+        const step = Math.hypot(current.staff.x - previous.staff.x, current.staff.y - previous.staff.y);
+        const speed = seconds > 48 && seconds <= 56 + .05 ? Math.max(3.4, fixedWalk) : 3.4;
+        assert.ok(step <= speed * .05 + 2e-6, `step ${step} at E+${seconds}`);
+      } else if (Boolean(previous.staff) !== Boolean(current.staff)) {
+        const staff = current.staff ?? previous.staff;
+        assert.ok(Math.hypot(staff.x - eveRoom.doorPosition.x, staff.y - eveRoom.doorPosition.y) <= 3.4 * .05 + 2e-6);
+      }
+      if (!current.staff) dark(current);
+      previous = current;
+    }
+  }
+});
+
+test('gate 2: a move before E published after E keeps the hall lit, including reduced motion', () => {
+  const first = receive(snapshot(-100, false));
+  const opened = receive(snapshot(1, true, [practiceMove(-1)]), first);
+  for (const seconds of [0, 48, 60, 62, 3600]) {
+    for (const reduced of [false, true]) {
+      const state = eveAt(opened.timeline, seconds, reduced);
+      assert.equal(state.lights, 1);
+      assert.equal(state.occupied, true);
+      assert.match(state.action, /circulating/);
+      assert.ok(state.staff);
+    }
   }
 });

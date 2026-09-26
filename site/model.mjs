@@ -336,6 +336,21 @@ export function validateTimeline(input) {
       return { person, text, at };
     });
     practice = { people: practicePeople, speech };
+    if (raw.moves !== undefined) {
+      practice.moves = (Array.isArray(raw.moves) ? raw.moves : []).flatMap(rawMove => {
+        try {
+          const entry = object(rawMove, "practice move");
+          const { person, destination, table } = entry;
+          if (!personById.has(person) || !["table", "food", "lounge"].includes(destination)) return [];
+          if (destination === "table" ? !tableIds.has(table) : table !== null) return [];
+          const at = dateString(entry.at, "practice move.at", "zero-offset");
+          return [{ person, at, destination, table }];
+        } catch (error) {
+          if (!(error instanceof TimelineError)) throw error;
+          return [];
+        }
+      }).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    }
   }
   return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity, practice };
 }
@@ -586,6 +601,15 @@ function routePoint(layout, position) {
   return stop ?? { ...position, row: position.y };
 }
 
+const KITCHEN_ROUTES = new WeakMap();
+function cookingPath(layout, from, to) {
+  let routes = KITCHEN_ROUTES.get(layout);
+  if (!routes) { routes = new Map(); KITCHEN_ROUTES.set(layout, routes); }
+  const key = from * 10 + to;
+  if (!routes.has(key)) routes.set(key, kitchenPath(layout, from, to));
+  return routes.get(key);
+}
+
 function kitchenCooking(layout, start, duration, seed) {
   const random = seededRandom(seed), segments = [];
   let time = start, station = 8;
@@ -598,7 +622,7 @@ function kitchenCooking(layout, start, duration, seed) {
     append(here, here, Math.min(4 + random() * 5, start + duration - time));
     if (time >= start + duration) break;
     const next = (station + 1 + Math.floor(random() * 8)) % 9;
-    const path = kitchenPath(layout, station, next);
+    const path = cookingPath(layout, station, next);
     let reached = true;
     for (let i = 1; i < path.length; i++) {
       append(path[i - 1], path[i], distance(path[i - 1], path[i]) / CARETAKER_TILES_PER_SECOND);
@@ -611,7 +635,7 @@ function kitchenCooking(layout, start, duration, seed) {
     }
     if (reached) station = next;
   }
-  const back = kitchenPath(layout, station, 8);
+  const back = cookingPath(layout, station, 8);
   for (let i = 1; i < back.length; i++) append(back[i - 1], back[i], distance(back[i - 1], back[i]) / CARETAKER_TILES_PER_SECOND);
   return { segments, end: time };
 }
@@ -629,25 +653,37 @@ function kitchenSchedule(timeline, layout) {
   if (cached?.layout === layout) return cached;
   const unit = timeline.event.slot_minutes * 60, horizon = timeline.event.slots * unit;
   const intervals = hallIntervals(timeline), visits = rawFoodVisits(timeline);
-  const services = [], pieces = [], readyByStart = new Map();
-  const tour = caretakerTour(timeline, layout), lightSwitch = tour.stops[0];
-  const pickup = atFood(layout, FOOD_CORNER.pickup);
+  const readyByStart = new Map();
+  const selectVisit = candidate => {
+    // Readiness of earlier visits is already known; preserve the event resolver's precedence.
+    const selected = resolveLocation(timeline, candidate.person, candidate.at, activeEvents(timeline, candidate.at),
+      (_data, slot, at) => {
+        const raw = at * unit, effective = Math.max(raw, readyByStart.get(foodTimeKey(raw)) ?? raw);
+        return slot * unit < effective + 400 ? { kind: 'food', rawStart: raw } : null;
+      });
+    candidate.reason = selected.event?.kind === 'meal' ? 'meal' : 'visit';
+    return selected.rawStart !== undefined && foodTimeKey(selected.rawStart) === foodTimeKey(candidate.start);
+  };
+  const result = buildKitchenSchedule(layout, { visits, intervals, horizon, readyByStart, selectVisit,
+    tour: caretakerTour(timeline, layout), opening: Math.max(0, (intervals[0]?.[0] ?? 0) - 60) });
+  KITCHEN_SERVICES.set(timeline, result);
+  return result;
+}
+
+/** Shared service engine. Inputs and outputs are seconds in the caller's clock. */
+function buildKitchenSchedule(layout, { visits, intervals, horizon, tour, opening,
+  readyByStart = new Map(), selectVisit = () => true, practice = false,
+  fixedCloseAt = null, initiallyDark = false }) {
+  const services = [], pieces = [];
+  let appliedFixedCloseAt = null;
+  const lightSwitch = tour.stops[0], pickup = atFood(layout, FOOD_CORNER.pickup);
   const kitchenDoor = { ...atFood(layout, FOOD_CORNER.staffSpots[0]), row: layout.aisles[0] };
-  const opening = Math.max(0, (intervals[0]?.[0] ?? 0) - 60);
-  let now = opening, position = layout.doorPosition, tourClock = 0, vi = 0;
+  let tourClock = practice ? ((opening % tour.seconds) + tour.seconds) % tour.seconds : 0;
+  let now = opening, position = practice ? tourState(tour, tourClock).position : layout.doorPosition, vi = 0;
   const nextVisit = () => {
     while (vi < visits.length) {
       const candidate = visits[vi];
-      // Readiness of earlier visits is already known. This checks exact supersession without a cycle.
-      const selected = resolveLocation(timeline, candidate.person, candidate.at, activeEvents(timeline, candidate.at),
-        (_data, slot, at) => {
-          const raw = at * unit, effective = Math.max(raw, readyByStart.get(foodTimeKey(raw)) ?? raw);
-          return slot * unit < effective + 400 ? { kind: 'food', rawStart: raw } : null;
-        });
-      if (selected.rawStart !== undefined && foodTimeKey(selected.rawStart) === foodTimeKey(candidate.start)) {
-        candidate.reason = selected.event?.kind === 'meal' ? 'meal' : 'visit';
-        return candidate;
-      }
+      if (selectVisit(candidate)) return candidate;
       vi++;
     }
     return null;
@@ -664,14 +700,21 @@ function kitchenSchedule(timeline, layout) {
   };
   const roundUntil = end => { add(end, { roundClock: tourClock, action: CIRCULATING }); tourClock += pieces.at(-1).end - pieces.at(-1).start;
     position = tourState(tour, tourClock).position; };
-  const openingAction = 'Staff are turning on the lights.';
-  add(now + 4, { from: position, to: lightSwitch, action: openingAction, lightFrom: 0, lightTo: 0 });
-  position = lightSwitch;
-  add(now + 2, { from: position, to: position, action: openingAction, lightFrom: 0, lightTo: 1 });
-  add(now + 2, { from: position, to: position, action: openingAction });
+  if (!practice) {
+    const openingAction = 'Staff are turning on the lights.';
+    add(now + 4, { from: position, to: lightSwitch, action: openingAction, lightFrom: 0, lightTo: 0 });
+    position = lightSwitch;
+    add(now + 2, { from: position, to: position, action: openingAction, lightFrom: 0, lightTo: 1 });
+    add(now + 2, { from: position, to: position, action: openingAction });
+  }
+  const dinerEnd = (visit, ready) => Math.min(Math.max(visit.start, ready) + 400, visit.end ?? Infinity);
   let returnPath = null, returnToSwitch = false;
   while (now <= horizon || vi < visits.length) {
     const demand = nextVisit()?.start ?? Infinity;
+    if (practice && demand === Infinity && occupied(now) && nextDeparture(now) === Infinity) {
+      add(Infinity, { roundClock: tourClock, action: CIRCULATING });
+      break;
+    }
     if (demand <= now && occupied(now)) {
       const start = services.length ? Math.max(now, demand) : demand, service = { start, walkIn: 0, reason: visits[vi].reason };
       services.push(service);
@@ -681,6 +724,7 @@ function kitchenSchedule(timeline, layout) {
           walk([position, state.end], CARETAKER_TILES_PER_SECOND, 'Staff are heading to the kitchen.', { service, load: 'food' });
           tourClock += state.remaining;
         }
+        if (practice) service.tourDeparture = now;
         const leave = routePoint(layout, position);
         // Return to the segment end, where the paused tour will resume.
         returnPath = [position, ...corridorPath(layout, leave, kitchenDoor), pickup];
@@ -697,17 +741,17 @@ function kitchenSchedule(timeline, layout) {
       while (nextVisit()?.start < Math.min(quiet + 300, departure)) {
         const visit = visits[vi++];
         readyByStart.set(foodTimeKey(visit.start), service.readyTime);
-        quiet = Math.max(quiet, Math.max(visit.start, service.readyTime) + 400);
+        quiet = Math.max(quiet, dinerEnd(visit, service.readyTime));
       }
       let cooking = kitchenCleanup(layout, start, service.readyTime, quiet, departure);
       // Food stays available while the cook returns to pickup. A new diner cancels quiet cleanup.
       while (!cooking.emptied && nextVisit()?.start < cooking.end) {
         const visit = visits[vi++];
         readyByStart.set(foodTimeKey(visit.start), service.readyTime);
-        quiet = Math.max(quiet, visit.start + 400);
+        quiet = Math.max(quiet, dinerEnd(visit, service.readyTime));
         while (nextVisit()?.start < Math.min(quiet + 300, departure)) {
           const more = visits[vi++];
-          readyByStart.set(foodTimeKey(more.start), service.readyTime); quiet = Math.max(quiet, more.start + 400);
+          readyByStart.set(foodTimeKey(more.start), service.readyTime); quiet = Math.max(quiet, dinerEnd(more, service.readyTime));
         }
         cooking = kitchenCleanup(layout, start, service.readyTime, quiet, departure);
       }
@@ -716,7 +760,7 @@ function kitchenSchedule(timeline, layout) {
       service.emptied = cooking.emptied;
       returnToSwitch ||= service.emptied;
       service.cleanupStart = cooking.end;
-      for (const part of cooking.segments) add(part.end, { ...part, service, phase: 'cooking', action: 'Staff are cooking in the kitchen.' });
+      add(cooking.end, { segments: cooking.segments, service, phase: 'cooking', action: 'Staff are cooking in the kitchen.' });
       service.cleanupEnd = now + SET_OUT_SECONDS;
       add(service.cleanupEnd, { service, phase: 'cleanup', action: 'Staff are clearing the food table.' });
       // Requests during cleanup start the next service here, without a trip into the hall.
@@ -742,26 +786,37 @@ function kitchenSchedule(timeline, layout) {
     }
     // Finish closing, interrupting from the actual position if attendance resumes.
     const arrival = nextArrival(now);
+    const fixedClose = now === fixedCloseAt;
+    if (fixedClose) {
+      appliedFixedCloseAt = now;
+      const tourEnd = now + 48;
+      roundUntil(Math.min(tourEnd, arrival));
+      // Attendance during the initial tour cancels closing without restarting the tour.
+      if (arrival < tourEnd) continue;
+    }
+    const alreadyGone = initiallyDark && now === opening;
+    if (alreadyGone) position = layout.doorPosition;
     const state = tourState(tour, tourClock);
-    const finishSegment = state.remaining && distance(state.position, position) < 1e-7;
+    const finishSegment = !fixedClose && state.remaining && distance(state.position, position) < 1e-7;
     const departurePoint = finishSegment ? state.end : position;
-    const path = [position, ...(finishSegment ? [departurePoint] : []),
+    const path = alreadyGone ? [position] : fixedClose ? [position, lightSwitch] : [position, ...(finishSegment ? [departurePoint] : []),
       ...corridorPath(layout, routePoint(layout, departurePoint), routePoint(layout, lightSwitch))];
-    let interrupted = false, reopenPath = null;
+    let interrupted = false, reopenPath = null, lightLevel = alreadyGone ? 0 : 1;
     for (let i = 1; i < path.length; i++) {
       const speed = finishSegment && i === 1 ? CARETAKER_TILES_PER_SECOND : SERVICE_SPEED;
-      const end = now + distance(position, path[i]) / speed;
+      const end = now + (fixedClose ? 8 : distance(position, path[i]) / speed);
       const to = arrival < end ? interpolate(position, path[i], (arrival - now) / (end - now)) : path[i];
       add(Math.min(end, arrival), { from: position, to, action: SWITCHING_OFF }); position = to;
       if (now === arrival) { interrupted = true; reopenPath = [position, ...path.slice(i)]; break; }
     }
-    if (!interrupted) {
+    if (!interrupted && !alreadyGone) {
       const fadeEnd = now + 4;
+      lightLevel = 1 - clampUnit((Math.min(fadeEnd, arrival) - now) / 4);
       add(Math.min(fadeEnd, arrival), { from: position, to: position, action: SWITCHING_OFF, lightFrom: 1,
-        lightTo: 1 - clampUnit((Math.min(fadeEnd, arrival) - now) / 4) });
+        lightTo: lightLevel });
       if (now === arrival) interrupted = true;
     }
-    if (!interrupted) {
+    if (!interrupted && !alreadyGone) {
       const end = now + EXIT_SECONDS;
       const to = arrival < end ? interpolate(position, layout.doorPosition, (arrival - now) / EXIT_SECONDS) : layout.doorPosition;
       add(Math.min(end, arrival), { from: position, to, action: HEADING_HOME, lightFrom: 0, lightTo: 0 }); position = to;
@@ -774,15 +829,13 @@ function kitchenSchedule(timeline, layout) {
     const backAction = 'Staff are turning the lights back on.';
     const backPath = reopenPath ?? [position, ...corridorPath(layout, routePoint(layout, position), routePoint(layout, lightSwitch))];
     const length = backPath.slice(1).reduce((sum, p, i) => sum + distance(backPath[i], p), 0);
-    walk(backPath, Math.min(SERVICE_SPEED, length / 8), backAction, { lightFrom: 0, lightTo: 0 });
-    add(now + 4, { from: position, to: position, action: backAction, lightFrom: 0, lightTo: 1 });
+    walk(backPath, Math.min(SERVICE_SPEED, length / 8), backAction, { lightFrom: lightLevel, lightTo: lightLevel });
+    add(now + 4, { from: position, to: position, action: backAction, lightFrom: lightLevel, lightTo: 1 });
     tourClock = 0;
     // Ignore candidates whose people left before reopening completed.
     while (nextVisit()?.start < now && !occupied(visits[vi].start)) vi++;
   }
-  const result = { layout, services, pieces, readyByStart, tour, intervals, opening };
-  KITCHEN_SERVICES.set(timeline, result);
-  return result;
+  return { layout, services, pieces, readyByStart, tour, intervals, opening, fixedCloseAt: appliedFixedCloseAt };
 }
 
 export function kitchenServices(timeline, layout = KITCHEN_SERVICES.get(timeline)?.layout ?? createRoomLayout(timeline.tables ?? [], timeline.room_layout)) {
@@ -794,10 +847,18 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
   const schedule = kitchenSchedule(timeline, layout);
   let seconds = Math.max(0, slot * timeline.event.slot_minutes * 60);
   if (slot === timeline.event.slots) seconds += 12;
+  return kitchenAmbience(schedule, seconds, layout, reducedMotion);
+}
+
+function pieceAt(pieces, seconds) {
+  let lo = 0, hi = pieces.length;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (pieces[mid].end <= seconds) lo = mid + 1; else hi = mid; }
+  return pieces[lo];
+}
+
+function kitchenAmbience(schedule, seconds, layout, reducedMotion) {
   const lightSwitch = schedule.tour.stops[0], pickup = atFood(layout, FOOD_CORNER.pickup);
-  let lo = 0, hi = schedule.pieces.length;
-  while (lo < hi) { const mid = (lo + hi) >>> 1; if (schedule.pieces[mid].end <= seconds) lo = mid + 1; else hi = mid; }
-  const piece = schedule.pieces[lo];
+  const piece = pieceAt(schedule.pieces, seconds);
   let staff = null, foodCount = 0, foodProgress = 0, lights = 0;
   let action = 'The hall is dark. Staff have not arrived yet.';
   if (piece && seconds >= schedule.opening) {
@@ -812,7 +873,11 @@ export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
       foodProgress = (piece.phase === 'cleanup' ? 1 - elapsed / SET_OUT_SECONDS : elapsed / SET_OUT_SECONDS) * 6;
       const food = piece.phase === 'cleanup' ? foodClearAt(layout, elapsed) : foodSetOut(layout, foodProgress);
       foodCount = food.count; staff = { ...food.staff, carrying: food.dish };
-    } else if (piece.phase === 'cooking') { foodCount = 6; foodProgress = 6; }
+    } else if (piece.phase === 'cooking') {
+      foodCount = 6; foodProgress = 6;
+      const segment = pieceAt(piece.segments, seconds);
+      staff = interpolate(segment.from, segment.to, (seconds - segment.start) / (segment.end - segment.start));
+    }
     if (staff) staff = { ...staff, load: piece.load ?? null, carrying: staff.carrying ?? null };
     if (reducedMotion) {
       staff = staff && { ...(piece.service ? pickup : lightSwitch), load: null, carrying: null };
@@ -841,6 +906,131 @@ function gatheringTour(timeline, layout) {
   return scaled;
 }
 
+/** Adapt successive live snapshots without mutating them. Old bots have no timed move history. */
+export function receivePracticeSnapshot(snapshot, previous, receivedAt, previousPollAt = null) {
+  const generatedAt = Date.parse(snapshot.generated_at);
+  const observed = generatedAt - receivedAt;
+  if (generatedAt >= Date.parse(snapshot.event.start)) {
+    return { timeline: snapshot, offset: observed, lo: -Infinity, hi: Infinity, seen: new Map(), moves: [] };
+  }
+  let lo = Math.max(previous?.lo ?? -Infinity, observed);
+  let hi = previous?.hi ?? Infinity;
+  if (previousPollAt !== null && previous && generatedAt > Date.parse(previous.timeline.generated_at)) {
+    hi = Math.min(hi, generatedAt - previousPollAt + 2000);
+  }
+  if (lo > hi) lo = hi = observed;
+  const offset = Math.min(Math.max(0, lo), hi);
+  const people = snapshot.practice?.people ?? {};
+  const timed = snapshot.practice?.moves ?? [];
+  const occupied = Object.keys(people).length > 0;
+  const eve = Date.parse(snapshot.event.start) - EVE_MS;
+  // Keep transition timestamps in bot time. Later polls (including unrelated changes)
+  // must not move an idle close or a reaction-only opening forward.
+  const occupancy = previous?.occupancy ?? {
+    initiallyDark: !occupied && receivedAt + offset >= eve,
+    changes: [{ at: generatedAt, occupied }],
+  };
+  const changes = [...occupancy.changes];
+  const last = changes.at(-1);
+  if (occupied !== last.occupied) {
+    const firstMove = occupied ? timed.map(move => Date.parse(move.at))
+      .filter(at => at > last.at && at <= generatedAt).sort((a, b) => a - b)[0] : undefined;
+    changes.push({ at: generatedAt, occupied, opening: firstMove ?? generatedAt });
+  }
+  const nextOccupancy = { ...occupancy, changes };
+  const timedPeople = new Set(timed.map(move => move.person));
+  const seen = new Map();
+  const moves = (previous?.moves ?? []).filter(move => !timedPeople.has(move.person));
+  for (const [person, entry] of Object.entries(people)) {
+    if (timedPeople.has(person)) continue;
+    seen.set(person, entry);
+    const old = previous?.seen.get(person);
+    if (old?.position === entry.position && old?.table === entry.table) continue;
+    moves.push({ person, at: snapshot.generated_at, destination: entry.position,
+      table: entry.position === 'table' ? entry.table : null });
+  }
+  // An idle reset also ends a legacy visit, but its kitchen service remains in the history.
+  for (const [person] of previous?.seen ?? []) {
+    if (!people[person] && !timedPeople.has(person)) {
+      moves.push({ person, at: snapshot.generated_at, destination: 'table', table: null });
+    }
+  }
+  const timeline = { ...snapshot, practiceOccupancy: nextOccupancy, practice: {
+    ...snapshot.practice, people, moves: [...timed, ...moves].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
+  } };
+  return { timeline, offset, lo, hi, seen, moves, occupancy: nextOccupancy };
+}
+
+export function practiceNow(session, viewerNow) {
+  return viewerNow + (session?.offset ?? 0);
+}
+
+const PRACTICE_SERVICES = new WeakMap();
+
+function practiceOccupancy(timeline) {
+  const eve = (Date.parse(timeline.event.start) - EVE_MS) / 1000;
+  const occupancy = timeline.practiceOccupancy;
+  const changes = occupancy?.changes ?? [{ at: Date.parse(timeline.generated_at),
+    occupied: Object.keys(timeline.practice?.people ?? {}).length > 0 }];
+  let occupied = changes[0].occupied;
+  for (const change of changes.slice(1)) {
+    if (change.at / 1000 <= eve) occupied = change.occupied;
+  }
+  const intervals = [[-Infinity, occupied ? Infinity : eve]];
+  for (const change of changes.slice(1)) {
+    if (change.at / 1000 <= eve) continue;
+    if (change.occupied) {
+      const start = Math.max(eve, change.opening / 1000);
+      if (start <= intervals.at(-1)[1]) intervals.at(-1)[1] = Infinity;
+      else intervals.push([start, Infinity]);
+    } else intervals.at(-1)[1] = change.at / 1000;
+  }
+  return { intervals, eve, initiallyDark: occupancy?.initiallyDark ?? false,
+    fixedCloseAt: intervals[0][1] === eve && !occupancy?.initiallyDark ? eve : null };
+}
+
+/** Wall-second history, including superseded visits and completed services. Never mutate the feed. */
+function practiceSchedule(timeline, layout) {
+  const cached = PRACTICE_SERVICES.get(timeline);
+  if (cached?.layout === layout) return cached;
+  const histories = new Map(), visits = [];
+  const moves = [...(timeline.practice?.moves ?? [])];
+  // Direct model callers also get a full visit from an old-bot snapshot. The app keeps this
+  // first-seen timestamp across polls via its practice snapshot adapter.
+  for (const [person, entry] of Object.entries(timeline.practice?.people ?? {})) {
+    if (entry.position === 'food' && !moves.some(move => move.person === person)) {
+      moves.push({ person, at: timeline.generated_at, destination: 'food', table: null });
+    }
+  }
+  moves.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  for (const move of moves) {
+    const history = histories.get(move.person) ?? [];
+    const previous = history.at(-1);
+    if (move.destination !== 'food' && previous?.destination === move.destination && previous.table === move.table) continue;
+    const entry = { ...move, start: Date.parse(move.at) / 1000, end: Infinity, reason: 'visit' };
+    if (previous) previous.end = entry.start;
+    history.push(entry); histories.set(move.person, history);
+    if (move.destination === 'food') visits.push(entry);
+  }
+  const { intervals, eve, initiallyDark, fixedCloseAt } = practiceOccupancy(timeline);
+  const opening = initiallyDark ? eve : Math.min(eve, moves.length ? Date.parse(moves[0].at) / 1000 : eve);
+  const tour = gatheringTour(timeline, layout);
+  // Run through E on the same clock. A service spanning E uses D5; a touring
+  // caretaker reaches E in this schedule and takes the fixed E3 close from there.
+  const schedule = buildKitchenSchedule(layout, {
+    visits: visits.filter(visit => visit.start >= opening && intervals.some(([a, b]) => a <= visit.start && visit.start < b)),
+    intervals, fixedCloseAt, initiallyDark,
+    horizon: Infinity, tour, opening, practice: true });
+  const result = { ...schedule, histories, planned: timeline.tables ? gatheringLocations(timeline) : new Map() };
+  PRACTICE_SERVICES.set(timeline, result);
+  return result;
+}
+
+export function practiceKitchenServices(timeline, layout = PRACTICE_SERVICES.get(timeline)?.layout
+  ?? createRoomLayout(timeline.tables ?? [], timeline.room_layout)) {
+  return practiceSchedule(timeline, layout).services;
+}
+
 function doorsOpenText(timeline) {
   const start = Date.parse(timeline.event.start);
   const part = options => {
@@ -850,48 +1040,33 @@ function doorsOpenText(timeline) {
   return `The hall is dark. Doors open ${part({ weekday: 'long' })} at ${part({ hour: 'numeric', minute: '2-digit' })}.`;
 }
 
-/** Ambience before the event, driven by the wall clock: a lit gathering, then the eve's closing and a dark hall.
- * Same shape as `hallAmbience`. Position is a function of the instant, so every page load agrees. */
+/** The gathering stays lit; in the eve snapshot footprints control closing and reopening. */
 export function gatheringAmbience(timeline, layout, milliseconds, reducedMotion = false) {
-  const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
-  const tour = gatheringTour(timeline, layout);
-  const clamp = value => Math.max(0, Math.min(1, value));
-  const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
-  const roam = seconds => {
-    if (reducedMotion) return { ...tour.stops[0] };
-    let remaining = ((seconds % tour.seconds) + tour.seconds) % tour.seconds;
-    for (const segment of tour.segments) {
-      if (remaining <= segment.seconds) {
-        const progress = segment.seconds ? remaining / segment.seconds : 1;
-        return { x: segment.from.x + (segment.to.x - segment.from.x) * progress,
-          y: segment.from.y + (segment.to.y - segment.from.y) * progress };
-      }
-      remaining -= segment.seconds;
-    }
-    return { ...tour.stops[0] };
-  };
-  const eveStart = Date.parse(timeline.event.start) - EVE_MS;
-  const elapsed = (milliseconds - eveStart) / 1000;
-  let staff, lights = 1, action = CIRCULATING, occupied = true;
-  if (elapsed < 0) {
-    staff = roam(milliseconds / 1000);
-  } else if (elapsed < 48) {
-    // Attendees are walking out (staggered over the first 45 s); the caretaker keeps touring.
-    staff = roam(eveStart / 1000 + elapsed);
-  } else if (elapsed <= 60) {
-    // Walk to the switch (48–56 s), then fade the lights (56–60 s), like the event-day closing.
-    staff = reducedMotion ? { ...tour.stops[0] } : elapsed < 56 ? move(roam(eveStart / 1000 + 48), lightSwitch, (elapsed - 48) / 8) : { ...lightSwitch };
-    lights = reducedMotion ? (elapsed < 60 ? 1 : 0) : 1 - clamp((elapsed - 56) / 4);
-    action = SWITCHING_OFF;
-  } else if (elapsed < EVE_EXIT_SECONDS) {
-    staff = reducedMotion ? { ...tour.stops[0] } : move(lightSwitch, layout.doorPosition, (elapsed - 60) / EXIT_SECONDS);
-    lights = 0;
-    action = reducedMotion ? SWITCHING_OFF : HEADING_HOME;
-  } else {
-    staff = null; lights = 0; occupied = false;
-    action = doorsOpenText(timeline);
+  const schedule = practiceSchedule(timeline, layout), seconds = milliseconds / 1000;
+  // Before the first click, follow the same epoch-origin tour used by the gathering scene.
+  if (seconds < schedule.opening) {
+    const lightSwitch = schedule.tour.stops[0];
+    return { staff: { ...(reducedMotion ? lightSwitch : tourState(schedule.tour,
+      ((seconds % schedule.tour.seconds) + schedule.tour.seconds) % schedule.tour.seconds).position),
+      load: null, carrying: null }, lights: 1, foodCount: 0, foodProgress: 0,
+      lightSwitch, action: CIRCULATING, occupied: true };
   }
-  return { staff: staff && { ...staff, load: null }, lights, foodCount: 0, lightSwitch, action, occupied };
+  const result = kitchenAmbience(schedule, seconds, layout, reducedMotion);
+  const elapsed = seconds - schedule.fixedCloseAt;
+  const firstArrival = schedule.intervals[1]?.[0] ?? Infinity;
+  if (schedule.fixedCloseAt !== null && elapsed >= 0 && elapsed < EVE_EXIT_SECONDS && seconds < firstArrival) {
+    // Preserve the original eve's boundary and reduced-motion timing, including t=60.
+    if (elapsed === 60) result.action = SWITCHING_OFF;
+    if (reducedMotion) {
+      result.staff = { ...result.lightSwitch, load: null, carrying: null };
+      result.lights = elapsed < 60 ? 1 : 0;
+      result.action = elapsed < 48 ? CIRCULATING : SWITCHING_OFF;
+    }
+  }
+  if (!result.staff && milliseconds >= Date.parse(timeline.event.start) - EVE_MS) {
+    result.action = schedule.doorsText ??= doorsOpenText(timeline);
+  }
+  return result;
 }
 
 export function effectiveSignupRange(signup) {
@@ -1225,9 +1400,14 @@ export function foodVisit(timeline, slot, startedAt) {
   const unit = timeline.event.slot_minutes * 60;
   kitchenServices(timeline);
   const ready = KITCHEN_SERVICES.get(timeline).readyByStart.get(foodTimeKey(startedAt * unit)) ?? startedAt * unit;
-  if (slot * unit < ready) return { kind: "food", label: "the food queue, waiting for food", foodPhase: "waiting",
+  return foodVisitPhase(slot * unit, startedAt * unit, ready);
+}
+
+/** The same waiting, plating, eating and clearing phases in either seconds clock. */
+function foodVisitPhase(now, start, ready) {
+  if (now < ready) return { kind: "food", label: "the food queue, waiting for food", foodPhase: "waiting",
     plate: false, foodRemaining: 1 };
-  const elapsed = Math.max(0, slot * unit - Math.max(startedAt * unit, ready));
+  const elapsed = Math.max(0, now - Math.max(start, ready));
   // Allow for floating-point conversion at the half-open phase boundaries.
   const seconds = Math.round(elapsed * 1e6) / 1e6;
   if (seconds >= 400) return null;
@@ -1326,15 +1506,27 @@ export function gatheringLocations(timeline) {
 
 /** Where practising people stand before doors, from the live feed's optional practice key: the seat they
  * hold on the table whose thread they practised in, else their planned placement, else the lounge. */
-export function practicePlaces(timeline) {
+export function practicePlaces(timeline, milliseconds = Date.parse(timeline.generated_at),
+  layout = PRACTICE_SERVICES.get(timeline)?.layout ?? createRoomLayout(timeline.tables ?? [], timeline.room_layout)) {
   const result = new Map();
   const entries = Object.entries(timeline.practice?.people ?? {});
   if (entries.length === 0) return result;
-  const planned = gatheringLocations(timeline);
-  for (const [id, entry] of entries) {
+  const schedule = practiceSchedule(timeline, layout), planned = schedule.planned, seconds = milliseconds / 1000;
+  for (const [id, current] of entries) {
+    const history = schedule.histories.get(id) ?? [];
+    const latest = history.findLast(move => move.start <= seconds);
+    let entry = current;
+    if (latest) entry = { position: latest.destination, table: latest.table };
+    else if (history.length) entry = { position: 'table', table: current.table };
+    // A fresh reaction after the bot's idle reset can restore its default position without a move.
+    if (latest === history.at(-1) && latest && current.position !== latest.destination) entry = current;
     if (entry.position === "food") {
-      result.set(id, { kind: "food", label: "the food seating, eating", foodPhase: "eating", plate: true, foodRemaining: 1 });
-      continue;
+      const ready = latest && schedule.readyByStart.get(foodTimeKey(latest.start));
+      const visit = latest && foodVisitPhase(seconds, latest.start, ready ?? latest.start);
+      if (visit) { result.set(id, visit); continue; }
+      // Repeat food clicks keep the original return destination, including after auto-return.
+      const origin = history.slice(0, history.indexOf(latest)).findLast(move => move.destination !== 'food');
+      entry = origin ? { position: origin.destination, table: origin.table } : { position: 'table', table: current.table };
     }
     if (entry.position === "lounge") {
       result.set(id, { kind: "lounge", label: "the lounge" });

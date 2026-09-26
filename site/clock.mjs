@@ -1,4 +1,4 @@
-import { activeEvents, modeAt, msToSlot, playbackSpeed } from "./model.mjs?v=f43c39fa71ff";
+import { activeEvents, modeAt, msToSlot, playbackSpeed } from "./model.mjs?v=beda39f7e247";
 
 const clampSlot = (timeline, slot) => Math.max(0, Math.min(timeline.event.slots, slot));
 

@@ -72,6 +72,41 @@ A legacy schema-4 fake day is in `timeline.sample.json`
 | `visitors` | object | Schema 6: `open` boolean and `people` person-ID array; no copied names or Discord IDs. |
 | `tables` | array | current tables. Deleted tables are gone, not tombstoned. |
 | `events` | array | admin `/event` history plus attendee shouts and approved donations. |
+| `practice` | object | Optional pre-doors live-feed positions, speech and timed move history; see below. |
+
+## `practice` (optional live-feed overlay)
+
+Before doors the live feed may carry `{ people, speech, moves }`. It is absent from
+Git snapshots, samples and archives, and sample/archive viewers ignore it.
+
+- `people`: person-ID keys mapping to `{ position: "table" | "food" | "lounge", table: <table ID> | null }`.
+- `speech`: recent `{ person, text, at }` entries, unchanged.
+- `moves`: oldest-first `{ person, at, destination, table }` entries. `destination`
+  is `table`, `food` or `lounge`; `table` is the destination table ID for a table
+  move and null otherwise. `at` uses the same UTC format and publisher clock as
+  `generated_at`. Every accepted move and Roll Dice's forced table move is kept;
+  repeat Get Food clicks start new visits. Malformed move entries are dropped by
+  the site validator.
+
+The move history stays in bot memory until doors, even after idle positions reset.
+It reconstructs completed kitchen services and the paused caretaker tour.
+The site uses wall seconds and keeps the greatest `generated_at` minus viewer
+receipt time as a lower bound on the clock offset.
+A snapshot newer than the previous successful live poll supplies an upper bound
+of `generated_at` minus that poll's receipt time plus two seconds for PUT latency;
+the site keeps the smallest upper bound, with none from the first snapshot.
+Clamping zero between these bounds leaves correct clocks alone on stale loads,
+corrects slow clocks from a fresh first snapshot, and corrects fast clocks after
+a new snapshot follows a successful poll.
+Diners queue until food is ready, then take the event's
+400-second visit and return to their preceding destination (or their thread seat, planned seat or lounge).
+Later moves end the visit immediately; the kitchen still finishes service.
+
+For an old bot without timed moves, the viewer remembers the first snapshot time
+at which each person appeared at food. Later polls do not restart that visit.
+Changing position permits a new synthetic visit; a repeat food click without any
+observable position change cannot be detected by an old-bot viewer. Bot first,
+then site is the rollout order. At doors practice is discarded with no handover.
 
 ## `event`
 

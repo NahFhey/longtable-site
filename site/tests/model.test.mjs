@@ -801,7 +801,7 @@ test("practicePlaces seats people where they practise, falls back to plans, and 
   assert.deepEqual(places.get("player"), { kind: "table", label: "Table One", table: one, tableIndex: 0, seat: 1 });
   assert.deepEqual(places.get("admin"), { kind: "table", label: "Table Two", table: two, tableIndex: 1, seat: 0 });
   assert.deepEqual(places.get("loner"), { kind: "lounge", label: "the lounge" });
-  assert.deepEqual(places.get("guest"), { kind: "food", label: "the food seating, eating", foodPhase: "eating", plate: true, foodRemaining: 1 });
+  assert.deepEqual(places.get("guest"), { kind: "food", label: "the food queue, waiting for food", foodPhase: "waiting", plate: false, foodRemaining: 1 });
   assert.deepEqual(places.get("visitor"), { kind: "lounge", label: "the lounge" });
   assert.equal(places.size, 7);
   assert.equal(practicePlaces(validateTimeline(practiceTimeline())).size, 0, "no key, no places");
