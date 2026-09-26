@@ -134,6 +134,7 @@ const state = {
   viewport: null,
   speed: 600,
   selectedId: null,
+  manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
   layout: null,
   people: new Map(),
@@ -299,7 +300,7 @@ function updateCamera() {
       state.frameKey = "kiosk";
       hideTooltip();
     }
-    state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
   } else if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
     // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is
@@ -323,7 +324,7 @@ function updateCamera() {
         height: Math.max(tables.y + tables.height, state.layout.height - 1) - y }, size, hallBounds());
     }
     state.frameKey = key;
-    state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
     renderDetail();
   }
   state.camera = constrainCamera(state.camera, size, hallBounds());
@@ -795,7 +796,6 @@ function drawRoom() {
 
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.banners[index], layout.stage.x + 1 + index * 2, 0);
   drawTile(state.images.rpg, RPG.barrel, layout.stage.x + 3, layout.stage.y + 1);
-  drawLabel("STAGE", layout.stage.x + layout.stage.w / 2, layout.stage.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 
   const foodX = layout.food.x + 1;
   const foodY = layout.food.y + 1;
@@ -813,8 +813,6 @@ function drawRoom() {
   }
   ctx.fillStyle = "#303e43";
   ctx.fillRect((foodScene.bin.x - .35) * TILE * SCALE, (foodScene.bin.y - .7) * TILE * SCALE, .7 * TILE * SCALE, .9 * TILE * SCALE);
-  drawLabel("TRASH", foodScene.bin.x, foodScene.bin.y - 1, { size: 2.5, color: "#fff", background: false });
-  drawLabel("FOOD", layout.food.x + layout.food.w / 2, layout.food.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 
   drawTile(state.images.rpg, RPG.shelf[0], layout.lounge.x, layout.lounge.y);
   drawTile(state.images.rpg, RPG.shelf[1], layout.lounge.x, layout.lounge.y + 1);
@@ -822,7 +820,6 @@ function drawRoom() {
   drawTile(state.images.rpg, RPG.plant, layout.lounge.x, layout.lounge.y + layout.lounge.h - 1);
   drawTile(state.images.rpg, RPG.couch[0], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 2);
   drawTile(state.images.rpg, RPG.couch[1], layout.lounge.x + 1, layout.lounge.y + layout.lounge.h - 1);
-  drawLabel("LOUNGE", layout.lounge.x + layout.lounge.w / 2, layout.lounge.y + 0.5, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
 
   const drawnGroups = new Set();
   for (const activity of state.leisure.values()) {
@@ -833,8 +830,6 @@ function drawRoom() {
       ctx.fillRect((activity.center.x - .6) * TILE * SCALE, (activity.center.y - .35) * TILE * SCALE, 1.2 * TILE * SCALE, .7 * TILE * SCALE);
       drawLabel("♠ ♥", activity.center.x, activity.center.y, { size: 3, color: "#fff4da", background: false });
     }
-    drawLabel(activity.activity === "cards" ? "CARDS" : activity.activity === "reading" ? "READING" : "CONVERSATION",
-      activity.center.x, activity.center.y - 1.15, { size: 2.8, color: "#fff4da", background: "#302b3d" });
   }
 
   if (layout.overflowSeats.length) {
@@ -846,7 +841,6 @@ function drawRoom() {
     ctx.fillStyle = doorOpen ? "#17131b" : "#bd8c55";
     ctx.fillRect(0, layout.door.y * TILE * SCALE, TILE * SCALE, TILE * SCALE);
   }
-  drawLabel("DOOR", 1.6, layout.door.y - 0.6, { size: 4, color: "#ffe0a0", background: "rgba(0,0,0,.35)" });
   drawJukebox();
 }
 
@@ -1240,10 +1234,12 @@ function renderDetail(focus = false) {
   if (focus) heading.focus();
 }
 
-function selectTable(id, focus = false) {
+// Selecting shows the details; only a double click in the hall (or the table list) also zooms to the table.
+function selectTable(id, focus = false, zoom = false) {
   state.selectedId = id;
+  state.manualSelection = true;
   const index = state.data.tables.findIndex((table) => table.id === id);
-  if (index >= 0) frameTables([index], true);
+  if (zoom && index >= 0) frameTables([index], true);
   renderDetail(focus && state.selectedId !== null);
 }
 
@@ -1284,7 +1280,7 @@ function renderTableList() {
     const button = append(heading, "button", view.name);
     button.type = "button";
     button.setAttribute("aria-label", `Show details for ${view.name}`);
-    button.addEventListener("click", () => selectTable(table.id, true));
+    button.addEventListener("click", () => selectTable(table.id, true, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
     state.tablePhaseNodes.set(table.id, append(article, "p", phaseText(table), "table-phase"));
     const diceNode = append(article, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
@@ -1636,6 +1632,7 @@ function applyKioskIdle(now) {
   if (!state.kiosk) return;
   if (state.manualCamera && now - state.lastInputAt >= KIOSK_CAMERA_RESET_MS) {
     state.manualCamera = false;
+    state.manualSelection = false;
     state.frameKey = null;
   }
   const dataset = document.documentElement?.dataset;
@@ -1702,6 +1699,8 @@ function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.curs
 const pointers = new Map();
 let gesture = null;
 let suppressClick = false;
+let lastTap = null;   // { id, at } of the last table click, so a second quick click on it zooms
+const DOUBLE_TAP_MS = 400;
 function gesturePosition() {
   const points = [...pointers.values()];
   return { center: { x: points.reduce((n, p) => n + p.x, 0) / points.length, y: points.reduce((n, p) => n + p.y, 0) / points.length }, distance: points.length > 1 ? Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) : 0 };
@@ -1778,7 +1777,14 @@ canvas.addEventListener("click", (event) => {
   const screen = pointerPoint(event);
   const label = state.labelBoxes?.find((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
   const index = label?.index ?? state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6);
-  if (index >= 0 && state.data.tables[index]) selectTable(state.data.tables[index].id);
+  const table = index >= 0 ? state.data.tables[index] : null;
+  // Timed here rather than with dblclick so a double tap on a phone zooms too.
+  const now = performance.now();
+  const double = !!table && lastTap?.id === table.id && now - lastTap.at < DOUBLE_TAP_MS;
+  lastTap = table && !double ? { id: table.id, at: now } : null;
+  // One click selects, a click on the selected table or the empty floor clears it, a double click zooms.
+  if (double) selectTable(table.id, false, true);
+  else selectTable(table && table.id !== state.selectedId ? table.id : null);
 });
 canvas.addEventListener("wheel", (event) => {
   if (!state.camera) return;

@@ -394,6 +394,29 @@ test("a captured drag suppresses table clicks; a fresh tap selects with transfor
   assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[1].name);
 });
 
+test("one click selects without zooming, a second click deselects, and a double click zooms", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
+  const app = await runApp([sample], "select-zoom");
+  const events = app.nodes.get("hall").listeners;
+  const nextFrame = () => { app.transforms.length = 0; app.frames.shift()?.(performance.now() + 30); return JSON.stringify(app.transforms[1]); };
+  const tap = (x) => { events.get("pointerdown")({ pointerId: 1, clientX: x, clientY: 240, button: 0 }); events.get("pointerup")({ pointerId: 1 }); events.get("click")({ clientX: x, clientY: 240 }); };
+  app.nodes.get("fit-active").listeners.get("click")();
+  const framed = nextFrame();
+  tap(680);
+  assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[1].name);
+  assert.equal(nextFrame(), framed, "a single click leaves the camera where it was");
+  await new Promise((resolve) => setTimeout(resolve, 450));
+  tap(680);
+  assert.match(allText(app.nodes.get("detail")), /Select a table/, "clicking the selected table clears it");
+  await new Promise((resolve) => setTimeout(resolve, 450));
+  tap(680);
+  tap(680);
+  assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[1].name);
+  assert.notEqual(nextFrame(), framed, "a double click zooms to the table");
+});
+
 test("production has one community link and no repeated Discord signup instructions", async () => {
   const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   production.event.name = "Longtable";
