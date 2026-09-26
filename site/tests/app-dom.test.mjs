@@ -1846,7 +1846,7 @@ test("only the selected or hovered table shows its name plate", async () => {
   sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
   const app = await runApp([sample], "name-plates");
   const events = app.nodes.get("hall").listeners;
-  const plates = () => { app.contextCalls.length = 0; app.frames.shift()?.(performance.now() + 30); return sample.tables.filter((table) => app.contextCalls.some((call) => typeof call === "string" && call.startsWith(table.name.slice(0, 20)))).length; };
+  const plates = () => { app.contextCalls.length = 0; app.frames.shift()?.(performance.now() + 30); return app.contextCalls.filter((call) => /seats left$/.test(call)).length; };
   assert.equal(plates(), 0, "no plate while nothing is selected");
   app.nodes.get("fit-active").listeners.get("click")();
   plates();
@@ -1858,4 +1858,21 @@ test("only the selected or hovered table shows its name plate", async () => {
   events.get("pointerup")({ pointerId: 1 });
   events.get("click")({ clientX: 680, clientY: 240 });
   assert.equal(plates(), 1, "the selected table gets its plate");
+});
+
+test("a plate wraps the full title above its seats, and the projector labels every table", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
+  sample.tables[1].name = "A Very Long Adventure Title That Would Never Fit On One Line";
+  const kiosk = await runApp([sample], "kiosk-plates", { search: "?kiosk=1" });
+  kiosk.textCalls.length = 0;
+  kiosk.frames.shift()?.(performance.now() + 30);
+  const seats = kiosk.textCalls.filter((call) => /seats left$/.test(call.text));
+  assert.equal(seats.length, 2, "every table has a plate on the projector");
+  const words = new Set(sample.tables[1].name.split(" "));
+  const title = kiosk.textCalls.filter((call) => call.text.split(" ").every((word) => words.has(word.replace("…", ""))));
+  assert.ok(title.length >= 2, "the long title wraps onto more than one line");
+  const seatLine = seats.find((call) => Math.abs(call.x - title[0].x) < 1);
+  assert.ok(seatLine && title.every((line) => line.y < seatLine.y), "seats sit on the line under the title");
 });

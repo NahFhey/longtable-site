@@ -880,7 +880,6 @@ function chairFor(offset) {
   return offset.x < 0 ? RPG.chairs.left : RPG.chairs.right;
 }
 
-function truncate(value, length) { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
 
 // Before doors every table is shown ready for its game (furniture and props, no porter): people wait at them.
 function scenerySlot(table) { return upcoming() ? table.start : state.time; }
@@ -986,35 +985,62 @@ function drawTableProps(x, y) {
   ctx.restore();
 }
 
+// Word-wraps text to maxWidth in the current font; the last kept line ends in an ellipsis when cut.
+function wrapText(text, maxWidth, maxLines) {
+  const lines = [];
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = lines.length ? `${lines[lines.length - 1]} ${word}` : word;
+    if (lines.length && ctx.measureText(next).width <= maxWidth) lines[lines.length - 1] = next;
+    else lines.push(word);
+  }
+  if (lines.length <= maxLines) return lines;
+  let last = lines[maxLines - 1];
+  while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+  return [...lines.slice(0, maxLines - 1), `${last.trimEnd()}…`];
+}
+
 function drawTableLabels() {
   const dpr = globalThis.devicePixelRatio || 1;
   ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const boxes = [];
-  // Only the selected and the hovered table carry a name plate; the hovered one draws on top.
+  // The hovered and selected tables carry a name plate; the projector labels every table. A plate is no
+  // wider than its table, so neighbours sit side by side; one that would still overlap an earlier plate
+  // is skipped, which keeps the hovered and selected plates when the overview is crowded.
   const selected = state.data.tables.findIndex((table) => table.id === state.selectedId);
-  const indices = [...new Set([selected, state.hoverTable])].filter((i) => i >= 0 && state.data.tables[i]);
+  const everyTable = state.kiosk ? state.data.tables.map((_, i) => i) : [];
+  const indices = [...new Set([state.hoverTable, selected, ...everyTable])].filter((i) => i >= 0 && state.data.tables[i]);
+  const TITLE = "700 13px system-ui, sans-serif", DETAIL = "12px system-ui, sans-serif";
   for (const index of indices) {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
     const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
-    ctx.font = "700 13px system-ui, sans-serif";
     const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
     const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
-    const text = `${truncate(table.name, 26)} · ${status}`;
-    const width = Math.min(state.viewport.width - 8, ctx.measureText(text).width + 16);
-    const height = state.camera.zoom >= 25 ? 40 : 23;
+    const details = [status];
+    if (state.camera.zoom >= 25) details.push(`${formatSlot(table.start)}–${formatSlot(table.end)}`);
+    // The projector keeps every plate inside its own table's width; elsewhere a lone plate may be wider.
+    const maxWidth = Math.min(state.viewport.width - 8, Math.max(state.kiosk ? 60 : 160, Math.min(260, state.layout.cellWidth * state.camera.zoom - 8)));
+    ctx.font = TITLE;
+    const title = wrapText(table.name, maxWidth - 16, 3);
+    const titleWidth = Math.max(...title.map((line) => ctx.measureText(line).width));
+    ctx.font = DETAIL;
+    const detailWidth = Math.max(...details.map((line) => ctx.measureText(line).width));
+    const width = Math.min(maxWidth, Math.max(titleWidth, detailWidth) + 16);
+    const height = 6 + title.length * 16 + details.length * 15;
     const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
     const top = Math.min(point.y, state.viewport.height - height - 4);
+    if (boxes.some((box) => left < box.x + box.w && left + width > box.x && top < box.y + box.h && top + height > box.y)) continue;
     boxes.push({ x: left, y: top, w: width, h: height, index });
     ctx.fillStyle = "#17141feb"; ctx.fillRect(left, top, width, height);
-    ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
     ctx.textAlign = "center"; ctx.textBaseline = "top";
-    ctx.fillText(text, left + width / 2, top + 3, width - 8);
-    if (height > 23) {
-      ctx.font = "12px system-ui, sans-serif"; ctx.fillStyle = "#f1cf91";
-      ctx.fillText(`${formatSlot(table.start)}–${formatSlot(table.end)}`, left + width / 2, top + 21, width - 8);
-    }
+    ctx.font = TITLE; ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
+    title.forEach((line, n) => ctx.fillText(line, left + width / 2, top + 3 + n * 16, width - 8));
+    ctx.font = DETAIL;
+    details.forEach((line, n) => {
+      ctx.fillStyle = n === 0 ? "#d8d0e4" : "#f1cf91";
+      ctx.fillText(line, left + width / 2, top + 4 + title.length * 16 + n * 15, width - 8);
+    });
   }
   state.labelBoxes = boxes;
   ctx.restore();
