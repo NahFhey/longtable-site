@@ -101,7 +101,7 @@ function arrangeHall() {
   const cameraHelp = $("camera-help");
   const timeline = $("timeline-controls");
   if (mobile.matches) {
-    // Phones show the hall under a slim bar with its summary hidden, so a hall collapsed at a wider width reopens here.
+    // The hall's summary never shows at any width, so the hall stays open; this only re-asserts it.
     // The camera buttons stay in the scene, where styles.css lays them over the bottom of the canvas.
     // Below the canvas, in reading order: status, camera help, timeline, sidebar, table list.
     // styles.css lifts the explorer above the status; kiosk hides everything moved here.
@@ -298,7 +298,9 @@ function updateCamera() {
   // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
   const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
   const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0;
-  const key = indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
+  // With no game in play (before doors, a replay's opening minutes, a gap between games) the view shows the whole room.
+  const wholeRoom = upcoming() || !state.data.tables.some((table) => state.time >= table.start && state.time < table.end);
+  const key = wholeRoom ? "room" : indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
   if (!state.manualCamera && state.kiosk) {
     // The projector shows the whole room: the idle reset returns to this frame, never to a close-up that
     // cuts off the stage or the lounge. Framing by relevant tables stays a live-page behaviour.
@@ -308,6 +310,12 @@ function updateCamera() {
       hideTooltip();
     }
     if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+  } else if (!state.manualCamera && wholeRoom && (state.frameKey !== key || !state.camera)) {
+    state.camera = fitBounds(hallBounds(), size, hallBounds(), 0);
+    state.frameKey = key;
+    hideTooltip();
+    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
+    renderDetail();
   } else if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
     frameTables(indices);
     // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is

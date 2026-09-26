@@ -84,12 +84,9 @@ main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 .status a { color: var(--gold); font-weight: 700; }
 .sync-controls { margin: 1rem 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem 1rem; color: var(--muted); font-size: .72rem; }
 .sync-controls button { min-height: 2rem; padding: .2rem .6rem; background: transparent; font-size: .72rem; }
+/* The hall is always open: app.mjs opens the <details> and nothing on the page can close it, since its summary never shows. */
 .hall-explorer { margin-top: 1rem; border: 1px solid var(--line); border-radius: .6rem; background: #18241f; }
-.hall-explorer > summary { display: flex; align-items: center; flex-wrap: wrap; gap: .8rem; padding: 1.1rem 1.3rem; color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-size: 1.4rem; list-style: none; }
-.hall-explorer > summary::-webkit-details-marker { display: none; }
-.hall-explorer > summary::before { content: "+"; font: 400 1.3rem system-ui, sans-serif; color: var(--gold); }
-.hall-explorer[open] > summary::before { content: "−"; }
-.hall-explorer[open] > summary { border-bottom: 1px solid var(--line); }
+.hall-explorer > summary { display: none; }
 .hall-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem); gap: 1.25rem; padding: 1.25rem; align-items: start; }
 .scene-wrap { position: relative; min-width: 0; }
 .camera-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
@@ -201,7 +198,6 @@ footer p { margin: .3rem 0; }
   .table-list { padding-top: 1.75rem; }
   #hall-content > .hall-sidebar { margin: .5rem 0 1rem; }
   .hall-explorer { margin-top: 1rem; }
-  .hall-explorer > summary { font-size: 1.2rem; padding: 1rem; }
   .hall-layout { padding: .75rem; }
   .camera-controls button { min-height: 44px; }
   .timeline-controls { padding: .75rem; }
@@ -217,7 +213,7 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) { --phone-bar: 4.7rem; --phone-actions: calc(44px + .4rem); --phone-strip: 3rem; }
   html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-actions: 0px; }
   html:not([data-kiosk]):has(#hall-content) .site-nav, html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) #scene-event,
-  html:not([data-kiosk]):has(#hall-content) .event-console .controls, html:not([data-kiosk]):has(#hall-content) .hall-explorer > summary { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .event-console .controls { display: none; }
   html:not([data-kiosk]):has(#hall-content) .masthead { height: calc(var(--phone-bar) + var(--phone-actions)); display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 0 .75rem; padding: .4rem var(--gutter); overflow: hidden; }
   html:not([data-kiosk]):has(#hall-content) .masthead::before, html:not([data-kiosk]):has(#hall-content) .masthead::after { content: ""; flex-basis: 100%; height: 0; }
   html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
@@ -255,6 +251,57 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions:not(:empty) { margin-top: 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; padding: 0 1rem; }
 }
+/* Event page off phones (not kiosk; past-events.html is left alone): the phone layout's shape on a wide screen.
+   One slim bar, then the hall filling the rest of the first screen with the sidebar beside it and the status strip under it.
+   Bar, in order: title, badge, event name, total, scene event (these three ellipsize), nav, actions, clock, time controls.
+   Under 1100px the nav and actions drop to a second bar line. The camera buttons and help float over the canvas. */
+@media not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px))) {
+  html:not([data-kiosk]):has(#hall-content) { --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
+  html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) .site-nav a:first-child:not(:last-child) { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { max-width: none; height: var(--desk-bar); display: flex; flex-wrap: nowrap; align-content: center; align-items: center; gap: .4rem 1rem; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+  html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 2; flex: none; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .orientation, html:not([data-kiosk]):has(#hall-content) .fundraising-total, html:not([data-kiosk]):has(#hall-content) #scene-event {
+    flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .fundraising-total { order: 4; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 5; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav { order: 6; flex: none; flex-wrap: nowrap; gap: 1.25rem; margin: 0 0 0 auto; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 7; flex: none; flex-wrap: nowrap; margin: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { padding: .4rem .85rem; font-size: .8rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .readout time { order: 8; flex: none; font-size: 1.05rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .event-console .controls { order: 9; flex: none; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
+  html:not([data-kiosk]):has(#hall-content) .controls button, html:not([data-kiosk]):has(#hall-content) .controls select { min-height: 2.25rem; padding: .2rem .7rem; }
+  html:not([data-kiosk]):has(#hall-content) .controls label { margin-left: .25rem; }
+  html:not([data-kiosk]):has(#hall-content) main { max-width: none; }
+  html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { gap: var(--desk-gap); padding: var(--desk-gap) 0 0; align-items: stretch; }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap, html:not([data-kiosk]):has(#hall-content) .hall-sidebar {
+    height: max(20rem, calc(100vh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
+    height: max(20rem, calc(100svh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: flex; flex-direction: column; }
+  html:not([data-kiosk]):has(#hall-content) .hall-sidebar { overflow-y: auto; }
+  html:not([data-kiosk]):has(#hall-content) #hall { flex: 1 1 0; min-height: 0; max-height: none; aspect-ratio: auto; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; top: .5rem; left: .5rem; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
+  html:not([data-kiosk]):has(#hall-content) #camera-help { position: absolute; top: .5rem; right: .5rem; z-index: 1; margin: 0; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-controls { flex: none; margin-top: .6rem; padding: .45rem .85rem; }
+  html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
+  html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
+}
+@media (not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px)))) and (max-width: 1099px) {
+  html:not([data-kiosk]):has(#hall-content) { --desk-bar: 6rem; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { flex-wrap: wrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::after { content: ""; order: 10; flex-basis: 100%; height: 0; }
+  html:not([data-kiosk]):has(#hall-content) .readout time { margin-left: auto; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav { order: 11; margin: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 12; }
+}
+/* One column (under 800px): the sidebar sits under the hall at its own height. */
+@media (not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px)))) and (max-width: 800px) {
+  html:not([data-kiosk]):has(#hall-content) .hall-sidebar { height: auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
@@ -268,8 +315,7 @@ html[data-kiosk][data-idle] body { cursor: none; }
 html[data-kiosk] .skip-link, html[data-kiosk] .site-nav, html[data-kiosk] #event-actions, html[data-kiosk] #record-note,
 html[data-kiosk] .event-console .controls, html[data-kiosk] #table-list, html[data-kiosk] #table-list details,
 html[data-kiosk] #hall-sidebar, html[data-kiosk] .camera-controls, html[data-kiosk] #camera-help,
-html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer,
-html[data-kiosk] .hall-explorer > summary { display: none; }
+html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer { display: none; }
 html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
 html[data-kiosk] .identity { display: contents; }
 html[data-kiosk] h1 { margin: 0; font-size: 2rem; white-space: nowrap; }

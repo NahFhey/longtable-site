@@ -434,6 +434,23 @@ test("one click selects without zooming, a second click deselects, and a double 
   assert.notEqual(nextFrame(), framed, "a double click zooms to the table");
 });
 
+test("with no game in play the first view shows the whole room, and a game in play frames its tables", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  const frameOf = async (start, label) => {
+    const data = { ...sample, tables: sample.tables.slice(0, 2).map((table) => ({ ...table, start, end: sample.event.slots, signups: [] })) };
+    const app = await runApp([data], label);
+    const nextFrame = () => { app.transforms.length = 0; app.frames.shift()?.(performance.now() + 30); return JSON.stringify(app.transforms[1]); };
+    const first = nextFrame();
+    app.nodes.get("recenter").listeners.get("click")();
+    return { first, room: nextFrame() };
+  };
+  const waiting = await frameOf(4, "room-before-games");
+  assert.equal(waiting.first, waiting.room, "before any game starts the view matches Recenter");
+  const playing = await frameOf(0, "room-games-running");
+  assert.notEqual(playing.first, playing.room, "a running game is framed closer than the whole room");
+});
+
 test("production has one community link and no repeated Discord signup instructions", async () => {
   const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   production.event.name = "Longtable";
