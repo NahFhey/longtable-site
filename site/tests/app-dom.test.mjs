@@ -1860,7 +1860,7 @@ test("only the selected or hovered table shows its name plate", async () => {
   assert.equal(plates(), 1, "the selected table gets its plate");
 });
 
-test("a plate wraps the full title above its seats, and the projector labels every table", async () => {
+test("the projector labels every table, and a zoomed-in plate wraps its full title above its seats", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   sample.events = [];
   sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
@@ -1868,11 +1868,83 @@ test("a plate wraps the full title above its seats, and the projector labels eve
   const kiosk = await runApp([sample], "kiosk-plates", { search: "?kiosk=1" });
   kiosk.textCalls.length = 0;
   kiosk.frames.shift()?.(performance.now() + 30);
-  const seats = kiosk.textCalls.filter((call) => /seats left$/.test(call.text));
-  assert.equal(seats.length, 2, "every table has a plate on the projector");
+  const texts = kiosk.textCalls.map((call) => call.text);
+  // At this small projector zoom a plate keeps one title line, cut with an ellipsis when it is long.
+  assert.ok(texts.some((text) => text.startsWith("The Sunken")) && texts.some((text) => text.startsWith("A Very")), "every table has a plate on the projector");
+
+  const app = await runApp([sample], "zoomed-plate");
+  const events = app.nodes.get("hall").listeners;
+  const tap = (x) => { events.get("pointerdown")({ pointerId: 1, clientX: x, clientY: 240, button: 0 }); events.get("pointerup")({ pointerId: 1 }); events.get("click")({ clientX: x, clientY: 240 }); };
+  app.nodes.get("fit-active").listeners.get("click")();
+  tap(680);
+  tap(680);
+  for (let frame = 0; frame < 90; frame += 1) app.frames.shift()?.(performance.now() + 30 + frame * 16);
+  app.textCalls.length = 0;
+  app.frames.shift()?.(performance.now() + 2000);
+  const seats = app.textCalls.filter((call) => /seats left$/.test(call.text));
   const words = new Set(sample.tables[1].name.split(" "));
-  const title = kiosk.textCalls.filter((call) => call.text.split(" ").every((word) => words.has(word.replace("…", ""))));
+  const title = app.textCalls.filter((call) => call.text.split(" ").every((word) => words.has(word.replace("…", ""))));
   assert.ok(title.length >= 2, "the long title wraps onto more than one line");
   const seatLine = seats.find((call) => Math.abs(call.x - title[0].x) < 1);
   assert.ok(seatLine && title.every((line) => line.y < seatLine.y), "seats sit on the line under the title");
+});
+
+
+test("a game that has ended takes its plate down, and a plate stays between its table and the one above", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  sample.tables = sample.tables.slice(0, 3).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
+  sample.tables[0].name = "Still Playing";
+  sample.tables[1].name = "Long Finished";
+  sample.tables[1].end = 4;
+  sample.tables[2].name = "Just Ended";
+  sample.tables[2].end = 24;
+  const kiosk = await runApp([sample], "ended-plates", { search: "?kiosk=1&sample=1&at=24" });
+  kiosk.textCalls.length = 0;
+  kiosk.rectCalls.length = 0;
+  kiosk.transforms.length = 0;
+  kiosk.frames.shift()?.(performance.now() + 30);
+  const texts = kiosk.textCalls.map((call) => call.text);
+  assert.ok(texts.includes("Still Playing"), "the game in progress keeps its plate");
+  assert.ok(!texts.includes("Long Finished") && !texts.includes("Inactive"), "an inactive game has no plate");
+  assert.ok(!texts.includes("Just Ended") && !texts.includes("Packing up"), "a game packing up has no plate");
+
+  // The hall transform is the one that is not a reset to the identity; its scale is zoom over the 32 px tile.
+  const world = kiosk.transforms.find((entry) => entry[0] !== 1 || entry[4] !== 0 || entry[5] !== 0);
+  const camera = { zoom: world[0] * 32, x: world[4], y: world[5] };
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const topSeat = seatPositionForPlan(layout, 0, 1);
+  const seatTop = worldToScreen(camera, { x: topSeat.x, y: topSeat.y - .5 });
+  // The table above ends with its roll label, 1.4 tiles above this table's cell.
+  const aboveEnds = worldToScreen(camera, { x: topSeat.x, y: layout.cells[0].y - 1.4 });
+  // The wall plaques share the wood colour but are drawn in world units, a few pixels wide.
+  const plates = kiosk.rectCalls.filter((call) => call.color === "#4a3524" && call.args[2] > 20);
+  assert.equal(plates.length, 1, "one plate is drawn");
+  const [left, top, width, height] = plates[0].args;
+  assert.ok(top >= aboveEnds.y && top + height <= seatTop.y, `the plate (${top}–${top + height}) stays between the table above (${aboveEnds.y}) and its own top seats (${seatTop.y})`);
+  const rowRight = worldToScreen(camera, seatPositionForPlan(layout, 0, 2));
+  assert.ok(left + width / 2 > seatTop.x && left + width / 2 < rowRight.x, "and hangs over its own table's top row");
+});
+
+
+test("a hovered player's name draws on top of their table's plate", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  sample.tables = sample.tables.slice(0, 2).map((table) => ({ ...table, start: 0, end: sample.event.slots, signups: [] }));
+  const app = await runApp([sample], "hover-name-over-plate", { search: "?sample=1&at=12" });
+  app.nodes.get("fit-active").listeners.get("click")();
+  app.transforms.length = 0;
+  app.frames.shift()?.(performance.now() + 30);
+  const world = app.transforms.find((entry) => entry[0] !== 1 || entry[4] !== 0 || entry[5] !== 0);
+  const camera = { zoom: world[0] * 32, x: world[4], y: world[5] };
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  const dm = worldToScreen(camera, seatPositionForPlan(layout, 0, 0));
+  app.nodes.get("hall").listeners.get("pointermove")({ pointerId: 1, clientX: dm.x, clientY: dm.y });
+  app.textCalls.length = 0;
+  app.frames.shift()?.(performance.now() + 60);
+  const texts = app.textCalls.map((call) => call.text);
+  const plate = texts.indexOf(sample.tables[0].name);
+  const name = texts.findIndex((text) => text.startsWith("DM "));
+  assert.ok(plate >= 0, "hovering the DM shows their table's plate");
+  assert.ok(name > plate, "and the DM's name is drawn after it, on top");
 });

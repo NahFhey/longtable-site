@@ -136,6 +136,7 @@ const state = {
   selectedId: null,
   manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
+  hoverName: null,  // the hovered person's name label, drawn after the plates
   hoverTable: -1,   // index of the table under the mouse; it shows its name plate like the selected one
   layout: null,
   people: new Map(),
@@ -1009,12 +1010,15 @@ function drawTableLabels() {
   const selected = state.data.tables.findIndex((table) => table.id === state.selectedId);
   const everyTable = state.kiosk ? state.data.tables.map((_, i) => i) : [];
   const indices = [...new Set([state.hoverTable, selected, ...everyTable])].filter((i) => i >= 0 && state.data.tables[i]);
-  const TITLE = "700 13px Georgia, serif", DETAIL = "12px system-ui, sans-serif";
+  const DETAIL = "12px system-ui, sans-serif";
+  // A plate stays in the empty floor between its own top seats and the table above: that table's bottom
+  // seats and roll label end 1.4 tiles above this cell, so no plate covers another table's seats or players.
+  const band = (.6 + 1.35) * state.camera.zoom;
   for (const index of indices) {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
     // The plate hangs just above its own table's top row of seats, so it reads as that table's sign.
-    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + .35 });
+    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + .6 });
     if (point.x < 0 || point.x > state.viewport.width || point.y < 18 || point.y > state.viewport.height) continue;
     const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
     // A game that has ended takes its plate down.
@@ -1024,13 +1028,27 @@ function drawTableLabels() {
     if (state.camera.zoom >= 25) details.push(`${formatSlot(table.start)}–${formatSlot(table.end)}`);
     // The projector keeps every plate inside its own table's width; elsewhere a lone plate may be wider.
     const maxWidth = Math.min(state.viewport.width - 8, Math.max(state.kiosk ? 60 : 160, Math.min(260, state.layout.cellWidth * state.camera.zoom - 8)));
-    ctx.font = TITLE;
-    const title = wrapText(table.name, maxWidth - 16, 3);
+    // A plate too tall for the band sheds the times, the third title line, the status, the second title
+    // line, then shrinks its lettering; one that still does not fit is left off.
+    let lines = 3, size = 13, title, height;
+    for (;;) {
+      ctx.font = `700 ${size}px Georgia, serif`;
+      title = wrapText(table.name, maxWidth - 16, lines);
+      height = 6 + title.length * (size + 3) + details.length * 15;
+      if (height <= band) break;
+      if (details.length > 1) details.pop();
+      else if (lines > 2) lines = 2;
+      else if (details.length) details.pop();
+      else if (lines > 1) lines = 1;
+      else if (size > 9) size -= 1;
+      else break;
+    }
+    if (height > band) continue;
+    const TITLE = ctx.font;
     const titleWidth = Math.max(...title.map((line) => ctx.measureText(line).width));
     ctx.font = DETAIL;
     const detailWidth = Math.max(...details.map((line) => ctx.measureText(line).width));
     const width = Math.min(maxWidth, Math.max(titleWidth, detailWidth) + 16);
-    const height = 6 + title.length * 16 + details.length * 15;
     const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
     const top = Math.max(4, point.y - height);
     if (boxes.some((box) => left < box.x + box.w && left + width > box.x && top < box.y + box.h && top + height > box.y)) continue;
@@ -1040,11 +1058,11 @@ function drawTableLabels() {
     ctx.lineWidth = 1.5; ctx.strokeStyle = "#b89b5c"; ctx.strokeRect(left + .75, top + .75, width - 1.5, height - 1.5);
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.font = TITLE; ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#e9d9ae";
-    title.forEach((line, n) => ctx.fillText(line, left + width / 2, top + 3 + n * 16, width - 8));
+    title.forEach((line, n) => ctx.fillText(line, left + width / 2, top + 3 + n * (size + 3), width - 8));
     ctx.font = DETAIL;
     details.forEach((line, n) => {
       ctx.fillStyle = n === 0 ? "#c9b98a" : "#d8b86d";
-      ctx.fillText(line, left + width / 2, top + 4 + title.length * 16 + n * 15, width - 8);
+      ctx.fillText(line, left + width / 2, top + 4 + title.length * (size + 3) + n * 15, width - 8);
     });
   }
   state.labelBoxes = boxes;
@@ -1103,9 +1121,14 @@ function drawPerson(runtime, now, active) {
   if (place.kind === "spotlight" && !runtime.moving) drawLabel("★", x + 0.5, y - 0.55, { size: 6, color: "#ffd84a", background: false });
   if (cheering && ((now / 400 + runtime.phase * 3) % 3) < 1) drawLabel("♥", x + 0.5 + runtime.phase * 0.4, y - 0.6, { size: 4, color: "#ff7a9a", background: false });
   if (active.announce && !runtime.moving && ((runtime.phase * 7) % 1) < 0.35) drawLabel("!", x + 0.9, y - 0.35, { size: 4, color: "#ffe066", background: false });
-  if (state.hover === runtime && !person.hidden) {
-    drawLabel(`${person.dm ? "DM " : ""}${person.name}`, x + 0.5, y - 0.55, { size: 3.6, bold: person.dm, color: person.dm ? "#ffd27a" : "#fff", background: person.dm ? "rgba(60,30,0,.86)" : "rgba(0,0,0,.76)" });
-  }
+  // The hovered name is drawn after the table plates (drawHoverName), so a plate never covers it.
+  if (state.hover === runtime && !person.hidden) state.hoverName = { person, x: x + 0.5, y: y - 0.55 };
+}
+
+function drawHoverName() {
+  if (!state.hoverName) return;
+  const { person, x, y } = state.hoverName;
+  drawLabel(`${person.dm ? "DM " : ""}${person.name}`, x, y, { size: 3.6, bold: person.dm, color: person.dm ? "#ffd27a" : "#fff", background: person.dm ? "rgba(60,30,0,.86)" : "rgba(0,0,0,.76)" });
 }
 
 function drawBubble(value, x, y, color, label = "") {
@@ -1209,6 +1232,7 @@ function render(now, active) {
   ctx.imageSmoothingEnabled = false;
   drawRoom();
   drawTables();
+  state.hoverName = null;
   [...state.people.values()].filter((person) => person.visible && !person.entering).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
   if (!gathering) state.data.tables.forEach((table, index) => {
     if (tableLifecycle(state.data, table, state.time).phase === "active") {
@@ -1229,6 +1253,7 @@ function render(now, active) {
   ctx.fillStyle = lights > .5 ? "#fff3ac" : "#697a9d";
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
+  drawHoverName();
   drawEvents(active, now);
   placeMusicPanel();
 }
