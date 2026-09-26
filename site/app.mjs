@@ -1009,13 +1009,16 @@ function drawTableLabels() {
   const selected = state.data.tables.findIndex((table) => table.id === state.selectedId);
   const everyTable = state.kiosk ? state.data.tables.map((_, i) => i) : [];
   const indices = [...new Set([state.hoverTable, selected, ...everyTable])].filter((i) => i >= 0 && state.data.tables[i]);
-  const TITLE = "700 13px system-ui, sans-serif", DETAIL = "12px system-ui, sans-serif";
+  const TITLE = "700 13px Georgia, serif", DETAIL = "12px system-ui, sans-serif";
   for (const index of indices) {
     const table = state.data.tables[index];
     const cell = state.layout.cells[index];
-    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + 5.2 });
-    if (point.x < 0 || point.x > state.viewport.width || point.y < 0 || point.y > state.viewport.height - 18) continue;
+    // The plate hangs just above its own table's top row of seats, so it reads as that table's sign.
+    const point = worldToScreen(state.camera, { x: cell.x + 3, y: cell.y + .35 });
+    if (point.x < 0 || point.x > state.viewport.width || point.y < 18 || point.y > state.viewport.height) continue;
     const lifecycle = tableLifecycle(state.data, table, scenerySlot(table));
+    // A game that has ended takes its plate down.
+    if (lifecycle.phase === "cleaning" || lifecycle.phase === "inactive") continue;
     const status = lifecycle.phase === "active" ? `${Math.max(0, table.seats - table.signups.length)} seats left` : lifecycle.label;
     const details = [status];
     if (state.camera.zoom >= 25) details.push(`${formatSlot(table.start)}–${formatSlot(table.end)}`);
@@ -1029,16 +1032,18 @@ function drawTableLabels() {
     const width = Math.min(maxWidth, Math.max(titleWidth, detailWidth) + 16);
     const height = 6 + title.length * 16 + details.length * 15;
     const left = clamp(point.x - width / 2, 4, state.viewport.width - width - 4);
-    const top = Math.min(point.y, state.viewport.height - height - 4);
+    const top = Math.max(4, point.y - height);
     if (boxes.some((box) => left < box.x + box.w && left + width > box.x && top < box.y + box.h && top + height > box.y)) continue;
     boxes.push({ x: left, y: top, w: width, h: height, index });
-    ctx.fillStyle = "#17141feb"; ctx.fillRect(left, top, width, height);
+    // Styled like the wall plaques: dark wood, a brass edge, parchment lettering.
+    ctx.fillStyle = "#4a3524"; ctx.fillRect(left, top, width, height);
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "#b89b5c"; ctx.strokeRect(left + .75, top + .75, width - 1.5, height - 1.5);
     ctx.textAlign = "center"; ctx.textBaseline = "top";
-    ctx.font = TITLE; ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#fff";
+    ctx.font = TITLE; ctx.fillStyle = table.id === state.selectedId ? "#ffd27a" : "#e9d9ae";
     title.forEach((line, n) => ctx.fillText(line, left + width / 2, top + 3 + n * 16, width - 8));
     ctx.font = DETAIL;
     details.forEach((line, n) => {
-      ctx.fillStyle = n === 0 ? "#d8d0e4" : "#f1cf91";
+      ctx.fillStyle = n === 0 ? "#c9b98a" : "#d8b86d";
       ctx.fillText(line, left + width / 2, top + 4 + title.length * 16 + n * 15, width - 8);
     });
   }
