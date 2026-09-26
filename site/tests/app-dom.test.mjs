@@ -55,13 +55,27 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   const imageCalls = [];
   const rectCalls = [];
   const transforms = [];
+  // Each drawTile save scope records its own flip; outer body motion must not
+  // change assertions about the sprite's underlying hall position.
+  const scopes = [{}];
   const context = new Proxy({
     setTransform(...args) { transforms.push(args); },
     getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
     measureText(value) { return { width: String(value).length * 5 }; },
     fillText(value, x, y) { contextCalls.push(String(value)); textCalls.push({ text: String(value), x, y }); },
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
-    drawImage(image, ...args) { imageCalls.push({ src: image._src, args }); },
+    save() { scopes.push({}); },
+    restore() { if (scopes.length > 1) scopes.pop(); },
+    translate(x, y) { scopes.at(-1).translation = [x, y]; },
+    scale(x, y) { scopes.at(-1).flip = x === -1 && y === 1; },
+    drawImage(image, ...args) {
+      const local = scopes.at(-1), logicalArgs = [...args];
+      if (local.flip && local.translation) {
+        logicalArgs[4] = local.translation[0] - args[6];
+        logicalArgs[5] = local.translation[1];
+      }
+      imageCalls.push({ src: image._src, args, logicalArgs });
+    },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
   scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"));
@@ -222,11 +236,14 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
     .map(({ args }) => args.slice(0, 2));
   const player = await runApp([sample], "custom-character");
   assert.equal(player.errors.length, 0);
-  assert.deepEqual(coordinates(player).slice(0, 3), [[0, 51], [238, 153], [323, 34]]);
+  const hasLayers = (app, layers) => coordinates(app).some((_, i, drawn) =>
+    JSON.stringify(drawn.slice(i, i + layers.length)) === JSON.stringify(layers));
+  assert.ok(hasLayers(player, [[0, 51], [238, 153], [323, 34]]), "chosen player layers survive furniture/staff depth sorting");
+  assert.ok(!coordinates(player).some(([x]) => x >= 27 * 17 && x <= 31 * 17), "a player never draws a hat");
   assert.equal(coordinates(player).length, 6, "player and caretaker each draw three layers");
   sample.people[0].dm = true;
   const dm = await runApp([sample], "custom-dm");
-  assert.deepEqual(coordinates(dm).slice(0, 4), [[0, 51], [238, 153], [323, 34], [510, 136]]);
+  assert.ok(hasLayers(dm, [[0, 51], [238, 153], [323, 34], [510, 136]]), "the DM uses the chosen layers including the hat");
   assert.equal(coordinates(dm).length, 7, "only the DM adds a hat layer");
 });
 
@@ -597,7 +614,8 @@ test("staff scenery renders identically after seeking and reload without changin
   data.tables = [{ ...data.tables[0], start: 2, end: 4, signups: [] }];
   data.events = [];
   data.people.forEach(person => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
-  const staff = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar"));
+  const staff = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar"))
+    .map(call => ({ src: call.src, args: call.logicalArgs }));
   for (const slot of [1.4, 1.55, 4.2, 4.29]) {
     const seek = await runApp([data], `staff-seek-${slot}`, { mobile: true });
     const roster = allText(seek.nodes.get("tables"));
@@ -1067,7 +1085,7 @@ test("attendee walking follows replay speed and freezes when the event clock is 
   data.events = [];
   data.visitors = { open: true, people: [] };
   const seat = seatPositionForPlan(createRoomLayout(data.tables, data.room_layout), 0, 0);
-  const sprites = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar")).map(call => call.args.slice(4));
+  const sprites = app => app.imageCalls.filter(call => call.src.includes("roguelikeChar")).map(call => call.logicalArgs.slice(4));
   for (const speed of [1, 30, 600]) {
     const app = await runApp([data], `walking-speed-${speed}`, { search: "?sample=1&at=0.99999" });
     const step = stageStepper(app);
@@ -1096,8 +1114,8 @@ test('one door opens before arrivals and departures and closes one second after 
   const layout = createRoomLayout(data.tables, data.room_layout);
   const seat = seatPositionForPlan(layout, 0, 0);
   const atSeat = app => app.imageCalls.some(call => call.src.includes('roguelikeChar')
-    && call.args[4] === Math.round((seat.x - .5) * 32)
-    && call.args[5] === Math.round((seat.y - .6) * 32));
+    && call.logicalArgs[4] === Math.round((seat.x - .5) * 32)
+    && call.logicalArgs[5] === Math.round((seat.y - .6) * 32));
   const doorState = app => {
     const doors = app.imageCalls.filter(call => call.src.includes('roguelikeSheet')
       && call.args[1] === 0 && [36 * 17, 37 * 17].includes(call.args[0]));
@@ -1262,7 +1280,7 @@ test("a closed, dark hall draws no caretaker and reports that staff have gone ho
 const DAY = 24 * 60 * 60_000;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 const nowQuery = (milliseconds) => `now=${encodeURIComponent(new Date(milliseconds).toISOString())}`;
-const spritePositions = (app) => new Set(app.imageCalls.filter((call) => call.src.includes("roguelikeChar")).map((call) => `${call.args[4]},${call.args[5]}`));
+const spritePositions = (app) => new Set(app.imageCalls.filter((call) => call.src.includes("roguelikeChar")).map((call) => `${call.logicalArgs[4]},${call.logicalArgs[5]}`));
 
 test("before doors a phone header shows the short doors date, while the announced text keeps the long one", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
@@ -1299,7 +1317,7 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   const status = app.nodes.get("status");
   assert.match(status.textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
   assert.equal(status.children.length, 0, "the sample shows the invitation as text, not a link");
-  // Settled on load: everyone the model places is drawn at their seat or lounge spot after the first frame.
+  // Settled anchors are independent of the idle breathing and look-around transforms.
   const layout = createRoomLayout(sample.tables, sample.room_layout);
   const leisure = loungeActivities(layout, sample.people.filter((person) => places.get(person.id).kind === "lounge"));
   const drawn = spritePositions(app);
@@ -1685,7 +1703,7 @@ test("the plaques join the automatic frame before doors and on the projector, ne
 // --- Practice before doors: the live feed's optional `practice` key ---
 const LIVE_FEED = "https://feed.example/timeline.json";
 const drawnKey = (position) => `${Math.round((position.x - .5) * 32)},${Math.round((position.y - .6) * 32)}`;
-/** A diner bobs a few pixels while eating, so the food seat is matched with a small vertical tolerance. */
+/** The seated pose lowers a diner a few pixels from their logical stool anchor. */
 const drawnNear = (drawn, position, tolerance = 8) => [...drawn].some((key) => {
   const [x, y] = key.split(",").map(Number);
   return x === Math.round((position.x - .5) * 32) && Math.abs(y - (position.y - .6) * 32) <= tolerance;
@@ -1716,6 +1734,9 @@ test("practising people are drawn at their practice position before doors and st
   const lenaPractice = seatPositionForPlan(layout, 3, 3);
   const lenaPlanned = seatPositionForPlan(layout, 0, 1);
   const tessPractice = foodGeometry(layout, 0, 4).seat;
+  assert.deepEqual({ x: tessPractice.x, y: tessPractice.y, facing: tessPractice.facing },
+    { x: layout.food.x + 12.5, y: layout.food.y + .75, facing: 1 }, "practice uses the first of the 20 stools");
+  assert.deepEqual(tessPractice.plate, { x: layout.food.x + 13.5, y: layout.food.y + .95 });
   assert.deepEqual(gatheringLocations(sample).get("u_lena"), { ...gatheringLocations(sample).get("u_lena"), tableIndex: 0, seat: 1 });
 
   const app = await runApp([{ ...sample, practice }], "practice-placement", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });

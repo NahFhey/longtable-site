@@ -379,24 +379,37 @@ Deploy the schema-7 reader before the writer; schemas 1–6 still render.
 ### Hall caretaker
 
 Before the doors open (until a minute before the first arrival) the hall is dark
-and nobody is drawn. A caretaker then comes in from the door, turns on the lights
-and sets out food during the opening minute, then tours the hall: the corridors, the aisles between tables, the food front,
-the lounge, the stairs beside the stage and the door, pausing a few seconds at
-each stop. The route is a seeded tour fixed per event (from `event.start`), so it
-is the same on every replay and after a seek; legs follow the trunk corridor and
-the aisles rather than cutting across tables, and no leg walks straight back the
-way it came. When the last attendee leaves, the caretaker walks to the switch,
-dims the room, and then leaves through the door; the hall stays dark and empty
-with nobody drawn until a later arrival brings the caretaker back in from the
-door to relight it. Staff never count as attendees. Occupancy uses effective
-attendance, including recorded arrival/departure overrides. The room remains
-faintly visible when dark, and controls and table information stay readable.
+and nobody is drawn. The caretaker enters through the door, switches on the lights
+in the first eight seconds, and starts rounds at the switch. No food is set out at
+opening. The seeded tour visits corridors, table aisles, the food front, lounge,
+stage stairs and door, with a short dwell at each stop.
 
-This scenery follows event time, so seeking and reloading reproduce it. Reduced
-motion uses stationary staff and immediate lighting changes, and removes the
-caretaker as soon as the lights go off. The canvas description also reports the
-caretaker's current activity, including that staff have gone home. Frozen archives keep their own
-renderer; this change does not rewrite older archives or add attendance records.
+A meal, eligible explicit food choice, or visitor food beat starts kitchen service
+when none is running. The caretaker finishes the current straight tour segment
+(or leaves a dwell immediately), walks to the kitchen at two tiles per event
+second, and sets out six dishes at their natural speed of 3.4 tiles per second.
+The schedule takes `SET_OUT_SECONDS` (currently 31.094117647 s). While food is out,
+the caretaker cooks at seeded kitchen stations, dwelling 4–9 seconds and walking
+at 1.2 tiles per second along the open floor bands. After the last visit ends and
+five minutes pass without a new diner, the caretaker finishes any current kitchen
+segment, returns to the pickup, and clears dishes one at a time, last placed first.
+Demand during that return still cancels quiet cleanup; demand during cleanup waits
+for another service starting at cleanup end, without a walk into the hall.
+
+After service, the caretaker retraces the route to the exact tour departure point.
+The tour clock counts only rounds, including the completion of an interrupted
+straight segment; it pauses throughout service. If the hall empties, cleanup is
+requested immediately. After cleanup and any pending service, the caretaker walks
+to the switch, fades the lights over four seconds, and exits through the door.
+A returning attendee brings the caretaker back from their actual closing position
+or the door. After reaching the switch and relighting, rounds restart at tour clock
+zero. Staff never count as attendees; occupancy uses effective attendance overrides.
+
+Everything follows event time, so pause, seek and reload reproduce the scene.
+Reduced motion pins staff at the pickup during service and the switch otherwise;
+all six dishes appear at readiness and disappear at cleanup start, using the same
+times as normal motion. Lights change immediately. The canvas description reports
+staff activity. Frozen archives retain their own renderer.
 
 ### Custom messages on stage
 
@@ -454,14 +467,29 @@ identifiers, copied names, and arbitrary result messages are never stored in act
 
 ## Meals, lounge activities, and scheduled breaks
 
-Food visits are derived from event time: 20 seconds at each of the two serving
-tables, 30 seconds to reach a food-area chair, five minutes eating, then 30 seconds
-to take the plate to the labelled trash bin. The plate empties while eating and
+The 23 × 6 food corner has a flagstone kitchen with ovens, a stove, sink, prep
+counter and stores. Staff carry six dishes from the kitchen to a deep wood serving
+table. An orange rug holds four dining tables and two wall bars, with 20 stools
+facing sideways across the tables and plates on each diner's own half. Extra
+diners hold their plates in two lines down the column aisle, then along the rug's
+bottom edge, clear of the hall aisle. The bin is an open barrel with no label.
+
+Food visits are derived from event time. Before service is ready, diners wait at
+the first queue with the label “the food queue, waiting for food” and no plate.
+The remaining phases start at the later of the visit start and service readiness:
+20 seconds at each of the two serving
+points, 30 seconds to reach a food-area stool, five minutes eating, then 30 seconds
+to take the plate to the bin. Diners queue along the serving table's front and
+east side, reach stools along the row aisle and side lanes, and leave via the bin.
+The plate empties while eating and
 disappears at the bin. Afterward, the attendee resumes their last lounge/table
 choice, or their current scheduled activity. A new movement, departure, or game
 assignment supersedes the visit. Automatic visitor meals continue across their
 four-minute wandering beats; an event meal starts one visit per attendee rather
-than keeping them at the buffet for the whole event meal window.
+than keeping them at the buffet for the whole event meal window. A visit ends
+400 seconds after that effective start; the last such end starts the five-minute
+quiet window. Serving dishes pop only when their count rises during playback,
+shrink over 0.2 seconds during clearing, and appear full-size on load or seek.
 
 A lone lounge attendee reads, two chat, and three to six play cards. Larger crowds
 split into groups of up to four alternating cards and conversation. Speakers and
@@ -469,7 +497,8 @@ food diners are excluded from the lounge population. Activity labels, props, and
 hover descriptions reflect these activities; the canvas description includes
 population counts. Food stages and lounge groups reconstruct from the selected
 time and roster on refresh or rewind. Reduced motion shows the same activities
-without walking or eating animation.
+without walking or eating animation. Reduced motion also disables breathing,
+look-around, dish pops and bin squash, and keeps steam and light flicker static.
 
 Scheduled breaks appear in the existing timeline break events. During a break,
 an anonymous staff member announces the return time from the stage, and the
@@ -479,7 +508,10 @@ speakers and spotlights retain their temporary priority. At the end, attendees
 resume their current location rules. Breaks do not extend game end times.
 
 Attendee walking uses the same event-time delta as staff, so replay speed changes
-apply to both and pausing freezes ordinary travel. Stage speech remains readable
+apply to both and pausing freezes ordinary travel. The waddle cycle and idle
+breathing and look-around use real time, independent of replay speed. A changed
+destination during a corner walk retains the next forward waypoint before
+rerouting, so the person does not cut back through furniture. Stage speech remains readable
 for its display time, which scales with replay speed down to a one-second floor and
 is unchanged at 1× and while paused; its temporary visit may finish while replay is paused.
 

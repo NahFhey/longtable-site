@@ -1,4 +1,6 @@
 import { CHOICE_COUNTS } from "./characters.mjs";
+import { FOOD_CORNER, atFood, foodSetOut, foodClearAt, SET_OUT_SECONDS, kitchenPath } from "./food-layout.mjs?v=44523bdb9315";
+export { foodGeometry } from "./food-layout.mjs?v=44523bdb9315";
 
 const ADMIN_KINDS = new Set(["break", "meal", "announce", "spotlight"]);
 const SPEECH_KINDS = new Set(["shout", "donation"]);
@@ -447,7 +449,6 @@ function seededRandom(seed) {
 function caretakerWaypoints(layout) {
   const nearestAisle = y => layout.aisles.reduce((best, aisle) => Math.abs(aisle - y) < Math.abs(best - y) ? aisle : best);
   const point = (x, y, row = y) => ({ x, y, row });
-  const foodY = layout.food.y + layout.food.h - 1.2;
   const loungeY = layout.lounge.y + 2;
   const stairsX = layout.stage.x - .8;
   const points = [point(1.3, layout.door.y - .8)];
@@ -455,7 +456,10 @@ function caretakerWaypoints(layout) {
     points.push(point(layout.trunkX, aisle));
     for (const fraction of [.25, .5, .75]) points.push(point(Math.round(layout.width * fraction), aisle));
   }
-  for (const x of [layout.food.x + 1.5, layout.food.x + 6, layout.food.x + layout.food.w - 2.5]) points.push(point(x, foodY));
+  for (const spot of FOOD_CORNER.staffSpots) {
+    const p = atFood(layout, spot);
+    points.push(point(p.x, p.y, layout.aisles[0]));
+  }
   for (const x of [layout.lounge.x + 1.5, layout.lounge.x + layout.lounge.w - 1.5]) points.push(point(x, loungeY));
   for (const offset of [-3, 0, 3]) {
     const y = Math.max(layout.aisles[0], Math.min(layout.aisles.at(-1), layout.stageFront.y + offset));
@@ -517,92 +521,311 @@ export function caretakerTour(timeline, layout) {
   return tour;
 }
 
-/** Decorative caretaker: event-time motion, without adding attendance or events. */
-export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
+const KITCHEN_SERVICES = new WeakMap();
+const SERVICE_SPEED = 2;
+const foodTimeKey = seconds => Math.round(seconds * 1e6);
+const clampUnit = value => Math.max(0, Math.min(1, value));
+const distance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+const interpolate = (a, b, fraction) => ({ x: a.x + (b.x - a.x) * clampUnit(fraction),
+  y: a.y + (b.y - a.y) * clampUnit(fraction) });
+
+function hallIntervals(timeline) {
   let intervals = HALL_OCCUPANCY.get(timeline);
-  const secondsPerSlot = timeline.event.slot_minutes * 60;
-  if (!intervals) {
-    const ranges = timeline.people.map(person => effectivePresence(person, timeline.event.slots))
-      .filter(range => range && range[0] < range[1])
-      .map(([start, end]) => [Math.max(0, start) * secondsPerSlot, Math.min(timeline.event.slots, end) * secondsPerSlot])
-      .sort((a, b) => a[0] - b[0]);
-    intervals = [];
-    for (const range of ranges) {
-      const last = intervals.at(-1);
-      if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
-      else intervals.push(range);
-    }
-    HALL_OCCUPANCY.set(timeline, intervals);
+  if (intervals) return intervals;
+  const unit = timeline.event.slot_minutes * 60;
+  const ranges = timeline.people.map(p => effectivePresence(p, timeline.event.slots))
+    .filter(r => r && r[0] < r[1]).map(([a, b]) => [Math.max(0, a) * unit, Math.min(timeline.event.slots, b) * unit])
+    .filter(([a, b]) => a < b).sort((a, b) => a[0] - b[0]);
+  intervals = [];
+  for (const range of ranges) {
+    const last = intervals.at(-1);
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else intervals.push(range);
   }
-  // A seek to the exact event end shows completed closing, even with a clamped clock.
-  let seconds = Math.max(0, slot * secondsPerSlot);
-  if (slot === timeline.event.slots) seconds += 12;
-  const opening = Math.max(0, (intervals[0]?.[0] ?? 0) - 60);
-  const sinceOpen = seconds - opening;
-  const occupied = intervals.find(([start, end]) => seconds >= start && seconds < end);
-  const lightSwitch = { x: 1.3, y: layout.door.y - .8 };
-  const corridor = { x: layout.trunkX, y: layout.aisles[0] };
-  const food = { x: layout.food.x + 6, y: layout.food.y + layout.food.h - 1.2 };
-  const tour = caretakerTour(timeline, layout);
-  const roam = elapsed => {
-    if (reducedMotion) return lightSwitch;
-    let remaining = Math.max(0, elapsed) % tour.seconds;
-    for (const segment of tour.segments) {
-      if (remaining <= segment.seconds) {
-        const progress = segment.seconds ? remaining / segment.seconds : 1;
-        return { x: segment.from.x + (segment.to.x - segment.from.x) * progress,
-          y: segment.from.y + (segment.to.y - segment.from.y) * progress };
+  HALL_OCCUPANCY.set(timeline, intervals);
+  return intervals;
+}
+
+/** Exact candidates only: no frame or time-grid sampling of the event. */
+function rawFoodVisits(timeline) {
+  const unit = timeline.event.slot_minutes * 60;
+  const meals = (timeline.events ?? []).filter(e => e.kind === 'meal');
+  const visits = [];
+  for (const person of timeline.people) {
+    const presence = effectivePresence(person, timeline.event.slots);
+    if (!presence) continue;
+    const candidates = new Set(meals.map(e => mealVisitStart(timeline, person, e, e.at)));
+    for (const move of person.movements ?? []) if (move.destination === 'food') candidates.add(move.at);
+    if (timeline.visitors?.people.includes(person.id)) {
+      for (let beat = Math.max(0, Math.ceil(presence[0] * unit / 240)); beat * 240 < Math.min(presence[1], timeline.event.slots) * unit; beat++) {
+        const at = beat * 4 / timeline.event.slot_minutes;
+        if (ordinaryLocation(timeline, person, at).kind === "food") candidates.add(at);
       }
-      remaining -= segment.seconds;
     }
-    return lightSwitch;
-  };
-  const clamp = value => Math.max(0, Math.min(1, value));
-  const move = (from, to, progress) => ({ x: from.x + (to.x - from.x) * clamp(progress), y: from.y + (to.y - from.y) * clamp(progress) });
-  // Closing: walk to the switch (0–8 s), fade (8–12 s), walk out through the door, then nobody until someone returns.
-  const closingAt = atSeconds => {
-    const departure = intervals.filter(([, end]) => end <= atSeconds).at(-1)?.[1] ?? opening + 60;
-    const elapsed = atSeconds - departure;
-    if (reducedMotion) return elapsed < 8 ? { staff: lightSwitch, lights: 0, action: SWITCHING_OFF } : { staff: null, lights: 0, action: GONE_HOME };
-    if (elapsed < 12) return { staff: move(roam(Math.max(0, departure - opening - 60)), lightSwitch, elapsed / 8),
-      lights: 1 - clamp((elapsed - 8) / 4), action: SWITCHING_OFF };
-    if (elapsed < 12 + EXIT_SECONDS) return { staff: move(lightSwitch, layout.doorPosition, (elapsed - 12) / EXIT_SECONDS), lights: 0, action: HEADING_HOME };
-    return { staff: null, lights: 0, action: GONE_HOME };
-  };
-  let staff = roam(seconds), lights = occupied ? 1 : 0, action = 'Staff are on duty; the empty hall’s lights are off.';
-  let foodCount = Math.floor(clamp((sinceOpen - 20) / 30) * 6);
-  if (sinceOpen < 0) {
-    // Nobody is drawn before the doors open; the opening walk starts from the door.
-    staff = null; lights = 0; action = 'The hall is dark. Staff have not arrived yet.';
-  } else if (sinceOpen < 60) {
-    lights = reducedMotion ? 1 : clamp((sinceOpen - 4) / 2);
-    if (sinceOpen < 8) {
-      staff = move(layout.doorPosition, lightSwitch, sinceOpen / 4);
-      action = 'Staff are turning on the lights.';
-    } else if (sinceOpen < 20) {
-      staff = sinceOpen < 14 ? move(lightSwitch, corridor, (sinceOpen - 8) / 6) : move(corridor, food, (sinceOpen - 14) / 6);
-      action = 'Staff are bringing food to the food table.';
-    } else {
-      staff = food;
-      action = 'Staff are setting out food.';
+    for (const at of candidates) {
+      if (at < 0 || at >= timeline.event.slots || !isPresent(person, at, timeline.event.slots)) continue;
+      visits.push({ start: at * unit, at, person });
     }
-    if (reducedMotion) { staff = food; foodCount = 6; }
-  } else if (occupied) {
-    staff = roam(seconds - opening - 60);
-    action = CIRCULATING;
-    if (occupied !== intervals[0] && seconds - occupied[0] < 12) {
-      const elapsed = seconds - occupied[0];
-      // Return from wherever closing left the caretaker: the door once gone, or mid-walk if still leaving.
-      const from = closingAt(occupied[0]).staff ?? layout.doorPosition;
-      staff = reducedMotion ? lightSwitch : move(from, lightSwitch, elapsed / 8);
-      lights = reducedMotion ? 1 : clamp((elapsed - 8) / 4);
-      action = 'Staff are turning the lights back on.';
-    }
-  } else if (sinceOpen >= 60) {
-    ({ staff, lights, action } = closingAt(seconds));
   }
-  return { staff: staff && { ...staff, load: sinceOpen >= 8 && sinceOpen < 50 ? 'food' : null },
-    lights, foodCount, lightSwitch, action, occupied: Boolean(occupied) };
+  return visits.sort((a, b) => a.start - b.start);
+}
+
+function tourState(tour, clock) {
+  let elapsed = clock % tour.seconds;
+  for (const segment of tour.segments) {
+    if (elapsed < segment.seconds) return { position: interpolate(segment.from, segment.to, elapsed / segment.seconds),
+      end: segment.to, remaining: distance(segment.from, segment.to) ? segment.seconds - elapsed : 0 };
+    elapsed -= segment.seconds;
+  }
+  return { position: tour.stops[0], end: tour.stops[0], remaining: 0 };
+}
+
+function routePoint(layout, position) {
+  const stop = caretakerWaypoints(layout).find(p => distance(p, position) < 1e-7);
+  // Segment endpoints lie on an aisle/trunk unless they are an authored stop.
+  return stop ?? { ...position, row: position.y };
+}
+
+function kitchenCooking(layout, start, duration, seed) {
+  const random = seededRandom(seed), segments = [];
+  let time = start, station = 8;
+  const append = (from, to, seconds) => {
+    segments.push({ start: time, end: time + seconds, from, to }); time += seconds;
+  };
+  // Do not cut a straight walking segment short when cleanup is requested.
+  while (time < start + duration) {
+    const here = atFood(layout, FOOD_CORNER.kitchenStations[station]);
+    append(here, here, Math.min(4 + random() * 5, start + duration - time));
+    if (time >= start + duration) break;
+    const next = (station + 1 + Math.floor(random() * 8)) % 9;
+    const path = kitchenPath(layout, station, next);
+    let reached = true;
+    for (let i = 1; i < path.length; i++) {
+      append(path[i - 1], path[i], distance(path[i - 1], path[i]) / CARETAKER_TILES_PER_SECOND);
+      if (time >= start + duration) {
+        // The kitchen graph is a tree. Return via this segment's forward node.
+        const node = [...FOOD_CORNER.kitchenStations, { x: 3.65, y: 3 }]
+          .findIndex(p => distance(atFood(layout, p), path[i]) < 1e-7);
+        station = node; reached = false; break;
+      }
+    }
+    if (reached) station = next;
+  }
+  const back = kitchenPath(layout, station, 8);
+  for (let i = 1; i < back.length; i++) append(back[i - 1], back[i], distance(back[i - 1], back[i]) / CARETAKER_TILES_PER_SECOND);
+  return { segments, end: time };
+}
+
+/** Quiet service, including a service whose diners have all been superseded. */
+export function kitchenCleanup(layout, start, readyTime, lastDinerEnd = readyTime, emptyAt = Infinity) {
+  const requested = Math.max(readyTime, Math.min(lastDinerEnd + 300, emptyAt));
+  return { ...kitchenCooking(layout, readyTime, requested - readyTime, String(start)), requested,
+    emptied: emptyAt <= lastDinerEnd + 300 };
+}
+
+/** One cached event schedule; rounds restart at clock zero after a reopening at the switch. */
+function kitchenSchedule(timeline, layout) {
+  const cached = KITCHEN_SERVICES.get(timeline);
+  if (cached?.layout === layout) return cached;
+  const unit = timeline.event.slot_minutes * 60, horizon = timeline.event.slots * unit;
+  const intervals = hallIntervals(timeline), visits = rawFoodVisits(timeline);
+  const services = [], pieces = [], readyByStart = new Map();
+  const tour = caretakerTour(timeline, layout), lightSwitch = tour.stops[0];
+  const pickup = atFood(layout, FOOD_CORNER.pickup);
+  const kitchenDoor = { ...atFood(layout, FOOD_CORNER.staffSpots[0]), row: layout.aisles[0] };
+  const opening = Math.max(0, (intervals[0]?.[0] ?? 0) - 60);
+  let now = opening, position = layout.doorPosition, tourClock = 0, vi = 0;
+  const nextVisit = () => {
+    while (vi < visits.length) {
+      const candidate = visits[vi];
+      // Readiness of earlier visits is already known. This checks exact supersession without a cycle.
+      const selected = resolveLocation(timeline, candidate.person, candidate.at, activeEvents(timeline, candidate.at),
+        (_data, slot, at) => {
+          const raw = at * unit, effective = Math.max(raw, readyByStart.get(foodTimeKey(raw)) ?? raw);
+          return slot * unit < effective + 400 ? { kind: 'food', rawStart: raw } : null;
+        });
+      if (selected.rawStart !== undefined && foodTimeKey(selected.rawStart) === foodTimeKey(candidate.start)) {
+        candidate.reason = selected.event?.kind === 'meal' ? 'meal' : 'visit';
+        return candidate;
+      }
+      vi++;
+    }
+    return null;
+  };
+  const occupied = time => intervals.some(([a, b]) => a <= time && time < b);
+  const nextArrival = time => intervals.find(([a]) => a > time)?.[0] ?? Infinity;
+  const nextDeparture = time => intervals.find(([, b]) => b > time)?.[1] ?? Infinity;
+  const add = (end, data) => { if (end > now) pieces.push({ start: now, end, ...data }); now = end; };
+  const walk = (path, speed, action, extra = {}) => {
+    for (let i = 1; i < path.length; i++) {
+      add(now + distance(path[i - 1], path[i]) / speed, { from: path[i - 1], to: path[i], action, ...extra });
+    }
+    position = path.at(-1);
+  };
+  const roundUntil = end => { add(end, { roundClock: tourClock, action: CIRCULATING }); tourClock += pieces.at(-1).end - pieces.at(-1).start;
+    position = tourState(tour, tourClock).position; };
+  const openingAction = 'Staff are turning on the lights.';
+  add(now + 4, { from: position, to: lightSwitch, action: openingAction, lightFrom: 0, lightTo: 0 });
+  position = lightSwitch;
+  add(now + 2, { from: position, to: position, action: openingAction, lightFrom: 0, lightTo: 1 });
+  add(now + 2, { from: position, to: position, action: openingAction });
+  let returnPath = null, returnToSwitch = false;
+  while (now <= horizon || vi < visits.length) {
+    const demand = nextVisit()?.start ?? Infinity;
+    if (demand <= now && occupied(now)) {
+      const start = services.length ? Math.max(now, demand) : demand, service = { start, walkIn: 0, reason: visits[vi].reason };
+      services.push(service);
+      if (!returnPath) {
+        const state = tourState(tour, tourClock);
+        if (state.remaining && distance(position, state.position) < 1e-7) {
+          walk([position, state.end], CARETAKER_TILES_PER_SECOND, 'Staff are heading to the kitchen.', { service, load: 'food' });
+          tourClock += state.remaining;
+        }
+        const leave = routePoint(layout, position);
+        // Return to the segment end, where the paused tour will resume.
+        returnPath = [position, ...corridorPath(layout, leave, kitchenDoor), pickup];
+        walk(returnPath, SERVICE_SPEED, 'Staff are heading to the kitchen.', { service, load: 'food' });
+      }
+      service.walkIn = now - start;
+      service.setOutStart = now;
+      service.readyTime = now + SET_OUT_SECONDS;
+      add(service.readyTime, { service, phase: 'set-out', action: 'Staff are setting out food.' });
+      position = pickup;
+      let quiet = service.readyTime;
+      const departure = nextDeparture(start);
+      // Extend the quiet window with every visit beginning before cleanup is requested.
+      while (nextVisit()?.start < Math.min(quiet + 300, departure)) {
+        const visit = visits[vi++];
+        readyByStart.set(foodTimeKey(visit.start), service.readyTime);
+        quiet = Math.max(quiet, Math.max(visit.start, service.readyTime) + 400);
+      }
+      let cooking = kitchenCleanup(layout, start, service.readyTime, quiet, departure);
+      // Food stays available while the cook returns to pickup. A new diner cancels quiet cleanup.
+      while (!cooking.emptied && nextVisit()?.start < cooking.end) {
+        const visit = visits[vi++];
+        readyByStart.set(foodTimeKey(visit.start), service.readyTime);
+        quiet = Math.max(quiet, visit.start + 400);
+        while (nextVisit()?.start < Math.min(quiet + 300, departure)) {
+          const more = visits[vi++];
+          readyByStart.set(foodTimeKey(more.start), service.readyTime); quiet = Math.max(quiet, more.start + 400);
+        }
+        cooking = kitchenCleanup(layout, start, service.readyTime, quiet, departure);
+      }
+      service.lastDinerEnd = quiet;
+      service.cleanupRequested = cooking.requested;
+      service.emptied = cooking.emptied;
+      returnToSwitch ||= service.emptied;
+      service.cleanupStart = cooking.end;
+      for (const part of cooking.segments) add(part.end, { ...part, service, phase: 'cooking', action: 'Staff are cooking in the kitchen.' });
+      service.cleanupEnd = now + SET_OUT_SECONDS;
+      add(service.cleanupEnd, { service, phase: 'cleanup', action: 'Staff are clearing the food table.' });
+      // Requests during cleanup start the next service here, without a trip into the hall.
+      if (nextVisit()?.start <= now && occupied(now)) {
+        service.backEnd = now;
+        continue;
+      }
+      const target = returnToSwitch || !occupied(now) ? lightSwitch : returnPath[0];
+      const path = target === lightSwitch
+        ? [pickup, kitchenDoor, ...corridorPath(layout, kitchenDoor, routePoint(layout, lightSwitch))]
+        : [...returnPath].reverse();
+      walk(path, SERVICE_SPEED, 'Staff are heading back to the hall.', { service });
+      service.backEnd = now;
+      returnPath = null; returnToSwitch = false;
+      if (target === lightSwitch) tourClock = 0;
+      continue;
+    }
+    if (occupied(now) || now < (intervals[0]?.[0] ?? opening + 60)) {
+      const end = Math.min(demand, occupied(now) ? nextDeparture(now) : (intervals[0]?.[0] ?? opening + 60), horizon + 1);
+      if (end > now) roundUntil(end);
+      else if (demand <= now) vi++;
+      continue;
+    }
+    // Finish closing, interrupting from the actual position if attendance resumes.
+    const arrival = nextArrival(now);
+    const state = tourState(tour, tourClock);
+    const finishSegment = state.remaining && distance(state.position, position) < 1e-7;
+    const departurePoint = finishSegment ? state.end : position;
+    const path = [position, ...(finishSegment ? [departurePoint] : []),
+      ...corridorPath(layout, routePoint(layout, departurePoint), routePoint(layout, lightSwitch))];
+    let interrupted = false, reopenPath = null;
+    for (let i = 1; i < path.length; i++) {
+      const speed = finishSegment && i === 1 ? CARETAKER_TILES_PER_SECOND : SERVICE_SPEED;
+      const end = now + distance(position, path[i]) / speed;
+      const to = arrival < end ? interpolate(position, path[i], (arrival - now) / (end - now)) : path[i];
+      add(Math.min(end, arrival), { from: position, to, action: SWITCHING_OFF }); position = to;
+      if (now === arrival) { interrupted = true; reopenPath = [position, ...path.slice(i)]; break; }
+    }
+    if (!interrupted) {
+      const fadeEnd = now + 4;
+      add(Math.min(fadeEnd, arrival), { from: position, to: position, action: SWITCHING_OFF, lightFrom: 1,
+        lightTo: 1 - clampUnit((Math.min(fadeEnd, arrival) - now) / 4) });
+      if (now === arrival) interrupted = true;
+    }
+    if (!interrupted) {
+      const end = now + EXIT_SECONDS;
+      const to = arrival < end ? interpolate(position, layout.doorPosition, (arrival - now) / EXIT_SECONDS) : layout.doorPosition;
+      add(Math.min(end, arrival), { from: position, to, action: HEADING_HOME, lightFrom: 0, lightTo: 0 }); position = to;
+      if (now === arrival) interrupted = true;
+    }
+    if (!interrupted) {
+      add(arrival, { gone: true, action: GONE_HOME, lightFrom: 0, lightTo: 0 });
+      if (!Number.isFinite(arrival)) break;
+    }
+    const backAction = 'Staff are turning the lights back on.';
+    const backPath = reopenPath ?? [position, ...corridorPath(layout, routePoint(layout, position), routePoint(layout, lightSwitch))];
+    const length = backPath.slice(1).reduce((sum, p, i) => sum + distance(backPath[i], p), 0);
+    walk(backPath, Math.min(SERVICE_SPEED, length / 8), backAction, { lightFrom: 0, lightTo: 0 });
+    add(now + 4, { from: position, to: position, action: backAction, lightFrom: 0, lightTo: 1 });
+    tourClock = 0;
+    // Ignore candidates whose people left before reopening completed.
+    while (nextVisit()?.start < now && !occupied(visits[vi].start)) vi++;
+  }
+  const result = { layout, services, pieces, readyByStart, tour, intervals, opening };
+  KITCHEN_SERVICES.set(timeline, result);
+  return result;
+}
+
+export function kitchenServices(timeline, layout = KITCHEN_SERVICES.get(timeline)?.layout ?? createRoomLayout(timeline.tables ?? [], timeline.room_layout)) {
+  return kitchenSchedule(timeline, layout).services;
+}
+
+/** Decorative caretaker and dishes, entirely determined by event seconds. */
+export function hallAmbience(timeline, slot, layout, reducedMotion = false) {
+  const schedule = kitchenSchedule(timeline, layout);
+  let seconds = Math.max(0, slot * timeline.event.slot_minutes * 60);
+  if (slot === timeline.event.slots) seconds += 12;
+  const lightSwitch = schedule.tour.stops[0], pickup = atFood(layout, FOOD_CORNER.pickup);
+  let lo = 0, hi = schedule.pieces.length;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (schedule.pieces[mid].end <= seconds) lo = mid + 1; else hi = mid; }
+  const piece = schedule.pieces[lo];
+  let staff = null, foodCount = 0, foodProgress = 0, lights = 0;
+  let action = 'The hall is dark. Staff have not arrived yet.';
+  if (piece && seconds >= schedule.opening) {
+    const fraction = (seconds - piece.start) / (piece.end - piece.start);
+    action = piece.action;
+    lights = (piece.lightFrom ?? 1) + ((piece.lightTo ?? 1) - (piece.lightFrom ?? 1)) * clampUnit(fraction);
+    if (!piece.gone) staff = piece.roundClock !== undefined
+      ? tourState(schedule.tour, piece.roundClock + seconds - piece.start).position
+      : piece.from ? interpolate(piece.from, piece.to, fraction) : pickup;
+    if (piece.phase === 'set-out' || piece.phase === 'cleanup') {
+      const elapsed = seconds - piece.start;
+      foodProgress = (piece.phase === 'cleanup' ? 1 - elapsed / SET_OUT_SECONDS : elapsed / SET_OUT_SECONDS) * 6;
+      const food = piece.phase === 'cleanup' ? foodClearAt(layout, elapsed) : foodSetOut(layout, foodProgress);
+      foodCount = food.count; staff = { ...food.staff, carrying: food.dish };
+    } else if (piece.phase === 'cooking') { foodCount = 6; foodProgress = 6; }
+    if (staff) staff = { ...staff, load: piece.load ?? null, carrying: staff.carrying ?? null };
+    if (reducedMotion) {
+      staff = staff && { ...(piece.service ? pickup : lightSwitch), load: null, carrying: null };
+      foodCount = piece.phase === 'cooking' ? 6 : 0;
+      lights = action === SWITCHING_OFF || action === HEADING_HOME || piece.gone ? 0 : 1;
+      const departure = schedule.intervals.filter(([, end]) => end <= seconds).at(-1)?.[1] ?? schedule.opening + 60;
+      if (!piece.service && (action === SWITCHING_OFF || action === HEADING_HOME) && seconds >= departure + 8) {
+        staff = null; action = GONE_HOME;
+      }
+    }
+  }
+  return { staff, lights, foodCount, foodProgress, lightSwitch, action,
+    occupied: schedule.intervals.some(([a, b]) => a <= seconds && seconds < b) };
 }
 
 /** The seeded tour at wall-clock pace: walking legs unchanged, dwells stretched to about half a minute. */
@@ -793,7 +1016,7 @@ export function createRoomLayout(tables, room = null) {
   layout.height = layout.tableGridBottom + overflowHeight + 6;
   layout.backWall = { x: 0, y: -6, w: layout.width, h: 6 };
   layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
-  layout.food = { x: 1, y: 1, w: 16, h: 6 };
+  layout.food = { x: 1, y: 1, w: 23, h: 6 };
   layout.lounge = { x: 1, y: layout.height - 6, w: layout.width - 9, h: 5 };
   layout.door = { x: 0, y: layout.gridY + 1 };
   layout.doorPosition = { x: 1.2, y: layout.door.y + 0.5 };
@@ -865,7 +1088,7 @@ export function chairSeatIndices(table) {
 export function indexAdminEvents(timeline) {
   let events = ADMIN_EVENT_CACHE.get(timeline);
   if (!events) {
-    events = timeline.events.filter((item) => ADMIN_KINDS.has(item.kind));
+    events = (timeline.events ?? []).filter((item) => ADMIN_KINDS.has(item.kind));
     ADMIN_EVENT_CACHE.set(timeline, events);
   }
   return events;
@@ -969,13 +1192,13 @@ export function tableScenery(timeline, table, slot, layout, index, reducedMotion
 
 export function ordinaryLocation(timeline, person, slot) {
   if (!isPresent(person, slot, timeline.event.slots)) return { kind: "absent", label: "outside the hall" };
-  for (let tableIndex = 0; tableIndex < timeline.tables.length; tableIndex += 1) {
+  for (let tableIndex = 0; tableIndex < (timeline.tables ?? []).length; tableIndex += 1) {
     const table = timeline.tables[tableIndex];
     if (table.dm === person.id && slot >= table.start && slot < table.end) {
       return { kind: "table", label: table.name, table, tableIndex, seat: 0 };
     }
   }
-  for (let tableIndex = 0; tableIndex < timeline.tables.length; tableIndex += 1) {
+  for (let tableIndex = 0; tableIndex < (timeline.tables ?? []).length; tableIndex += 1) {
     const table = timeline.tables[tableIndex];
     if (slot < table.start || slot >= table.end) continue;
     for (let signupIndex = 0; signupIndex < table.signups.length; signupIndex += 1) {
@@ -999,7 +1222,12 @@ export function ordinaryLocation(timeline, person, slot) {
 
 /** A food visit uses event seconds, so refresh, pause and rewind preserve the meal. */
 export function foodVisit(timeline, slot, startedAt) {
-  const elapsed = Math.max(0, (slot - startedAt) * timeline.event.slot_minutes * 60);
+  const unit = timeline.event.slot_minutes * 60;
+  kitchenServices(timeline);
+  const ready = KITCHEN_SERVICES.get(timeline).readyByStart.get(foodTimeKey(startedAt * unit)) ?? startedAt * unit;
+  if (slot * unit < ready) return { kind: "food", label: "the food queue, waiting for food", foodPhase: "waiting",
+    plate: false, foodRemaining: 1 };
+  const elapsed = Math.max(0, slot * unit - Math.max(startedAt * unit, ready));
   // Allow for floating-point conversion at the half-open phase boundaries.
   const seconds = Math.round(elapsed * 1e6) / 1e6;
   if (seconds >= 400) return null;
@@ -1012,8 +1240,22 @@ export function foodVisit(timeline, slot, startedAt) {
     plate: seconds < 390, foodRemaining: Math.max(0, Math.min(1, (370 - seconds) / 300)) };
 }
 
+/** Someone arriving mid-meal, on a break or still on stage when it starts, starts their own visit on
+ * arrival or when the break or their spotlight ends, so they queue and collect like everyone else.
+ * A break or spotlight that begins after their visit has started does not move it. */
+function mealVisitStart(timeline, person, meal, slot) {
+  let start = Math.max(meal.at ?? slot, effectivePresence(person, timeline.event.slots)?.[0] ?? -Infinity);
+  const spotlightDuration = SPOTLIGHT_MINUTES / timeline.event.slot_minutes;
+  for (;;) {
+    const active = activeEvents(timeline, start);
+    if (active.break) start = active.break.at + active.break.duration;
+    else if (active.spotlight?.person === person.id) start = active.spotlight.at + spotlightDuration;
+    else return start;
+  }
+}
+
 /** Explicit choices override automatic activity while their table/visitor context still applies. */
-export function resolveLocation(timeline, person, slot, active = activeEvents(timeline, slot)) {
+export function resolveLocation(timeline, person, slot, active = activeEvents(timeline, slot), visitAt = foodVisit) {
   const ordinary = ordinaryLocation(timeline, person, slot);
   if (ordinary.kind === "absent") return ordinary;
   if (active.break) {
@@ -1032,7 +1274,7 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
       && (table.dm === person.id || table.signups.some((signup) => signup.person === person.id)))) break;
     if (move.destination === "food") {
       if (finishedFood) continue;
-      const visit = foodVisit(timeline, slot, move.at);
+      const visit = visitAt(timeline, slot, move.at);
       if (visit) return visit;
       finishedFood = true;
       continue; // Resume the last lounge/table choice, without replaying older meals.
@@ -1041,7 +1283,7 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
   }
   if (active.spotlight?.person === person.id) return { kind: "spotlight", label: "the stage", event: active.spotlight };
   if (active.meal && !finishedFood) {
-    const visit = foodVisit(timeline, slot, active.meal.at ?? slot);
+    const visit = visitAt(timeline, slot, mealVisitStart(timeline, person, active.meal, slot));
     if (visit) return { ...visit, event: active.meal };
   }
   // Visitors can finish a meal across a four-minute wandering beat.
@@ -1049,7 +1291,7 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
     for (const beat of [ordinary.visitorBeat, ordinary.visitorBeat - 1]) {
       const start = beat * 4 / timeline.event.slot_minutes;
       if (start < 0 || ordinaryLocation(timeline, person, start).kind !== "food") continue;
-      const visit = foodVisit(timeline, slot, start);
+      const visit = visitAt(timeline, slot, start);
       if (visit) return visit;
     }
   }
@@ -1106,20 +1348,6 @@ export function practicePlaces(timeline) {
     result.set(id, place);
   }
   return result;
-}
-
-/** Food tables, seats and bin share geometry with the rendered furniture. */
-export function foodGeometry(layout, index = 0, count = 1) {
-  const { x, y } = layout.food;
-  const columns = Math.min(6, Math.max(1, count));
-  const rows = Math.ceil(count / columns);
-  return {
-    first: { x: x + 2, y: y + 2.3 },
-    second: { x: x + 5.8, y: y + 2.5 },
-    seat: { x: x + 8 + (index % columns) * 1.15,
-      y: y + 2.1 + Math.floor(index / columns) * Math.min(1.4, 3 / Math.max(1, rows - 1)) },
-    bin: { x: x + 15, y: y + 4.8 },
-  };
 }
 
 /** Allocate activities once for the people actually in the lounge, excluding speakers and diners. */

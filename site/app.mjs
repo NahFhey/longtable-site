@@ -1,9 +1,12 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=e12255a6bb3f";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=64a4c5e89701";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
 import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
+import * as foodCorner from "./food-corner.mjs?v=a9890a3c9660";
+import { cornerRoute } from "./food-routing.mjs?v=e52cc41290de";
+import { queueSpot } from "./food-layout.mjs?v=44523bdb9315";
 import {
   EVE_MS,
   PALETTE_SIZE,
@@ -41,7 +44,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=0d18d772771b";
+} from "./model.mjs?v=35a2a274fb32";
 
 const TILE = 16;
 const SCALE = 2;
@@ -117,6 +120,8 @@ mobile.addEventListener?.("change", arrangeHall);
 const music = setupHallMusic();
 $("music-open")?.addEventListener("click", () => music?.togglePanel());
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+foodCorner.bindFoodDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, reduced: () => reducedMotion.matches });
 
 const state = {
   data: null,
@@ -369,9 +374,10 @@ function destination(runtime, now, active) {
   }
   if (place.kind === "food") {
     const geometry = foodGeometry(state.layout, state.diners.indexOf(runtime.person.id), Math.max(4, state.diners.length));
-    const position = place.foodPhase === "serving-first" ? geometry.first
-      : place.foodPhase === "serving-second" ? geometry.second
-      : place.foodPhase === "trash" ? { x: geometry.bin.x - .7, y: geometry.bin.y } : geometry.seat;
+    const serving = (place.foodPhase === "waiting" || place.foodPhase === "serving-first") ? "first" : place.foodPhase === "serving-second" ? "second" : null;
+    const position = serving ? queueSpot(state.layout, serving,
+      state.diners.filter(id => state.locations.get(id)?.foodPhase === place.foodPhase).indexOf(runtime.person.id))
+      : place.foodPhase === "trash" ? geometry.binStand : geometry.seat;
     return { ...place, position, present: true };
   }
   return { ...place, position: seatPosition(place.tableIndex, place.seat), present: true };
@@ -386,8 +392,9 @@ function outsideTableGrid(point) {
   return point.x < state.layout.gridX - 0.2 || point.y < state.layout.gridY - 0.2 || point.y > state.layout.gridY + rows * state.layout.cellHeight - 0.2;
 }
 
-function pathBetween(from, to) {
-  return stagePath(state.layout, from, to, hallPathBetween);
+function pathBetween(from, to, remaining = []) {
+  const hallPath = (a, b) => stagePath(state.layout, a, b, hallPathBetween);
+  return cornerRoute(state.layout, from, to, hallPath, remaining, state.diners.length) ?? hallPath(from, to);
 }
 
 function hallPathBetween(from, to) {
@@ -451,7 +458,7 @@ function updatePeople(realSeconds, now, active) {
       runtime.entering = true;
       runtime.path = pathBetween(runtime.position, target.position);
     } else if (runtime.visible && targetChanged) {
-      runtime.path = pathBetween(runtime.position, target.position);
+      runtime.path = pathBetween(runtime.position, target.position, runtime.path);
     }
     runtime.target = target;
 
@@ -794,27 +801,13 @@ function drawRoom() {
   drawNine(layout.lounge, RPG.floor.lounge, "#4b4656");
   drawNine(layout.stage, RPG.floor.stage, "#554761");
   drawStageStairs();
-  drawNine(layout.food, RPG.floor.food, "#6b5936");
 
   for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.banners[index], layout.stage.x + 1 + index * 2, 0);
   drawTile(state.images.rpg, RPG.barrel, layout.stage.x + 3, layout.stage.y + 1);
 
-  const foodX = layout.food.x + 1;
-  const foodY = layout.food.y + 1;
-  for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + index, foodY);
-  for (let index = 0; index < 3; index += 1) drawTile(state.images.rpg, RPG.table[index], foodX + 4, foodY + index);
-  RPG.food.slice(0, state.ambience?.foodCount ?? 6).forEach((item, index) => drawTile(state.images.rpg, item, index < 3 ? foodX + index : foodX + 4, index < 3 ? foodY : foodY + index - 3));
-  const foodScene = foodGeometry(layout);
-  // A visible seat for each diner, with a few ready seats when the area is empty.
-  for (let index = 0; index < Math.max(4, state.diners.length); index += 1) {
-    const { seat } = foodGeometry(layout, index, Math.max(4, state.diners.length));
-    if (!drawTile(state.images.rpg, RPG.chairs.bottom, seat.x - .5, seat.y - .3)) {
-      ctx.fillStyle = "#99734d";
-      ctx.fillRect((seat.x - .4) * TILE * SCALE, (seat.y - .1) * TILE * SCALE, .8 * TILE * SCALE, .4 * TILE * SCALE);
-    }
-  }
-  ctx.fillStyle = "#303e43";
-  ctx.fillRect((foodScene.bin.x - .35) * TILE * SCALE, (foodScene.bin.y - .7) * TILE * SCALE, .7 * TILE * SCALE, .9 * TILE * SCALE);
+  const drops = [...state.people.values()].filter(runtime => runtime.trashAt != null)
+    .map(runtime => (state.animationNow - runtime.trashAt) / 1000);
+  foodCorner.drawFoodArea(layout, state.animationNow ?? 0, drops.length ? Math.min(...drops) : null);
 
   drawTile(state.images.rpg, RPG.shelf[0], layout.lounge.x, layout.lounge.y);
   drawTile(state.images.rpg, RPG.shelf[1], layout.lounge.x, layout.lounge.y + 1);
@@ -944,21 +937,36 @@ function drawDice(index, view) {
 }
 
 function drawStaff(staff, station = "caretaker") {
+  state.staffFrames ??= new Map();
+  const prev = state.staffFrames.get(station);
+  const dx = prev ? staff.x - prev.x : 0, dy = prev ? staff.y - prev.y : 0;
+  staff = { ...staff, moving: staff.moving ?? Math.hypot(dx, dy) > .002,
+    facing: staff.facing ?? (Math.abs(dx) > .002 ? Math.sign(dx) : prev?.facing ?? 1) };
+  state.staffFrames.set(station, staff);
   const unit = TILE * SCALE;
   const x = staff.x * unit, y = staff.y * unit;
   const appearance = staffAppearance(state.data.event.start, station);
   const spriteX = staff.x - .5, spriteY = staff.y - .6;
-  if (drawTile(state.images.characters, [0, SPRITES.skin[appearance.skin]], spriteX, spriteY)) {
-    drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], spriteX, spriteY);
-    drawTile(state.images.characters, SPRITES.hair[appearance.hair], spriteX, spriteY);
-  } else {
+  const phase = [...station].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 997, 0) / 997;
+  const motion = foodCorner.bodyMotion(phase, !!staff.moving, state.animationNow ?? 0);
+  const staffFlip = (staff.facing ?? 1) < 0 !== !!motion.look;
+  ctx.save();
+  foodCorner.applyMotion(ctx, motion, spriteX, spriteY);
+  const drawn = drawTile(state.images.characters, [0, SPRITES.skin[appearance.skin]], spriteX, spriteY, staffFlip);
+  if (drawn) {
+    drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], spriteX, spriteY, staffFlip);
+    drawTile(state.images.characters, SPRITES.hair[appearance.hair], spriteX, spriteY, staffFlip);
+  }
+  ctx.restore();
+  if (staff.carrying) foodCorner.drawCarried(staff.carrying, staff.x, staff.y, staff.facing ?? 1);
+  if (!drawn) {
     // Retain a visible staff figure when the character sheet cannot load.
     ctx.fillStyle = "#d8c7a6"; ctx.fillRect(x - 5, y - 20, 10, 9);
     ctx.fillStyle = "#73afb5"; ctx.fillRect(x - 7, y - 25, 14, 5);
     ctx.fillRect(x - 7, y - 11, 14, 14);
     ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
   }
-  if (staff.load) {
+  if (staff.load && staff.load !== "food") {
     ctx.fillStyle = staff.load === "map" ? "#d8c99f" : "#bd955c";
     ctx.fillRect(x + 7, y - 8, staff.load === "table" ? 22 : 10, staff.load === "chairs" ? 15 : 7);
   }
@@ -1073,19 +1081,25 @@ function drawPerson(runtime, now, active) {
   const person = runtime.person;
   const place = runtime.place;
   let x = runtime.position.x - 0.5;
-  let y = runtime.position.y - 0.6 + (place.foodPhase === "eating" && !runtime.moving ? .15 : 0);
-  const movingBob = runtime.moving && !reducedMotion.matches && Math.floor(state.time * state.data.event.slot_minutes * 60 / .14) % 2 ? 0.07 : 0;
+  let y = runtime.position.y - 0.6 + (place.foodPhase === "eating" && !runtime.moving && !place.position?.standing ? .15 : 0);
+  const seated = (place.foodPhase === "eating" || place.foodPhase === "seating") && !runtime.moving;
+  const motion = foodCorner.bodyMotion(runtime.phase, runtime.moving, now, seated || place.kind === "table");
   const cheering = active.spotlight && place.kind !== "spotlight" && !place.kind.startsWith("stage-") && !reducedMotion.matches;
   const social = place.activity === "chatting" || place.activity === "cards";
   const talkTime = social ? state.time * state.data.event.slot_minutes * 60 : now / 1000;
   const talk = (place.kind === "table" || social) && !runtime.moving && !reducedMotion.matches && ((talkTime + runtime.phase * 6) % 6) < 0.5;
-  y -= movingBob + (cheering ? Math.abs(Math.sin(now / 160 + runtime.phase * 8)) * 0.25 : 0);
+  y -= (cheering ? Math.abs(Math.sin(now / 160 + runtime.phase * 8)) * 0.25 : 0);
   let facing = runtime.facing;
+  if (seated && place.position?.facing) facing = place.position.facing;
+  const plateFacing = facing;
+  if (motion.look && !active.announce && !cheering) facing = -facing;
   if (active.announce && !runtime.moving) facing = state.layout.stageFront.x < runtime.position.x ? -1 : 1;
   if (place.kind === "stage-speaker" && !runtime.moving) facing = 1;
   const flip = facing < 0;
   const frame = talk || cheering || (place.kind === "stage-speaker" && state.speech?.phase === "speaking") ? 1 : 0;
   const appearance = characterAppearance(person);
+  ctx.save();
+  foodCorner.applyMotion(ctx, motion, x, y);
   if (appearance === null) {
     if (!drawTile(state.images.characters, [frame, 1], x, y, flip, 0.85)) {
       ctx.fillStyle = "#292832";
@@ -1102,18 +1116,24 @@ function drawPerson(runtime, now, active) {
     drawTile(state.images.characters, SPRITES.hair[appearance.hair], x, y, flip);
     if (person.dm) drawTile(state.images.characters, SPRITES.hats[appearance.hat], x, y - 0.15, flip);
   }
+  ctx.restore();
   if (place.plate) {
-    const eating = place.foodPhase === "eating" && !runtime.moving;
-    const bite = eating && !reducedMotion.matches && (state.time * state.data.event.slot_minutes * 60 % 5) < 1;
-    const unit = TILE * SCALE;
-    const plateX = x + .7, plateY = y + (bite ? .37 : .68);
-    ctx.fillStyle = "#fff2dc";
-    ctx.beginPath(); ctx.ellipse(plateX * unit, plateY * unit, .25 * unit, .10 * unit, 0, 0, Math.PI * 2); ctx.fill();
-    if (place.foodRemaining > 0 && place.foodPhase !== "trash") {
-      ctx.fillStyle = "#d28a42";
-      ctx.fillRect((plateX - .16) * unit, (plateY - .06) * unit, .32 * unit * place.foodRemaining, .07 * unit);
+    const plate = foodCorner.realPlate(place, runtime.ordinal, runtime.moving);
+    runtime.dishPops ??= [];
+    plate.items.forEach((item, i) => {
+      runtime.dishPops[i] ??= now;
+      item.pop = (now - runtime.dishPops[i]) / 1000;
+    });
+    runtime.dishPops.length = plate.items.length;
+    if (place.foodPhase === "trash" && !runtime.moving && !reducedMotion.matches) {
+      plate.toward = foodGeometry(state.layout).bin;
+      plate.drop = Math.min(1, (now - runtime.trashAt) / 650);
     }
-  }
+    if (plate && place.foodPhase === "eating" && !runtime.moving && !reducedMotion.matches && (now / 1000 + runtime.phase * 5) % 5 < .6) { plate.mode = "held"; plate.lift = true; }
+    const drawPlate = () => foodCorner.drawPlate(plate, runtime.position.x, runtime.position.y, plateFacing, now);
+    if (plate.mode === "table") state.foodPlates.push(drawPlate);
+    else drawPlate();
+  } else runtime.dishPops = [];
   if (place.activity === "reading" && !runtime.moving) {
     ctx.fillStyle = "#e9d5aa";
     ctx.fillRect((x + .35) * TILE * SCALE, (y + .55) * TILE * SCALE, .5 * TILE * SCALE, .3 * TILE * SCALE);
@@ -1188,7 +1208,7 @@ function drawEvents(active, now) {
   }
   if (active.announce) drawBubble(active.announce.text, front.x, front.y - 2.2, "#fff");
   if (active.break) drawLabel("BREAK — everyone to the lounge", state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#ffd27a" });
-  if (active.meal) drawLabel(`${active.meal.text || "MEAL"} — food corner is open`, state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#9fe08a" });
+  if (active.meal) drawLabel(`${active.meal.text || "MEAL"} — food service`, state.layout.width / 2, state.layout.height - .5, { size: 4.5, bold: true, color: "#1b1a22", background: "#9fe08a" });
 
   if (state.speech?.phase === "speaking") {
     const view = speechView(state.data, state.speech.event, state.time, active,
@@ -1210,6 +1230,28 @@ function drawEvents(active, now) {
   }
 }
 
+function updateFoodScene(now) {
+  state.animationNow = now;
+  for (const runtime of state.people.values()) {
+    if (runtime.visible && runtime.place?.foodPhase === "trash" && !runtime.moving) runtime.trashAt ??= now;
+    else runtime.trashAt = null;
+  }
+  state.foodScene = { count: state.ambience.foodCount };
+}
+
+function caretakerForFrame() {
+  let staff = state.ambience.staff;
+  if (!staff) { state.staffPrevious = null; return null; }
+  const prev = state.staffPrevious;
+  const dx = prev ? staff.x - prev.x : 0, dy = prev ? staff.y - prev.y : 0;
+  staff = { ...staff, moving: Math.hypot(dx, dy) > .002,
+    facing: Math.abs(dx) > .002 ? Math.sign(dx) : prev?.facing ?? 1,
+    carrying: staff.carrying != null ? foodCorner.DISHES[staff.carrying]
+      : staff.load === "food" ? foodCorner.DISHES[0] : null };
+  state.staffPrevious = staff;
+  return staff;
+}
+
 function render(now, active) {
   const gathering = gatheringScene();
   if (gathering) {
@@ -1219,6 +1261,7 @@ function render(now, active) {
       (wallNow() - Date.parse(state.data.event.start)) / (state.data.event.slot_minutes * 60000)) : state.time;
     state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
   }
+  updateFoodScene(now);
   updateCamera();
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
@@ -1233,7 +1276,17 @@ function render(now, active) {
   drawRoom();
   drawTables();
   state.hoverName = null;
-  [...state.people.values()].filter((person) => person.visible && !person.entering).sort((a, b) => a.position.y - b.position.y).forEach((person) => drawPerson(person, now, active));
+  state.foodPlates = [];
+  const drawables = [...state.people.values()].filter(person => person.visible && !person.entering)
+    .map(person => ({ y: person.position.y, draw: () => drawPerson(person, now, active) }));
+  drawables.push(...foodCorner.foodDepthItems(state.layout, now, state.foodScene.count, state.clock.mode === "replay" || state.clock.mode === "follow-now"));
+  const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : caretakerForFrame();
+  const food = state.layout.food;
+  const caretakerInFood = caretaker && !active.break && caretaker.x >= food.x && caretaker.x < food.x + food.w
+    && caretaker.y >= food.y - 1 && caretaker.y < food.y + food.h + .5;
+  if (caretakerInFood) drawables.push({ y: caretaker.y, draw: () => drawStaff(caretaker) });
+  drawables.sort((a, b) => a.y - b.y).forEach(item => item.draw());
+  state.foodPlates.forEach(draw => draw());
   if (!gathering) state.data.tables.forEach((table, index) => {
     if (tableLifecycle(state.data, table, state.time).phase === "active") {
       drawDice(index, diceAt(state.data, table.id, state.time, reducedMotion.matches));
@@ -1245,8 +1298,7 @@ function render(now, active) {
     ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
-  const caretaker = active.break ? { x: state.layout.stageFront.x + 2, y: state.layout.stageFront.y } : state.ambience.staff;
-  if (caretaker) drawStaff(caretaker);
+  if (caretaker && !caretakerInFood) drawStaff(caretaker);
   if (active.break) drawBubble(`Break time! Back at ${formatSlot(active.break.at + active.break.duration)}.`,
     state.layout.stageFront.x + 2, state.layout.stageFront.y - 1.3, "#b6e0df", "Staff");
   const lightSwitch = state.ambience.lightSwitch;
@@ -1442,6 +1494,7 @@ function setClock(clock, persistNow = true, snap = true) {
   state.clock = clock;
   state.time = clock.slot;
   state.snap = snap;
+  if (snap) foodCorner.resetDishes();
   clearSpeech();
   persistClockSelection(performance.now(), persistNow);
 }

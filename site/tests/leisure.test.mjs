@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveLocation, foodVisit, foodGeometry, loungeActivities, createRoomLayout, accessibleEventText } from '../model.mjs';
+import { resolveLocation, kitchenServices, foodVisit, foodGeometry, loungeActivities, createRoomLayout, accessibleEventText } from '../model.mjs';
 
 function fixture() {
   const person = { id: 'guest', presence: { planned: [0, 20], actual: { here: null, leaving: null } },
@@ -8,11 +8,12 @@ function fixture() {
   const table = { id: 't1', name: 'Game', dm: 'host', start: 0, end: 10, seats: 5,
     signups: [{ person: person.id, planned: [0, 10], actual: null }] };
   const data = { event: { slots: 20, slot_minutes: 30 }, people: [person], tables: [table], events: [], visitors: { people: [] } };
-  return { person, data, at: seconds => 2 + seconds / 1800 };
+  return { person, data, at: seconds => (kitchenServices(data)[0].readyTime + seconds) / 1800 };
 }
 
 test('food visits collect at both tables, eat exactly five minutes, clear the plate and return to their seat', () => {
   const { person, data, at } = fixture();
+  assert.equal(resolveLocation(data, person, 2).foodPhase, 'waiting');
   for (const [seconds, phase] of [[0, 'serving-first'], [19.999, 'serving-first'], [20, 'serving-second'],
     [40, 'seating'], [69.999, 'seating'], [70, 'eating'], [369.999, 'eating'], [370, 'trash'], [399.999, 'trash']]) {
     assert.equal(resolveLocation(data, person, at(seconds)).foodPhase, phase, String(seconds));
@@ -33,10 +34,11 @@ test('food state is independent of playback history, reloads and slot length', (
   assert.deepEqual(resolveLocation(structuredClone(data), structuredClone(person), at(190)), expected);
   assert.equal(expected.foodRemaining, .6);
   for (const minutes of [1, 5, 30, 60]) {
-    data.event.slot_minutes = minutes;
-    assert.equal(foodVisit(data, 70 / (minutes * 60), 0).foodPhase, 'eating');
-    assert.equal(foodVisit(data, 370 / (minutes * 60), 0).foodPhase, 'trash');
-    assert.equal(foodVisit(data, 400 / (minutes * 60), 0), null);
+    const varied = structuredClone(data); varied.event.slot_minutes = minutes;
+    const ready = kitchenServices(varied)[0].readyTime;
+    assert.equal(foodVisit(varied, (ready + 70) / (minutes * 60), 2).foodPhase, 'eating');
+    assert.equal(foodVisit(varied, (ready + 370) / (minutes * 60), 2).foodPhase, 'trash');
+    assert.equal(foodVisit(varied, (ready + 400) / (minutes * 60), 2), null);
   }
 });
 
@@ -55,26 +57,27 @@ test('food returns to the previous lounge choice; newer moves, absence and game 
 
 test('a break sends food and lounge visitors to activities and restores their current context afterward', () => {
   const { data, person, at } = fixture();
-  data.events = [{ id: 'break', kind: 'break', at: at(50), duration: 1 }];
-  assert.equal(resolveLocation(data, person, at(51)).kind, 'lounge');
-  assert.equal(resolveLocation(data, person, at(1850)).kind, 'table');
-  assert.match(accessibleEventText(data, { break: data.events[0] }), /Staff announcement: Break time/);
+  const withBreak = { ...data, events: [{ id: 'break', kind: 'break', at: at(50), duration: 1 }] };
+  assert.equal(resolveLocation(withBreak, person, at(51)).kind, 'lounge');
+  assert.equal(resolveLocation(withBreak, person, at(1850)).kind, 'table');
+  assert.match(accessibleEventText(withBreak, { break: withBreak.events[0] }), /Staff announcement: Break time/);
 });
 
 test('automatic meal and visitor meals do not restart on each frame or wandering beat', () => {
   const { data, person } = fixture();
   person.movements = [];
   data.events = [{ id: 'meal', kind: 'meal', at: 2, duration: 1 }];
-  assert.equal(resolveLocation(data, person, 2.1).foodPhase, 'eating');
+  assert.equal(resolveLocation(data, person, 2).foodPhase, 'waiting');
+  assert.equal(resolveLocation(data, person, (kitchenServices(data)[0].readyTime + 100) / 1800).foodPhase, 'eating');
   assert.equal(resolveLocation(data, person, 2.5).kind, 'table');
-  data.events = []; data.tables = []; data.visitors.people = [person.id];
+  const visitorData = { ...data, events: [], tables: [], visitors: { people: [person.id] } };
   let start;
   for (let minute = 0; minute < 16; minute += 4) {
-    if (resolveLocation(data, person, minute / 30).foodPhase === 'serving-first') { start = minute / 30; break; }
+    if (resolveLocation(visitorData, person, minute / 30).foodPhase === 'waiting') { start = minute / 30; break; }
   }
   assert.notEqual(start, undefined);
-  assert.equal(resolveLocation(data, person, start + 5 / 30).foodPhase, 'eating');
-  assert.notEqual(resolveLocation(data, person, start + 7 / 30).kind, 'food');
+  assert.equal(resolveLocation(visitorData, person, start + 5 / 30).foodPhase, 'eating');
+  assert.notEqual(resolveLocation(visitorData, person, (kitchenServices(visitorData)[0].readyTime + 401) / 1800).kind, 'food');
 });
 
 test('lounge population creates reading, conversation, cards and multiple stable groups within the lounge', () => {

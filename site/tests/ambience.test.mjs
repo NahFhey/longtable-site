@@ -1,30 +1,38 @@
+import { checkContinuity } from './kitchen-helpers.mjs';
+import { FOOD_CORNER, atFood } from "../food-layout.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EVE_EXIT_SECONDS, EVE_MS, GATHERING_DWELL_FACTOR, caretakerTour, createRoomLayout, gatheringAmbience, hallAmbience } from '../model.mjs';
 const layout=createRoomLayout([]);
 const person=(planned, actual={here:null,leaving:null})=>({presence:{planned,actual}});
-const timeline=people=>({event:{slots:8,slot_minutes:30},people});
-const at=(data,seconds,reduced=false)=>hallAmbience(data,seconds/1800,layout,reduced);
+const fixtures = new Set();
+const timeline=people=>{ const data={event:{slots:8,slot_minutes:30},people}; fixtures.add(data); return data; };
+const at=(data,seconds,reduced=false)=>{ fixtures.add(data); return hallAmbience(data,seconds/1800,layout,reduced); };
+const switchTime = (data, departure) => {
+  for (let t=departure;t<departure+120;t+=.01) { const a=at(data,t); if(a.lights<1) return t - (1-a.lights)*4; }
+  throw new Error('Closing never reached the switch');
+};
 
-test('staff switch lights on, place food, and remain on duty without adding attendees',()=>{
+test('staff switch lights on and start rounds without setting out food or adding attendees',()=>{
   const data=timeline([person([0,8])]);
   const before=structuredClone(data);
   assert.equal(at(data,0).lights,0);
   assert.equal(at(data,7).lights,1);
   assert.equal(at(data,15).foodCount,0);
-  assert.equal(at(data,35).foodCount,3);
-  assert.equal(at(data,55).foodCount,6);
+  assert.equal(at(data,35).foodCount,0);
+  assert.equal(at(data,55).foodCount,0);
   assert.equal(at(data,120).lights,1);
-  assert.notDeepEqual(at(data,100).staff,at(data,105).staff);
+  assert.notDeepEqual(at(data,100).staff,at(data,120).staff);
   assert.deepEqual(data,before);
 });
 test('only the last attendee leaving triggers closing; actual attendance wins over plans',()=>{
   const data=timeline([person([0,4]),person([0,8],{here:0,leaving:5})]);
   assert.equal(at(data,4*1800+20).lights,1);
-  const closing=at(data,5*1800+9);
+  const fade=switchTime(data,5*1800);
+  const closing=at(data,fade+1);
   assert.ok(closing.lights>0&&closing.lights<1);
   assert.match(closing.action,/switching off/);
-  assert.equal(at(data,5*1800+12).lights,0);
+  assert.equal(at(data,fade+4).lights,0);
   assert.equal(at(data,6*1800).staff,null);
   assert.equal(at(data,6*1800).lights,0);
   assert.match(at(data,6*1800).action,/gone home/);
@@ -46,8 +54,8 @@ test('seeks, reloads, reduced motion and the final event boundary are stable',()
   at(data,200);
   assert.deepEqual(at(data,120),result);
   assert.deepEqual(at(structuredClone(data),120),result);
-  assert.equal(hallAmbience(data,8,layout).lights,0);
-  assert.equal(at(data,0,true).foodCount,6);
+  assert.deepEqual(hallAmbience(data,8,layout),at(data,8*1800+12));
+  assert.equal(at(data,0,true).foodCount,0);
   assert.equal(at(data,0,true).lights,1);
   assert.deepEqual(at(data,100,true).staff,at(data,105,true).staff);
 });
@@ -55,15 +63,16 @@ test('after closing the caretaker walks from the switch out through the door and
   const data=timeline([person([0,4])]);
   const departure=4*1800;
   const {lightSwitch}=at(data,0);
-  const closing=at(data,departure+9);
-  assert.equal(closing.lights,.75);
+  const fade=switchTime(data,departure);
+  const closing=at(data,fade+1);
+  assert.ok(Math.abs(closing.lights-.75)<1e-8);
   assert.ok(Math.hypot(closing.staff.x-lightSwitch.x,closing.staff.y-lightSwitch.y)<1e-9,'at the switch while the lights fade');
-  const leaving=at(data,departure+13);
+  const leaving=at(data,fade+5);
   assert.equal(leaving.lights,0);
   assert.match(leaving.action,/heading home/);
   assert.ok(leaving.staff.y>lightSwitch.y&&leaving.staff.y<layout.doorPosition.y,'between the switch and the door');
   assert.ok(leaving.staff.x<lightSwitch.x&&leaving.staff.x>=layout.doorPosition.x);
-  for (const seconds of [departure+14,departure+60,8*1800]) {
+  for (const seconds of [fade+6.001,departure+120,8*1800]) {
     const gone=at(data,seconds);
     assert.equal(gone.staff,null);
     assert.equal(gone.lights,0);
@@ -83,9 +92,11 @@ test('a later arrival brings the caretaker back in from the door before the ligh
   assert.deepEqual({x:at(data,arrival+8).staff.x,y:at(data,arrival+8).staff.y},lightSwitch);
   assert.equal(at(data,arrival+12).lights,1);
   // Someone returning while the caretaker is still walking out starts the return from mid-walk, not the door.
-  const quick=timeline([person([0,2]),{presence:{planned:[0,8],actual:{here:2+13/1800,leaving:null}}}]);
-  const midway=at(quick,2*1800+13);
-  const outbound=at(timeline([person([0,2])]),2*1800+13).staff;
+  const outboundData=timeline([person([0,2])]);
+  const returnAt=switchTime(outboundData,2*1800)+5;
+  const quick=timeline([person([0,2]),{presence:{planned:[0,8],actual:{here:returnAt/1800,leaving:null}}}]);
+  const midway=at(quick,returnAt);
+  const outbound=at(outboundData,returnAt).staff;
   assert.deepEqual({x:midway.staff.x,y:midway.staff.y},{x:outbound.x,y:outbound.y});
   assert.match(midway.action,/back on/);
 });
@@ -105,6 +116,7 @@ test('reduced motion removes the caretaker as soon as the lights are off, withou
 });
 test('the caretaker tours many walkable stops with no back-and-forth legs',()=>{
   const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2026-11-07T10:00:00-05:00'}};
+  fixtures.add(data);
   const tour=caretakerTour(data,layout);
   const key=point=>`${Math.round(point.x)},${Math.round(point.y)}`;
   assert.deepEqual(tour.stops.at(-1),tour.stops[0]);
@@ -115,10 +127,10 @@ test('the caretaker tours many walkable stops with no back-and-forth legs',()=>{
   }
   for (const dwell of tour.dwell) assert.ok(dwell>=3&&dwell<=10);
   const near=(a,b)=>Math.abs(a-b)<1e-6;
-  const foodY=layout.food.y+layout.food.h-1.2, loungeY=layout.lounge.y+2, stairsX=layout.stage.x-.8;
+  const foodStops=FOOD_CORNER.staffSpots.map(p=>atFood(layout,p)), loungeY=layout.lounge.y+2, stairsX=layout.stage.x-.8;
   const walkable=({x,y})=>near(x,layout.trunkX)
     ||layout.aisles.some(aisle=>near(y,aisle)&&x>=layout.trunkX-1e-6&&x<=stairsX+1e-6)
-    ||(near(y,foodY)&&x>=layout.food.x+1.5-1e-6&&x<=layout.food.x+layout.food.w-2.5+1e-6)
+    ||foodStops.some(p=>near(x,p.x)&&y>=p.y-1e-6&&y<=layout.aisles[0]+1e-6)
     ||(near(y,loungeY)&&x>=layout.lounge.x+1.5-1e-6&&x<=layout.lounge.x+layout.lounge.w-1.5+1e-6)
     ||(near(x,stairsX)&&y>=layout.aisles[0]-1e-6&&y<=layout.aisles.at(-1)+1e-6)
     ||(x<=layout.trunkX+1e-6&&y>=layout.door.y-.8-1e-6&&y<=layout.doorPosition.y+1e-6);
@@ -135,12 +147,14 @@ test('the caretaker tours many walkable stops with no back-and-forth legs',()=>{
 test('the tour is fixed per event start and differs between events',()=>{
   const start='2026-11-07T10:00:00-05:00';
   const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start}};
+  fixtures.add(data);
   const positions=[300,900,2400].map(seconds=>at(data,seconds).staff);
   assert.deepEqual([300,900,2400].map(seconds=>at(data,seconds).staff),positions);
   const reloaded={...structuredClone(data)};
   assert.deepEqual([300,900,2400].map(seconds=>at(reloaded,seconds).staff),positions);
   assert.deepEqual(caretakerTour(reloaded,layout).stops,caretakerTour(data,layout).stops);
   const other={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2027-03-14T18:00:00-04:00'}};
+  fixtures.add(other);
   assert.notDeepEqual(caretakerTour(other,layout).stops,caretakerTour(data,layout).stops);
   assert.deepEqual(caretakerTour(other,layout).stops[0],caretakerTour(data,layout).stops[0],'every tour starts at the light switch');
 });
@@ -161,6 +175,7 @@ test('before the doors open the hall is dark and nobody is drawn, then the caret
 });
 test('the gathering keeps the lights on and the caretaker touring at real-time pace, the same on every load',()=>{
   const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2026-11-07T10:00:00-05:00',tz:'America/New_York'}};
+  fixtures.add(data);
   const start=Date.parse(data.event.start);
   const instant=start-40*24*3600e3;
   const at=(ms,reduced=false)=>gatheringAmbience(data,layout,ms,reduced);
@@ -188,6 +203,7 @@ test('the gathering keeps the lights on and the caretaker touring at real-time p
 });
 test('the eve closes the hall: lights off at a minute, caretaker gone after the exit walk, and a dated caption',()=>{
   const data={...timeline([person([0,8])]),event:{slots:8,slot_minutes:30,start:'2026-11-07T10:00:00-05:00',tz:'America/New_York'}};
+  fixtures.add(data);
   const eve=Date.parse(data.event.start)-EVE_MS;
   const at=(ms,reduced=false)=>gatheringAmbience(data,layout,ms,reduced);
   const opening=at(eve);
@@ -213,5 +229,13 @@ test('the eve closes the hall: lights off at a minute, caretaker gone after the 
   assert.deepEqual({x:reduced.staff.x,y:reduced.staff.y},reduced.lightSwitch);
   assert.equal(at(eve+EVE_EXIT_SECONDS*1000,true).staff,null);
   const auckland={...data,event:{...data.event,tz:'Pacific/Auckland'}};
+  fixtures.add(auckland);
   assert.equal(gatheringAmbience(auckland,layout,eve+3600e3).action,'The hall is dark. Doors open Sunday at 4:00 AM.','the caption uses the event time zone');
+});
+
+test('whole-event continuity for every ambience timeline fixture', async t => {
+  let index = 0;
+  for (const data of fixtures) {
+    await t.test(`ambience fixture ${++index}`, child => checkContinuity(data, layout, child));
+  }
 });

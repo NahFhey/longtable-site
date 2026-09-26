@@ -143,8 +143,22 @@ entry applies only to that person's current game assignment. A visitor entry
 applies only between games while in the visitor group and stops at the next game.
 Explicit movement takes priority over automatic spotlight and meal
 movement. Event breaks temporarily send attendees to the lounge. Food choices
-last for serving, five minutes of eating, and clearing the plate, then resume
-the previous eligible movement or current scheduled activity. It never changes seat reservations or attendance. Deleting a table
+wait at the first queue if food is not ready. From `effectiveStart = max(visitStart,
+serviceReadyTime)`, phases are serving-first [0,20), serving-second [20,40), seating
+[40,70), eating [70,370), and trash [370,400), in event seconds. Before readiness,
+the phase is `waiting`, labelled “the food queue, waiting for food”, without a plate.
+Visits then resume
+the previous eligible movement or current scheduled activity. Exact meal starts,
+explicit food movements and four-minute visitor beat boundaries are the service
+demand candidates; the same movement, break and assignment precedence decides
+which candidates apply. A new service sets out food, cooks while it is available,
+then clears after 300 seconds without a diner following the last visit end.
+Cleanup waits for the cook to finish a kitchen segment and reach the pickup; a
+new diner before cleanup starts restarts the quiet window. Demand during cleanup
+waits for the next service at cleanup end. Empty attendance requests cleanup
+immediately, followed by a walk to the light switch and door. These are derived
+scene states, not new records or schema fields. Reduced motion uses identical
+service times. Food choices never change seat reservations or attendance. Deleting a table
 removes its movement references.
 
 Dice-form submissions record a return to the active table. Private outcomes
