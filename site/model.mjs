@@ -1263,7 +1263,10 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
     return { kind: "lounge", label: "the lounge (break)", event: active.break };
   }
   const moves = person.movements || [];
-  let finishedFood = false;
+  let finishedFood = false, ateMeal = false, mealStart;
+  // A choice made before this person's meal start does not keep them from the meal.
+  const beforeMeal = (move) => active.meal
+    && move.at < (mealStart ??= mealVisitStart(timeline, person, active.meal, slot));
   for (let index = moves.length - 1; index >= 0; index -= 1) {
     const move = moves[index];
     if (move.at > slot) continue;
@@ -1277,13 +1280,17 @@ export function resolveLocation(timeline, person, slot, active = activeEvents(ti
       const visit = visitAt(timeline, slot, move.at);
       if (visit) return visit;
       finishedFood = true;
+      // A snack still running at the meal start stands in for that meal; an earlier one does not.
+      if (!beforeMeal(move) || visitAt(timeline, mealStart, move.at)) ateMeal = true;
       continue; // Resume the last lounge/table choice, without replaying older meals.
     }
+    // Hand over to the meal while it runs, then the choice resumes. A spotlit diner keeps the choice.
+    if (!ateMeal && beforeMeal(move) && slot >= mealStart && visitAt(timeline, slot, mealStart)) break;
     return move.destination === "table" ? ordinary : { kind: "lounge", label: "the lounge" };
   }
   if (active.spotlight?.person === person.id) return { kind: "spotlight", label: "the stage", event: active.spotlight };
-  if (active.meal && !finishedFood) {
-    const visit = visitAt(timeline, slot, mealVisitStart(timeline, person, active.meal, slot));
+  if (active.meal && !ateMeal) {
+    const visit = visitAt(timeline, slot, mealStart ??= mealVisitStart(timeline, person, active.meal, slot));
     if (visit) return { ...visit, event: active.meal };
   }
   // Visitors can finish a meal across a four-minute wandering beat.

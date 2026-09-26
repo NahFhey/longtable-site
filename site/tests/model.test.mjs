@@ -365,7 +365,7 @@ test("active-event scans cache and inspect only admin events after indexing", ()
   assert.equal(kindReads, 4 * 300);
 });
 
-test("movement overlap priority is spotlighted person, break, meal, ordinary", () => {
+test("movement overlap priority is spotlighted person, break, meal, ordinary; an earlier move yields to the meal", () => {
   const data = validateTimeline(timeline());
   const player = data.people.find((item) => item.id === "player");
   const active = { spotlight: event("s", "spotlight", 1), break: event("b", "break", 1), meal: event("m", "meal", 1), announce: null };
@@ -374,11 +374,38 @@ test("movement overlap priority is spotlighted person, break, meal, ordinary", (
   assert.equal(resolveLocation(data, player, 2, active).label, "the lounge (break)");
   active.break = null;
   assert.equal(resolveLocation(data, player, 1 + 1 / data.event.slot_minutes, active).kind, "food");
+  player.movements = [{ at: .9, table: "table-key", destination: "table" }];
+  assert.equal(resolveLocation(data, player, 1 + 1 / data.event.slot_minutes, active).kind, "food", "a table move before the meal");
+  player.movements.push({ at: 1, table: "table-key", destination: "table" });
+  assert.equal(resolveLocation(data, player, 1 + 1 / data.event.slot_minutes, active).kind, "table", "a table move at the meal start");
+  player.movements = [];
   assert.equal(resolveLocation(data, player, 2, active).kind, "table");
   active.meal = null;
   assert.equal(resolveLocation(data, player, 2, active).kind, "table");
   assert.equal(playbackSpeed(1800, { announce: {}, spotlight: null, break: null, meal: null }), 30);
   assert.equal(playbackSpeed(1800, { announce: null, spotlight: null, break: {}, meal: {} }), 120);
+});
+
+test("a lounge move or finished snack before a person's meal start yields to the meal; a later move wins", () => {
+  const input = timeline();
+  input.events = [event("m", "meal", 2), event("b", "break", 2, { duration: .2 })];
+  const data = validateTimeline(input);
+  const player = data.people.find((item) => item.id === "player");
+  const at = (slot, movements) => { player.movements = movements; return resolveLocation(data, player, slot, activeEvents(data, slot)); };
+  const lounge = (slot) => ({ at: slot, table: "table-key", destination: "lounge" });
+  const food = (slot) => ({ at: slot, table: "table-key", destination: "food" });
+  // The break over the meal start moves this person's meal start to 2.2.
+  assert.equal(at(2.3, [lounge(1.5)]).event?.id, "m", "a lounge move before the meal");
+  assert.equal(at(2.3, [lounge(2.1)]).event?.id, "m", "a lounge move during the break, before their meal start");
+  assert.equal(at(2.3, [lounge(2.2)]).kind, "lounge", "a lounge move at their meal start");
+  assert.equal(at(2.6, [lounge(1.5)]).kind, "lounge", "the lounge choice resumes after the meal");
+  assert.equal(at(2.3, [food(1.5)]).event?.id, "m", "a snack that finished before the meal");
+  assert.equal(at(2.3, [lounge(1), food(1.5)]).event?.id, "m", "a snack after a lounge move");
+  assert.equal(at(2.6, [lounge(1), food(1.5)]).kind, "lounge", "the lounge choice resumes after the meal");
+  assert.equal(at(2.3, [food(2.1)]).kind, "food", "a snack still running at their meal start");
+  assert.equal(at(2.3, [food(2.1)]).event, undefined, "stands in for the meal");
+  assert.equal(at(2.5, [food(2.1)]).kind, "table", "without a second trip");
+  assert.equal(at(2.5, [food(2.25)]).kind, "table", "a snack after the meal start stands in too");
 });
 
 test("live mode includes start and the end-plus-one-hour boundary", () => {

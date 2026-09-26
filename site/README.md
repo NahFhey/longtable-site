@@ -435,7 +435,10 @@ Discord player options and visitor room buttons publish per-person movement
 histories. The hall replays food, lounge, and table choices at their recorded
 times, with normal walking animation. Explicit choices override automatic
 spotlight/meal movement while the attendee is present and the matching
-game or visitor context applies. Game assignments supersede older visitor choices.
+game or visitor context applies. A meal still outranks a choice made before that
+attendee's meal start, so a snack trip or an earlier return to the table does not
+keep anyone from dinner; the choice resumes after their meal visit. A choice made
+at or after their meal start wins, and a snack still running then counts as the meal. Game assignments supersede older visitor choices.
 A successful dice-form submission records a return to the game table, including
 when the outcome is private. The private outcome itself is never published.
 Dice support 1–100 dice with 2–1000 sides, including custom sizes.

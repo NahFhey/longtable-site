@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { validateTimeline, isPresent, tableLifecycle } from '../model.mjs';
+import { validateTimeline, isPresent, tableLifecycle, resolveLocation } from '../model.mjs';
 
 const demo = validateTimeline(JSON.parse(await readFile(new URL('../data/timeline.demo-50.json', import.meta.url), 'utf8')));
 
@@ -58,4 +58,12 @@ test('demo includes visitors, meals, breaks, public rolls and present stage spea
   }
   assert.equal(demo.activity.filter(entry => entry.action === 'here').length, 50);
   assert.equal(demo.activity.filter(entry => entry.action === 'leaving').length, 50);
+});
+
+test('everyone present at Dinner goes to eat, including DMs back from a snack trip', () => {
+  const dinner = demo.events.find(event => event.kind === 'meal');
+  const present = demo.people.filter(person => isPresent(person, dinner.at + .1, demo.event.slots));
+  const returned = present.filter(person => person.movements.some(move => move.destination === 'table' && move.at < dinner.at));
+  assert.ok(returned.length >= 8);
+  for (const person of present) assert.equal(resolveLocation(demo, person, dinner.at + .1).event?.id, dinner.id, person.id);
 });

@@ -142,7 +142,10 @@ latest eligible entry controls location while the person is present. A table
 entry applies only to that person's current game assignment. A visitor entry
 applies only between games while in the visitor group and stops at the next game.
 Explicit movement takes priority over automatic spotlight and meal
-movement. Event breaks temporarily send attendees to the lounge. Food choices
+movement, except that a meal outranks a choice made before that person's meal
+start (`meal.at`, or later if they arrive, sit out a break or leave the stage
+after it). Such a choice resumes when their meal visit ends. A food visit still
+running at their meal start counts as that meal. Event breaks temporarily send attendees to the lounge. Food choices
 wait at the first queue if food is not ready. From `effectiveStart = max(visitStart,
 serviceReadyTime)`, phases are serving-first [0,20), serving-second [20,40), seating
 [40,70), eating [70,370), and trash [370,400), in event seconds. Before readiness,
