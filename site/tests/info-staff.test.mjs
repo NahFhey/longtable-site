@@ -67,7 +67,7 @@ test("all four welcome speeches have the exact lines and are frozen", () => {
     after: [
       "Hey, welcome to Longtable!",
       "The marathon is over: 24 hours of D&D, 10 AM November 7 to 10 AM November 8. Thanks to everyone who played.",
-      "Every table in this hall is a game we played. Press Play at the top of the page to watch the day back.",
+      "Every table in this hall is a game we played. Press Play under the map to watch the day back.",
       "It was all for Extra Life, raising money for Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
       "The thermometer at the top of the page shows where our total stands. The Donate plaque on the wall still works.",
       "Keep an eye on our Discord for the next Longtable. Thanks for stopping by!",
@@ -75,7 +75,7 @@ test("all four welcome speeches have the exact lines and are frozen", () => {
     record: [
       "Welcome to the Longtable record!",
       "This hall is a saved copy of a past Longtable. Every table here was a game played that day.",
-      "Press Play at the top of the page to watch it back. Thanks for stopping by!",
+      "Press Play under the map to watch it back. Thanks for stopping by!",
     ],
   });
 });

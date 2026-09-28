@@ -2,7 +2,7 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
 import { atMinZoom, constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=aa730e0710fe";
-import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=6913252ca788";
+import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=3dc1b3e40388";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
 import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
@@ -88,7 +88,7 @@ const RPG = {
   rug: [10,16],
 };
 
-const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
+const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are at the top of the page.";
 const JUKEBOX_SENTENCE = "A jukebox stands against the back wall under a sign that offers music when clicked.";
 const INFO_STAFF_SENTENCE = "A staff member stands at the north end of the stage under a sign that offers information about Longtable when clicked.";
 const JUKEBOX_TOOLTIP = "Jukebox — click for music";
@@ -127,8 +127,6 @@ function arrangeHall() {
     if (timeline && timeline.parentElement !== scene) scene.append(timeline);
   }
 }
-arrangeHall();
-mobile.addEventListener?.("change", arrangeHall);
 // Null when the player panel is absent: the jukebox still draws with its sign, but a click does nothing.
 const music = setupHallMusic();
 $("music-open")?.addEventListener("click", () => music?.togglePanel());
@@ -206,6 +204,10 @@ const state = {
   lastInputAt: 0,
   lastPointerAt: 0,
 };
+arrangeHall();
+mobile.addEventListener?.("change", arrangeHall);
+// Kiosk hides the scrubber panel, so its clock lives in the bar.
+if (state.kiosk) $("mode-badge").after($("clock"));
 if ($("info-open")) $("info-open").hidden = state.kiosk;
 if (state.kiosk) {
   if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
@@ -371,6 +373,7 @@ function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
   for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
+    if (action.url === DONATE_URL) continue;
     // Header actions are plain links; the QR codes live on the wall plaques.
     const link = append(host, "a", action.label);
     link.href = action.url;
@@ -1604,9 +1607,9 @@ function updateHeader(active) {
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
   const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
-  // Non-kiosk phones have one short header row for the clock, so the doors time there uses the replay clock's short date.
-  const phoneDoorsText = `${formatDate(start, { weekday: "short", month: "short", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
-  const clockText = upcomingNow ? (mobile.matches && !state.kiosk ? phoneDoorsText : doorsText) : formatSlot(state.time, true);
+  // The visible doors clock uses the short date in every layout.
+  const doorsClockText = `${formatDate(start, { weekday: "short", month: "short", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
+  const clockText = upcomingNow ? doorsClockText : formatSlot(state.time, true);
   if ($("clock").textContent !== clockText) $("clock").textContent = clockText;
   const clockStamp = upcomingNow ? state.data.event.start : "";
   if ($("clock").dateTime !== clockStamp) $("clock").dateTime = clockStamp;
@@ -1636,6 +1639,7 @@ function updateHeader(active) {
   const badge = $("mode-badge");
   badge.textContent = upcomingNow ? "UPCOMING" : following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
   badge.className = `badge${following ? " live" : ""}`;
+  if (badge.hidden !== upcomingNow) badge.hidden = upcomingNow;
   for (const table of state.data.tables) {
     const text = phaseText(table);
     const result = diceText(state.data, diceAt(state.data, table.id, state.time)?.event);

@@ -226,9 +226,11 @@ practice sees the current service or tour. Before the eve, the gathering stays
 lit regardless of practice. Sign-ups during the eve still count in table cards
 without anyone walking in. Doors open is a hard cut into the event-day rules.
 
-The header shows the full event date (`Saturday, November 7, 10:00 AM`) and a
-countdown ("40 days away", "3 hours away", "12 minutes away", "Doors open any
-moment") under an `UPCOMING` badge; slot labels show the day whenever the event
+Before doors the bar shows a countdown ("40 days away", "3 hours away",
+"12 minutes away", "Doors open any moment") with no badge. The scrubber panel clock shows the doors time in short
+form (`Sat, Nov 7, 10:00 AM`). Play, Return to Now and Speed live on the
+scrubber panel label line in every non-kiosk layout, phones included (phone
+controls wrap onto their own row). Slot labels show the day whenever the event
 is 24 hours or longer. The status line reads "14 gathered so far · 3 games with
 signup space · Sign up on Discord" (a link outside sample and archive views),
 or "Nobody has arrived yet · …" when empty, and the activity log shows
@@ -326,11 +328,12 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
-The header always carries two links, **Discord** and **Donate**. The QR codes
-are not in the header; the wall plaques carry them. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
+The header carries **Find a game** and **Discord**; **Past events** is in the
+footer. **Donate** appears only in the fundraising strip above the header. The
+wall plaques carry the QR codes. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
 to change their destinations; they are shared across current events without
 depending on their names or dates. Samples and archived replays suppress the
-header links. Table cards and details do not repeat signup instructions.
+Discord action. Table cards and details do not repeat signup instructions.
 
 Optional event actions in `EVENT_CONFIG` still match the event name and exact
 start string. Only absolute HTTPS URLs without credentials are accepted. Labels
@@ -650,10 +653,10 @@ The welcome uses real time in live, gathering, practice and replay views, yields
 to other stage activity, and is absent in kiosk mode. Reduced motion skips the
 walking, and each line is also announced through a polite live region.
 
-The current header links to Discord and Extra Life team 74917. A full-width
-fundraising strip above it shows the running total, goal, thermometer and Donate
-link. The total comes from the public Extra Life team API at boot and every 60 s
-while the page is visible; returning to the page refreshes a total at least 60 s
+The current header links to Discord. A full-width fundraising strip above it
+shows the running total, goal, thermometer and a Donate link for Extra Life
+team 74917. The total comes from the public Extra Life team
+API at boot and every 60 s while the page is visible; returning to the page refreshes a total at least 60 s
 old. Extra Life can cache its API response, so the display is not a guarantee of
 instant donation updates. The fill caps at 100%, with “goal reached!” when the
 goal is met. A zero goal hides the thermometer and omits the goal from the text.

@@ -8,6 +8,8 @@ import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
 import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES } from "../event-config.mjs";
 
+const pageHtml = await readFile(new URL("../index.html", import.meta.url), "utf8");
+
 class FakeNode {
   constructor(tag = "div") {
     this.ownerDocument = globalThis.document;
@@ -29,6 +31,13 @@ class FakeNode {
   set textContent(value) { this.children = []; this._textContent = String(value); this.textContentWrites += 1; }
   append(...nodes) { for (const node of nodes) { node.parentElement = this; this.children.push(node); } }
   insertBefore(node) { this.append(node); }
+  after(node) {
+    if (node.parentElement) node.parentElement.children.splice(node.parentElement.children.indexOf(node), 1);
+    node.parentElement = this.parentElement;
+    this.parentElement.children.splice(this.parentElement.children.indexOf(this) + 1, 0, node);
+  }
+  get nextElementSibling() { return this.parentElement?.children[this.parentElement.children.indexOf(this) + 1] ?? null; }
+  contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   replaceChildren(...nodes) { this._textContent = ""; this.children = []; this.append(...nodes); }
   addEventListener(kind, listener) { this.listeners.set(kind, listener); }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
@@ -48,6 +57,18 @@ const cardLines = (tables) => tables.children[0].children.map((article) => [line
 function installDom(dataSequence, search = "?sample=1", options = {}) {
   const ids = ["info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-donate", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
+  // Derive header and timeline ancestry from the shipped markup so placement tests catch HTML regressions.
+  for (const fragment of [pageHtml.match(/<header class="masthead">[\s\S]*?<\/header>/)[0],
+    pageHtml.slice(pageHtml.indexOf('<div id="timeline-controls"'), pageHtml.indexOf('<aside id="hall-sidebar"'))]) {
+    const stack = [];
+    for (const [, closing, tag, attributes] of fragment.matchAll(/<(\/?)([a-z][a-z0-9-]*)\b([^>]*)>/gi)) {
+      if (closing) { stack.pop(); continue; }
+      const id = attributes.match(/\bid="([^"]+)"/)?.[1];
+      const node = nodes.get(id) ?? new FakeNode(tag);
+      stack.at(-1)?.append(node);
+      if (!["input", "br", "img"].includes(tag)) stack.push(node);
+    }
+  }
   nodes.get("fundraising-strip").hidden = true;
   nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
@@ -476,11 +497,11 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  // Discord link and Donate link only: the QR codes hang on the wall plaques, not in the header.
-  assert.equal(actions.children.length, 2);
+  // Discord is the only header action; Donate is in the fundraising strip.
+  assert.equal(actions.children.length, 1);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
-  assert.equal(actions.children[1].textContent, "Donate");
+  assert.equal(app.nodes.get("fundraising-donate").href, DONATE_URL);
   assert.ok(actions.children.every((child) => child.tagName === "A"));
   assert.doesNotMatch(allText(actions), /Show QR/);
   assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
@@ -503,8 +524,7 @@ test("a live page fetches the Extra Life total once at boot and shows the strip"
   assert.equal(app.nodes.get("thermometer").hidden, false);
   assert.equal(app.nodes.get("thermometer-fill").style.width, "0.8%");
   assert.equal(app.nodes.get("fundraising-donate").href, DONATE_URL);
-  assert.equal(app.nodes.get("fundraising-donate").target, app.nodes.get("event-actions").children[1].target);
-  assert.equal(app.nodes.get("fundraising-donate").rel, app.nodes.get("event-actions").children[1].rel);
+  // No header Donate remains to compare target/rel against; the strip destination is asserted above.
   // A later timeline refresh reinstalls the timeline without a second setup or fetch.
   app.nodes.get("refresh-now").listeners.get("click")();
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1457,12 +1477,13 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 const nowQuery = (milliseconds) => `now=${encodeURIComponent(new Date(milliseconds).toISOString())}`;
 const spritePositions = (app) => new Set(app.imageCalls.filter((call) => call.src.includes("roguelikeChar")).map((call) => `${call.logicalArgs[4]},${call.logicalArgs[5]}`));
 
-test("before doors a phone header shows the short doors date, while the announced text keeps the long one", async () => {
+test("before doors a phone scrubber clock shows the short doors date, while the announced text keeps the long one", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const start = Date.parse(sample.event.start);
   const app = await runApp([sample], "gathering-phone-clock", { search: `?sample=1&${nowQuery(start - 40 * DAY)}`, mobile: true });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("clock").textContent, "Sat, Nov 7, 10:00 AM");
   assert.equal(app.nodes.get("clock").dateTime, sample.event.start);
   assert.equal(app.nodes.get("current-event").textContent, "Doors open Saturday, November 7, 10:00 AM. 40 days away.");
@@ -1474,8 +1495,9 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   const app = await runApp([sample], "gathering-sample", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("mode-badge").className, "badge");
-  assert.equal(app.nodes.get("clock").textContent, "Saturday, November 7, 10:00 AM");
+  assert.equal(app.nodes.get("clock").textContent, "Sat, Nov 7, 10:00 AM");
   assert.ok(cardLines(app.nodes.get("tables")).every(([phase]) => phase === "Scheduled"), "before doors no table reads as playing");
   assert.equal(app.nodes.get("clock").dateTime, sample.event.start);
   assert.equal(app.nodes.get("scene-event").textContent, "40 days away");
@@ -1509,6 +1531,7 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   assert.equal(app.nodes.get("start-label").textContent, "Sat, Nov 7, 10:00 AM");
   app.frames.shift()?.(performance.now() + 5_000);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING", "nothing auto-plays");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("scrubber").value, "0");
   assert.equal(app.urlWrites.length, 0, "waiting for doors is not a time choice");
   app.nodes.get("play").listeners.get("click")();
@@ -1525,6 +1548,7 @@ test("before doors the sample with ?now= opens on the settled gathering and prev
   app.nodes.get("return-now").listeners.get("click")();
   app.frames.shift()?.(performance.now() + 5_200);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("scrubber").value, "0");
   assert.equal(app.nodes.get("return-now").hidden, true);
   assert.equal(new URL(app.urlWrites.at(-1)).searchParams.has("at"), false);
@@ -1537,6 +1561,7 @@ test("at the start of the eve the caretaker stays in the lit hall while attendee
   const app = await runApp([sample], "eve-sample", { search: `?sample=1&${nowQuery(start - DAY + 46_000)}` });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("scene-event").textContent, "24 hours away");
   assert.equal(spritePositions(app).size, 2, "caretaker and info staff are drawn");
   assert.ok(!app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the caretaker keeps the hall lit");
@@ -1546,6 +1571,7 @@ test("at the start of the eve the caretaker stays in the lit hall while attendee
   app.frames.shift()?.(performance.now() + 3_000);
   assert.equal(spritePositions(app).size, 2, "caretaker and info staff remain");
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
 });
 
 test("after the empty eve closes the hall is dark with its dated caption and gathered count", async () => {
@@ -1559,6 +1585,7 @@ test("after the empty eve closes the hall is dark with its dated caption and gat
     /The hall is dark\. Doors open Saturday at 10:00 AM\..*44 people have gathered so far/);
   assert.match(app.nodes.get("status").textContent, /^44 gathered so far/);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
 });
 
 test("a live tab one minute before doors polls every 2 seconds and hands over to LIVE at the start", async () => {
@@ -1567,6 +1594,7 @@ test("a live tab one minute before doors polls every 2 seconds and hands over to
   const app = await runApp([data], "doors-handover", { search: `?${nowQuery(start - 60_000)}` });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.equal(app.nodes.get("scene-event").textContent, "Doors open any moment");
   // The sample was published on the event day, so the publish time keeps its time-only form here.
   assert.match(app.nodes.get("sync-status").textContent, /Checked at .*Checking every 2 seconds\. Data published at 3:09:41 PM\.$/);
@@ -1576,6 +1604,7 @@ test("a live tab one minute before doors polls every 2 seconds and hands over to
     app.frames.shift()?.(performance.now() + 100);
     await settle();
     app.frames.shift()?.(performance.now() + 200);
+    assert.equal(app.nodes.get("mode-badge").hidden, false);
     assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
     assert.equal(app.nodes.get("mode-badge").className, "badge live");
     assert.equal(app.nodes.get("now-marker").hidden, false);
@@ -1598,6 +1627,7 @@ test("during the sign-up window a live tab polls every 30 seconds, never while h
   assert.deepEqual(app.errors, []);
   assert.equal(app.fetchUrls.length, 1);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.match(app.nodes.get("sync-status").textContent, /Checked at .*Checking every 30 seconds\. Data published at Nov 7, 3:09 PM\.$/);
   assert.doesNotMatch(app.nodes.get("sync-status").textContent, /Viewing an earlier time/);
   const base = performance.now();
@@ -1640,6 +1670,7 @@ test("during the sign-up window a live tab polls every 30 seconds, never while h
   app.nodes.get("return-now").listeners.get("click")();
   app.frames.shift()?.(base + 61_400);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   assert.doesNotMatch(app.nodes.get("sync-status").textContent, /Previewing|Viewing an earlier time/);
   assert.equal(app.nodes.get("activity-note").textContent, "Newest first · America/New_York");
   assert.deepEqual(app.errors, []);
@@ -1887,6 +1918,7 @@ test("the plaques join the automatic frame before doors and on the projector; or
   const start = Date.parse(sample.event.start);
   const upcomingApp = await runApp([sample], "frame-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
   assert.equal(upcomingApp.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(upcomingApp.nodes.get("mode-badge").hidden, true);
   assert.ok(rightEdge(upcomingApp) >= plaques[1].x + plaques[1].w, "before doors the public page frames the plaques too");
 });
 
@@ -1929,6 +1961,7 @@ test("practising people are drawn at their practice position before doors and st
   const app = await runApp([{ ...sample, practice }], "practice-placement", { search: `?${nowQuery(start - 40 * DAY)}`, liveFeed: LIVE_FEED });
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(app.nodes.get("mode-badge").hidden, true);
   const drawn = spritePositions(app);
   assert.ok(drawn.has(drawnKey(lenaPractice)), "Lena is drawn at her t04 seat");
   assert.ok(!drawn.has(drawnKey(lenaPlanned)), "not at her planned t01 seat");
@@ -2448,6 +2481,7 @@ test("live break speech has an announcer while upcoming slot-zero announcements 
   sample.events = [{ ...sample.events.find(event => event.kind === "announce"), at: 0, text: "Doors announcement." }];
   const upcoming = await runApp([sample], "announcer-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
   assert.equal(upcoming.nodes.get("mode-badge").textContent, "UPCOMING");
+  assert.equal(upcoming.nodes.get("mode-badge").hidden, true);
   assert.ok(!spritePositions(upcoming).has(sprite));
   assert.ok(!upcoming.contextCalls.some(text => text.includes("Doors announcement.")));
   assert.deepEqual(upcoming.errors, []);
@@ -2557,6 +2591,7 @@ test("info visit locks before speech across doors opening and chooses during on 
       advance();
       step(walkMs + 1);
       assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+      assert.equal(app.nodes.get("mode-badge").hidden, true);
       assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
       wall = Date.parse("2026-11-07T15:00:01Z");
       step(1000);
@@ -2756,4 +2791,36 @@ test("the welcome button has the jukebox styling and its own polite live region"
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /<button id="info-open" class="jukebox-key" type="button">Hear the staff welcome to Longtable<\/button>/);
   assert.match(html, /<span id="info-speech" class="visually-hidden" role="status" aria-live="polite"><\/span>/);
+});
+
+for (const mobile of [false, true]) {
+  test(`time controls travel inside the scrubber panel (${mobile ? "phone" : "desktop"})`, async () => {
+    const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+    const app = await runApp([data], `timeline-placement-${mobile}`, { mobile, search: `?${nowQuery(Date.parse(data.event.start) + 3_600_000)}` });
+    for (const id of ["clock", "play", "return-now", "speed"]) {
+      assert.ok(app.nodes.get("timeline-controls").contains(app.nodes.get(id)), `${id} is inside the timeline`);
+    }
+    assert.equal(app.nodes.get("return-now").nextElementSibling, app.nodes.get("play"));
+    assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+    app.nodes.get("scrubber").listeners.get("input")({ target: { value: "0.5" } });
+    app.frames.shift()?.(performance.now() + 100);
+    assert.equal(app.nodes.get("return-now").hidden, false);
+    assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+    app.nodes.get("return-now").listeners.get("click")();
+    app.frames.shift()?.(performance.now() + 200);
+    assert.equal(app.nodes.get("return-now").hidden, true);
+    assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+    assert.equal(app.nodes.get("mode-badge").hidden, false);
+    assert.deepEqual(app.errors, []);
+  });
+}
+
+test("kiosk moves only the clock into the bar after the badge", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "kiosk-clock-placement", { search: "?kiosk=1" });
+  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
+  assert.equal(app.nodes.get("clock").nextElementSibling, app.nodes.get("scene-event"));
+  assert.equal(app.nodes.get("timeline-controls").contains(app.nodes.get("clock")), false);
+  for (const id of ["play", "return-now", "speed"]) assert.ok(app.nodes.get("timeline-controls").contains(app.nodes.get(id)));
+  assert.deepEqual(app.errors, []);
 });
