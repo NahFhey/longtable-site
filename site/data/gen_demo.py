@@ -11,7 +11,7 @@ data = json.loads((root / 'timeline.sample.json').read_text())
 data['schema'] = 7
 data['event'].update(name='Lanternlight Marathon — 50-person demo',
                      start='2026-11-07T10:00:00-05:00',
-                     host_name="Parzival's Books", host_icon_url='')
+                     host_name='The Lantern & Dice', host_icon_url='')
 data['generated_at'] = '2026-11-08T15:00:00Z'
 people = {person['id']: person for person in data['people']}
 people['u_admin']['name'] = 'Morgan Vale'
