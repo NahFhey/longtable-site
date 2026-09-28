@@ -8,7 +8,7 @@
  "phase": "live",
  "generated_at": "2026-11-08T15:00:00Z",
  "event": {
-  "name": "24 Hour D&D — 50-person demo",
+  "name": "Lanternlight Marathon — 50-person demo",
   "start": "2026-11-07T10:00:00-05:00",
   "tz": "America/New_York",
   "slot_minutes": 30,
@@ -1869,7 +1869,7 @@
    "kind": "announce",
    "at": 0.4,
    "duration": null,
-   "text": "Welcome to Longtable! A full day of games, snacks, and new friends.",
+   "text": "Welcome to Lanternlight! A full day of games, snacks, and new friends.",
    "person": null,
    "by": "u_admin"
   },

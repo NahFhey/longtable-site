@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parent
 rng = random.Random(50)
 data = json.loads((root / 'timeline.sample.json').read_text())
 data['schema'] = 7
-data['event'].update(name='24 Hour D&D — 50-person demo',
+data['event'].update(name='Lanternlight Marathon — 50-person demo',
                      start='2026-11-07T10:00:00-05:00',
                      host_name="Parzival's Books", host_icon_url='')
 data['generated_at'] = '2026-11-08T15:00:00Z'
@@ -119,7 +119,7 @@ for table in tables:
               roll=dict(expression='3d6', faces=faces, sides=6, modifier=0, total=sum(faces)))
         break
 
-event(.4, 'announce', 'Welcome to Longtable! A full day of games, snacks, and new friends.')
+event(.4, 'announce', 'Welcome to Lanternlight! A full day of games, snacks, and new friends.')
 event(8, 'break', duration=.5)
 event(16, 'meal', 'Dinner is ready! Visit the buffet and grab a seat.', duration=1)
 event(24, 'announce', 'The late-night games are starting. Welcome, night owls!')
