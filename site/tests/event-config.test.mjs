@@ -65,14 +65,34 @@ test("preserved QR asset bytes match the decoded originals", async () => {
 });
 
 
+// Model textContent's child aggregation and replacement without HTML-string rendering.
+function fundraisingNodes() {
+  const ownerDocument = { createElement() {
+    return { ownerDocument, children: [], style: {}, _text: "",
+      get textContent() { return this._text + this.children.map(child => child.textContent).join(""); },
+      set textContent(value) { this._text = value; this.children = []; },
+      append(child) { this.children.push(child); },
+    };
+  } };
+  return { strip: { hidden: true }, total: ownerDocument.createElement(), fill: { style: {} },
+    thermometer: { hidden: false }, donate: {} };
+}
+
 test('fundraising refreshes valid totals, retains stale values, and rejects invalid data', async () => {
-  const node = { hidden: true };
+  const nodes = fundraisingNodes();
+  const node = nodes.total;
   let callback;
   let team = { teamID: 74917, sumDonations: 20, fundraisingGoal: 2500 };
-  const update = setupFundraising(node, { fetchTeam: async () => ({ ok: true, json: async () => team }),
+  const update = setupFundraising(nodes, { fetchTeam: async () => ({ ok: true, json: async () => team }),
     schedule(fn, ms) { callback = fn; assert.equal(ms, 60000); }, visible: () => true });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(node.textContent, '$20 raised of $2,500 · Extra Life');
+  assert.deepEqual(node.children.map(child => child.className), ["raised", "goal", "brand"]);
+  assert.equal(nodes.fill.style.width, "0.8%");
+  assert.equal(nodes.thermometer.hidden, false);
+  assert.equal(nodes.strip.hidden, false);
+  assert.equal(nodes.donate.href, DONATE_URL);
+  assert.match(node.title, /Checks every minute/);
   team.sumDonations = 125.50;
   await callback();
   assert.match(node.textContent, /\$125.50 raised/);
@@ -80,23 +100,28 @@ test('fundraising refreshes valid totals, retains stale values, and rejects inva
   await update();
   assert.match(node.textContent, /125.50.*last available total/);
   assert.doesNotMatch(node.textContent, /10,000/);
+  assert.equal(node.textContent, "$125.50 raised of $2,500 · Extra Life · last available total");
+  assert.equal(nodes.fill.style.width, "5%");
+  assert.equal(nodes.thermometer.hidden, false);
+  assert.match(node.title, /temporarily unavailable/);
 });
 
 test('fundraising fetches once at a hidden boot, polls only while visible, and refreshes a stale total on show', async () => {
-  const node = { hidden: true };
+  const nodes = fundraisingNodes();
+  const node = nodes.total;
   let visible = false;
   let clock = 1_000_000;
   let fetches = 0;
   let poll;
   let onShow;
   const team = { teamID: 74917, sumDonations: 20, fundraisingGoal: 2500 };
-  setupFundraising(node, {
+  setupFundraising(nodes, {
     fetchTeam: async () => { fetches += 1; return { ok: true, json: async () => ({ ...team, sumDonations: 20 + fetches }) }; },
     schedule(fn) { poll = fn; }, visible: () => visible, now: () => clock, onVisibilityChange(fn) { onShow = fn; },
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(fetches, 1, 'the boot fetch runs while hidden so the line is ready when the page is shown');
-  assert.equal(node.hidden, false);
+  assert.equal(nodes.strip.hidden, false);
   assert.equal(node.textContent, '$21 raised of $2,500 · Extra Life');
   await poll();
   assert.equal(fetches, 1, 'hidden pages do not poll');
@@ -116,4 +141,77 @@ test('fundraising fetches once at a hidden boot, polls only while visible, and r
   onShow();
   await poll();
   assert.equal(fetches, 3);
+});
+
+
+test("fundraising caps at the goal, marks it reached, and hides the thermometer for goal zero", async () => {
+  const nodes = fundraisingNodes();
+  let team = { teamID: 74917, sumDonations: 2600, fundraisingGoal: 2500 };
+  const update = setupFundraising(nodes, {
+    fetchTeam: async () => ({ ok: true, json: async () => team }), schedule() {}, onVisibilityChange() {},
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nodes.fill.style.width, "100%");
+  assert.equal(nodes.total.textContent, "$2,600 raised of $2,500 · goal reached! · Extra Life");
+  assert.deepEqual(nodes.total.children.map(child => child.className), ["raised", "goal", "reached", "brand"]);
+  team.sumDonations = 2500;
+  await update();
+  assert.equal(nodes.total.textContent, "$2,500 raised of $2,500 · goal reached! · Extra Life");
+  team.fundraisingGoal = 0;
+  await update();
+  assert.equal(nodes.thermometer.hidden, true);
+  assert.equal(nodes.total.textContent, "$2,500 raised · Extra Life");
+  assert.deepEqual(nodes.total.children.map(child => child.className), ["raised", "brand"]);
+  team.teamID = 99;
+  await update();
+  assert.equal(nodes.thermometer.hidden, true);
+  assert.equal(nodes.fill.style.width, "100%");
+  assert.equal(nodes.total.textContent, "$2,500 raised · Extra Life · last available total");
+});
+
+test("first failure shows support text and Donate; recovery restores the spans and thermometer", async () => {
+  const failures = [new Error("offline"), { ok: false },
+    ...[{ teamID: 99 }, { sumDonations: -1 }, { sumDonations: NaN }, { fundraisingGoal: -1 }, { fundraisingGoal: Infinity }]
+      .map(invalid => ({ ok: true, json: async () => ({ teamID: 74917, sumDonations: 20, fundraisingGoal: 2500, ...invalid }) }))];
+  for (const failure of failures) {
+    const nodes = fundraisingNodes();
+    let response = failure;
+    const update = setupFundraising(nodes, {
+      fetchTeam: async (url, init) => {
+        assert.equal(url, "https://dd.extra-life.org/api/teams/74917");
+        assert.equal(init.credentials, "omit");
+        assert.equal(init.referrerPolicy, "no-referrer");
+        assert.equal(init.cache, "no-cache");
+        assert.ok(init.signal instanceof AbortSignal);
+        if (response instanceof Error) throw response;
+        return response;
+      }, schedule() {}, onVisibilityChange() {},
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(nodes.strip.hidden, false);
+    assert.equal(nodes.total.textContent, "Support our Extra Life team");
+    assert.equal(nodes.thermometer.hidden, true);
+    assert.equal(nodes.donate.href, DONATE_URL);
+    response = { ok: true, json: async () => ({ teamID: 74917, sumDonations: 0, fundraisingGoal: 2500 }) };
+    await update();
+    assert.equal(nodes.thermometer.hidden, false);
+    assert.equal(nodes.fill.style.width, "0%");
+    assert.equal(nodes.total.textContent, "$0 raised of $2,500 · Extra Life");
+    response = failure;
+    await update();
+    await update();
+    assert.equal(nodes.total.textContent, "$0 raised of $2,500 · Extra Life · last available total");
+    assert.equal(nodes.fill.style.width, "0%");
+    assert.equal(nodes.thermometer.hidden, false);
+  }
+});
+
+
+test("the fundraising strip sits before the masthead with one total and an accessible name", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.equal((html.match(/id="fundraising-total"/g) ?? []).length, 1);
+  assert.match(html, /class="skip-link"[^>]*>[^<]*<\/a>\s*<section id="fundraising-strip"/);
+  assert.match(html, /id="fundraising-strip"[^>]*aria-label="Extra Life fundraising"[^>]*hidden/);
+  assert.match(html, /id="thermometer"[^>]*aria-hidden="true"/);
+  assert.match(html, /id="fundraising-donate"[^>]*>Donate<\/a>\s*<\/section>\s*<header class="masthead">/);
 });

@@ -6,10 +6,11 @@ import { hallAmbience, practiceKitchenServices, practicePlaces, stageAnnouncer }
 import { queueSpot } from "../food-layout.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
-import { DISCORD_INVITE, INFO_SPEECH, WALL_PLAQUES } from "../event-config.mjs";
+import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES } from "../event-config.mjs";
 
 class FakeNode {
   constructor(tag = "div") {
+    this.ownerDocument = globalThis.document;
     this.tagName = tag.toUpperCase();
     this.children = [];
     this.style = { setProperty(name, value) { this[name] = String(value); } };
@@ -24,11 +25,11 @@ class FakeNode {
     this.max = "";
     this.parentElement = null;
   }
-  get textContent() { return this._textContent; }
-  set textContent(value) { this._textContent = String(value); this.textContentWrites += 1; }
+  get textContent() { return this._textContent + this.children.map(node => node.textContent).join(""); }
+  set textContent(value) { this.children = []; this._textContent = String(value); this.textContentWrites += 1; }
   append(...nodes) { for (const node of nodes) { node.parentElement = this; this.children.push(node); } }
   insertBefore(node) { this.append(node); }
-  replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
+  replaceChildren(...nodes) { this._textContent = ""; this.children = []; this.append(...nodes); }
   addEventListener(kind, listener) { this.listeners.set(kind, listener); }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
@@ -37,7 +38,7 @@ class FakeNode {
 }
 
 function allText(node) {
-  return [node.textContent, ...node.children.map(allText)].join(" ");
+  return [node._textContent, ...node.children.map(allText)].join(" ");
 }
 
 const lineOf = (node, className) => node.children.find((child) => child.className === className)?.textContent;
@@ -45,9 +46,9 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
+  const ids = ["info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-donate", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
-  nodes.get("fundraising-total").hidden = true;
+  nodes.get("fundraising-strip").hidden = true;
   nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
@@ -127,6 +128,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     getElementById(id) { return nodes.get(id); },
     createElement(tag) { return new FakeNode(tag); },
   };
+  for (const node of nodes.values()) node.ownerDocument = globalThis.document;
   const wakeLockRequests = [];
   Object.defineProperty(globalThis, "navigator", { configurable: true, writable: true, value: options.wakeLock ? { wakeLock: {
     async request(kind) { wakeLockRequests.push(kind); if (options.wakeLock === "rejects") throw new Error("NotAllowedError"); return { release() {} }; },
@@ -489,15 +491,20 @@ test("production has one community link and no repeated Discord signup instructi
   assert.equal(sample.nodes.get("event-actions").children.length, 0);
 });
 
-test("a live page fetches the Extra Life total once at boot and shows the line", async () => {
+test("a live page fetches the Extra Life total once at boot and shows the strip", async () => {
   const production = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([production], "fundraising-boot", { search: "" });
   assert.equal(app.teamFetches.length, 1);
   assert.equal(app.teamFetches[0].href, "https://dd.extra-life.org/api/teams/74917");
   assert.equal(app.teamFetches[0].init.credentials, "omit");
   const line = app.nodes.get("fundraising-total");
-  assert.equal(line.hidden, false);
+  assert.equal(app.nodes.get("fundraising-strip").hidden, false);
   assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
+  assert.equal(app.nodes.get("thermometer").hidden, false);
+  assert.equal(app.nodes.get("thermometer-fill").style.width, "0.8%");
+  assert.equal(app.nodes.get("fundraising-donate").href, DONATE_URL);
+  assert.equal(app.nodes.get("fundraising-donate").target, app.nodes.get("event-actions").children[1].target);
+  assert.equal(app.nodes.get("fundraising-donate").rel, app.nodes.get("event-actions").children[1].rel);
   // A later timeline refresh reinstalls the timeline without a second setup or fetch.
   app.nodes.get("refresh-now").listeners.get("click")();
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -505,12 +512,14 @@ test("a live page fetches the Extra Life total once at boot and shows the line",
   // Kiosk mode boots the same way; samples and archives never ask Extra Life.
   const kiosk = await runApp([production], "fundraising-kiosk", { search: "?kiosk=1" });
   assert.equal(kiosk.teamFetches.length, 1);
+  assert.equal(kiosk.nodes.get("fundraising-strip").hidden, false);
   assert.equal(kiosk.nodes.get("fundraising-total").textContent, "$20 raised of $2,500 · Extra Life");
   const sample = await runApp([production], "fundraising-sample");
   assert.equal(sample.teamFetches.length, 0);
-  assert.equal(sample.nodes.get("fundraising-total").hidden, true);
+  assert.equal(sample.nodes.get("fundraising-strip").hidden, true);
   const archive = await runApp([production], "fundraising-archive", { search: "", archive: true });
   assert.equal(archive.teamFetches.length, 0);
+  assert.equal(archive.nodes.get("fundraising-strip").hidden, true);
 });
 
 test("a page that boots hidden still fetches the total once, and showing it does not refetch a fresh total", async () => {
@@ -518,7 +527,7 @@ test("a page that boots hidden still fetches the total once, and showing it does
   const app = await runApp([production], "fundraising-hidden-boot", { search: "", hidden: true });
   assert.equal(app.teamFetches.length, 1);
   const line = app.nodes.get("fundraising-total");
-  assert.equal(line.hidden, false);
+  assert.equal(app.nodes.get("fundraising-strip").hidden, false);
   assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
   globalThis.document.visibilityState = "visible";
   app.documentListeners.get("visibilitychange")();
@@ -1580,7 +1589,7 @@ test("during the sign-up window a live tab polls every 30 seconds, never while h
   assert.equal(app.fetchUrls.length, 2, "no polling while hidden");
   document.hidden = false;
   const status = app.nodes.get("status");
-  assert.match(status.textContent, /^44 gathered so far · \d+ games with signup space · $/);
+  assert.match(status.textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
   assert.equal(status.children.length, 1);
   assert.equal(status.children[0].tagName, "A");
   assert.equal(status.children[0].textContent, "Sign up on Discord");
@@ -2477,7 +2486,103 @@ test("info staff and sign appear in live, replay, gathering and practice, and ne
   });
 });
 
-test("info hit starts a real-time walk, seven click-to-continue lines at the microphone, then returns home", async () => {
+for (const [name, options, key] of [
+  ["gathering", { search: "?now=2026-10-01T10:00:00Z" }, "before"],
+  ["eve", { search: "?now=2026-11-07T14:59:00Z" }, "before"],
+  ["day", { search: "?now=2026-11-07T18:00:00Z" }, "during"],
+  ["after", { search: "?now=2026-11-08T17:00:00Z" }, "after"],
+  ["archive", { archive: true, search: "?now=2026-11-07T18:00:00Z" }, "record"],
+  ["final", { search: "?now=2026-11-07T18:00:00Z" }, "record"],
+  ["sample", { search: "?sample=1" }, "before"],
+  ["eve-preview", { search: "?now=2026-11-07T14:59:00Z" }, "before"],
+]) {
+  test(`info speech selection and finish hint: ${name}`, async () => {
+    await withInfoApp(`info-selection-${name}`, { ...options, reducedMotion: true }, ({ app, step }) => {
+      if (name === "eve-preview") app.nodes.get("play").listeners.get("click")();
+      const advance = () => app.nodes.get("info-open").listeners.get("click")();
+      advance();
+      const lines = INFO_SPEECHES[key];
+      for (const [index, line] of lines.entries()) {
+        step();
+        assert.equal(app.nodes.get("info-speech").textContent, line);
+        assert.ok(app.contextCalls.join(" ").includes(`Staff: ${line}`));
+        const last = index === lines.length - 1;
+        assert.ok(app.contextCalls.includes(last ? "▸ click to finish" : "▸ click to continue"));
+        assert.ok(!app.contextCalls.includes(last ? "▸ click to continue" : "▸ click to finish"));
+        advance();
+      }
+      step();
+      assert.equal(app.nodes.get("info-speech").textContent, "");
+      assert.ok(app.contextCalls.includes("Click me for Info"));
+    }, sample => { if (name === "final") sample.phase = "final"; });
+  });
+}
+
+test("info visit locks before speech across doors opening and chooses during on the next visit", async () => {
+  const originalNow = Date.now;
+  let wall = Date.parse("2026-11-07T14:59:00Z");
+  Date.now = () => wall;
+  try {
+    await withInfoApp("info-doors-lock", { search: "" }, ({ app, step, walkMs }) => {
+      const advance = () => app.nodes.get("info-open").listeners.get("click")();
+      advance();
+      step(walkMs + 1);
+      assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
+      wall = Date.parse("2026-11-07T15:00:01Z");
+      step(1000);
+      assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
+      for (const [index, line] of INFO_SPEECHES.before.entries()) {
+        assert.equal(app.nodes.get("info-speech").textContent, line);
+        assert.ok(app.contextCalls.join(" ").includes(`Staff: ${line}`));
+        assert.ok(app.contextCalls.includes(index === INFO_SPEECHES.before.length - 1 ? "▸ click to finish" : "▸ click to continue"));
+        advance();
+        step();
+      }
+      step(walkMs + 1);
+      assert.equal(app.nodes.get("info-speech").textContent, "");
+      advance();
+      step(walkMs + 1);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.during[0]);
+      advance();
+      step();
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.during[1]);
+    });
+  } finally { Date.now = originalNow; }
+});
+
+test("selection tint matches the full rug rect even while partly unrolled", async () => {
+  const { data, table, layout, prepareAt, readyAt } = await rugFixture();
+  for (const slot of [table.start, prepareAt + .25 * (readyAt - prepareAt)]) {
+    const app = await runApp([data], `selection-rug-${slot}`, { search: `?sample=1&at=${slot}` });
+    const rug = tableScenery(data, table, slot, layout, 0).rug;
+    assert.ok(slot === table.start ? rug === 1 : rug > 0 && rug < 1);
+    app.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
+    app.rectCalls.length = 0;
+    app.frames.shift()(performance.now() + 30);
+    const cell = layout.cells[0];
+    const tint = app.rectCalls.filter(call => call.color === "rgba(255,210,122,.25)");
+    assert.deepEqual(tint.map(call => call.args), [[(cell.x - .5) * 32, (cell.y + .5) * 32, 192, 128]]);
+    assert.deepEqual(app.errors, []);
+  }
+});
+
+test("a click on the right neighbour rug edge selects its owner, including the leftmost rug edge", async () => {
+  await withInfoApp("rug-hit-owner", { reducedMotion: true }, ({ app, layout, sample, click, step }) => {
+    const index = layout.cells.findIndex(cell => cell.x === layout.gridX);
+    const cell = layout.cells[index];
+    const neighbour = layout.cells.findIndex(other => other.x === cell.x + 6 && other.y === cell.y);
+    assert.ok(neighbour >= 0);
+    click({ x: cell.x + 5.7, y: cell.y + .6 });
+    step();
+    assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[neighbour].name);
+    click({ x: cell.x - .25, y: cell.y + .6 });
+    step();
+    assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[index].name);
+  });
+});
+
+test("info hit starts a real-time walk, eight click-to-continue lines at the microphone, then returns home", async () => {
   await withInfoApp("info-visit", {}, ({ app, geometry, step, click, hit, pointEvent, walkMs, camera }) => {
     app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
     assert.equal(app.nodes.get("hall").style.cursor, "pointer");
@@ -2490,14 +2595,16 @@ test("info hit starts a real-time walk, seven click-to-continue lines at the mic
     click(hit); // Approaching ignores repeated clicks.
     step(walkMs / 2 + 1);
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
-    assert.ok(app.contextCalls.includes("Staff: Welcome to Longtable!"));
-    const bubble = app.textCalls.find(c => c.text === "Staff: Welcome to Longtable!");
+    assert.ok(app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
+    const bubble = app.textCalls.find(c => c.text === "Staff: Hey, welcome to Longtable! Glad you stopped by.");
     const anchor = worldToScreen(camera(), { x: geometry.speakSpot.x, y: geometry.speakSpot.y - 2.2 });
     assert.ok(Math.abs(bubble.x - 4 + (bubble.text.length * 5 + 8) / 2 - anchor.x) < 1);
-    for (let line = 0; line < INFO_SPEECH.length; line++) {
-      const hint = line === INFO_SPEECH.length - 1 ? "▸ click to finish" : "▸ click to continue";
+    assert.equal(INFO_SPEECHES.before.length, 8);
+    for (let line = 0; line < INFO_SPEECHES.before.length; line++) {
+      const hint = line === INFO_SPEECHES.before.length - 1 ? "▸ click to finish" : "▸ click to continue";
       step(60_000);
-      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line], "a line waits for the viewer");
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[line], "a line waits for the viewer");
+      assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECHES.before[line]}`), `line ${line + 1} bubble text`);
       const hintCall = app.textCalls.find(c => c.text === hint);
       assert.ok(hintCall, `line ${line} shows "${hint}"`);
       app.nodes.get("hall").listeners.get("pointermove")({ pointerId: 8, clientX: hintCall.x + 1, clientY: hintCall.y + 1 });
@@ -2517,14 +2624,14 @@ test("the keyboard starts the welcome and clicking the speaking staff skips each
   await withInfoApp("info-keyboard", {}, ({ app, geometry, step, click, walkMs }) => {
     app.nodes.get("info-open").listeners.get("click")();
     step(walkMs + 1);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
-    for (let line = 1; line < INFO_SPEECH.length; line++) {
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
+    for (let line = 1; line < INFO_SPEECHES.before.length; line++) {
       // Alternate the upper sprite and its feet, which sit .4 below the position.
       click({ x: geometry.speakSpot.x, y: geometry.speakSpot.y + (line % 2 ? -.5 : .3) });
       step();
-      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line]);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[line]);
     }
-    assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECH[6]}`));
+    assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECHES.before[7]}`));
     app.nodes.get("info-open").listeners.get("click")();
     step(walkMs + 1);
     assert.ok(app.contextCalls.includes("Click me for Info"));
@@ -2534,11 +2641,11 @@ test("the keyboard starts the welcome and clicking the speaking staff skips each
 test("reduced motion speaks on the first frame and returns without walking", async () => {
   await withInfoApp("info-reduced", { reducedMotion: true }, ({ app, geometry, click, hit, step }) => {
     click(hit);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
     step();
-    assert.ok(app.contextCalls.includes("Staff: Welcome to Longtable!"));
+    assert.ok(app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
-    for (let i = 0; i < INFO_SPEECH.length; i++) app.nodes.get("info-open").listeners.get("click")();
+    for (let i = 0; i < INFO_SPEECHES.before.length; i++) app.nodes.get("info-open").listeners.get("click")();
     step();
     assert.equal(infoSprites(app, geometry.post).length, 3);
     assert.ok(app.contextCalls.includes("Click me for Info"));
@@ -2550,14 +2657,14 @@ test("a donation speech blocks info clicks and interrupts a welcome already spea
     if (during) {
       click(hit);
       step(walkMs + 1);
-      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
     }
     app.nodes.get("play").listeners.get("click")();
     // One replay frame crosses the donation at .01, starting its approach.
     step(100);
     assert.match(app.nodes.get("current-event").textContent, /walking to the stage microphone/);
     assert.equal(app.nodes.get("info-speech").textContent, "");
-    assert.ok(!app.contextCalls.includes("Staff: Welcome to Longtable!"));
+    assert.ok(!app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
     if (!during) {
       app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
       assert.equal(app.nodes.get("tooltip").textContent, "Staff: busy on stage, try again shortly");
@@ -2587,12 +2694,12 @@ test("a running welcome frames the stage and survives seeking and replay speed c
     app.nodes.get("speed").listeners.get("change")({ target: { value: "1800" } });
     step(walkMs + 1);
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
     step(60_000);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0], "fast replay does not advance the welcome");
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0], "fast replay does not advance the welcome");
     app.nodes.get("info-open").listeners.get("click")();
     step(1);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[1]);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[1]);
   });
 });
 

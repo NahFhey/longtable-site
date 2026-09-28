@@ -6,6 +6,8 @@
   --panel-2: #273731;
   --line: #3b4b40;
   --gold: #dfba76;
+  --raised: #d9604c;
+  --fund-strip: 2.75rem;
   --focus: #9cdbcd;
   --error: #ffb2a7;
   --live: #285b43;
@@ -74,7 +76,7 @@ h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
 .record-note { margin: .75rem 0 0; color: var(--gold); }
 .event-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .event-actions:not(:empty) { margin: 1rem 0; }
-.event-actions a { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
+.event-actions a, .fundraising-donate { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
 
 main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 #hall-content { display: flex; flex-direction: column; }
@@ -97,7 +99,7 @@ canvas { display: block; width: 100%; height: clamp(320px, 39vw, 540px); touch-a
 canvas:active { cursor: grabbing; }
 /* Off phones and the kiosk the view takes the hall's shape (app.mjs sets --hall-aspect from the room), so each row
    of tables the hall gains makes the view taller. The cap keeps the whole view on one screen; past it, the camera pans. */
-html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 / 1); min-height: 320px; max-height: max(320px, calc(100vh - 6rem)); }
+html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 / 1); min-height: 320px; max-height: max(320px, calc(100vh - var(--fund-strip) - 6rem)); }
 .tooltip { position: absolute; z-index: 5; pointer-events: none; max-width: min(24rem, 80vw); padding: .4rem .65rem; border: 1px solid #ffffff52; border-radius: .3rem; background: #070d0beb; color: white; font-size: .82rem; }
 .timeline-controls { margin-top: 1rem; padding: .85rem 1rem; background: #111d17; border: 1px solid var(--line); border-radius: .35rem; }
 .timeline-controls > label { display: block; color: var(--gold); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
@@ -206,11 +208,11 @@ footer p { margin: .3rem 0; }
 }
 /* Event page on phones, portrait or landscape (not kiosk; past-events.html shares this sheet and is left alone): a slim bar, the event actions, then the hall filling the first screen above a status strip.
    The bar is a wrapping flex row; its ::before and ::after are line breaks. Line 1: title (never shrinks) + clock (ellipsizes last).
-   Line 2: badge + event name + fundraising total (the total ellipsizes first, then the name). Line 3: the actions.
+   Line 2: badge + event name (the name ellipsizes). Line 3: the actions.
    Heights: .4rem padding + 2.4rem line 1 + 1.5rem line 2 + .4rem padding = 4.7rem; the actions line adds .4rem + 44px.
    The status strip (3rem) stays on the first screen as a place to start a page scroll, since the canvas takes drag; the 10rem floor keeps it there on a 375px-tall landscape phone. */
 @media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
-  html:not([data-kiosk]):has(#hall-content) { --phone-bar: 4.7rem; --phone-actions: calc(44px + .4rem); --phone-strip: 3rem; }
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 3.25rem; --phone-bar: 4.7rem; --phone-actions: calc(44px + .4rem); --phone-strip: 3rem; }
   html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-actions: 0px; }
   html:not([data-kiosk]):has(#hall-content) .site-nav, html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) #scene-event,
   html:not([data-kiosk]):has(#hall-content) .event-console .controls { display: none; }
@@ -222,7 +224,6 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) .masthead::before { order: 3; }
   html:not([data-kiosk]):has(#hall-content) .badge { order: 4; flex: none; line-height: 1; white-space: nowrap; }
   html:not([data-kiosk]):has(#hall-content) .orientation { order: 5; flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  html:not([data-kiosk]):has(#hall-content) .fundraising-total { order: 6; flex: 1 1 0; min-width: 0; margin: 0; text-align: right; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html:not([data-kiosk]):has(#hall-content) .masthead::after { order: 7; }
   html:not([data-kiosk]):has(#hall-content) #event-actions { order: 8; flex: 0 0 100%; flex-wrap: nowrap; margin: 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions:not(:empty) { margin-top: .4rem; }
@@ -230,14 +231,14 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
   html:not([data-kiosk]):has(#hall-content) .hall-layout { grid-template-columns: 1fr; padding: 0; }
   html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0; min-height: 0; max-height: none;
-    height: max(10rem, calc(100vh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
-    height: max(10rem, calc(100svh - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
+    height: max(10rem, calc(100vh - var(--fund-strip) - var(--phone-bar) - var(--phone-actions) - var(--phone-strip)));
+    height: max(10rem, calc(100svh - var(--fund-strip) - var(--phone-bar) - var(--phone-actions) - var(--phone-strip))); }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
   html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; left: .5rem; right: .5rem; bottom: .5rem; z-index: 1; pointer-events: none; }
   html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
 }
-/* Landscape phones are too short for three bar lines: one row of title, badge, event name, total, clock, then the actions (44px + .8rem padding).
-   The total gives up space first, then the event name and clock together. */
+/* Landscape phones are too short for three bar lines: one row of title, badge, event name, clock, then the actions (44px + .8rem padding).
+   The event name and clock give up space together. */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   html:not([data-kiosk]):has(#hall-content) { --phone-bar: calc(44px + .8rem); --phone-actions: 0px; }
   html:not([data-kiosk]):has(#hall-content) .masthead { flex-wrap: nowrap; }
@@ -245,7 +246,6 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) h1 { order: 1; }
   html:not([data-kiosk]):has(#hall-content) .badge { order: 2; }
   html:not([data-kiosk]):has(#hall-content) .orientation { order: 3; }
-  html:not([data-kiosk]):has(#hall-content) .fundraising-total { order: 4; }
   html:not([data-kiosk]):has(#hall-content) .readout time { order: 5; margin-left: 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions { order: 6; flex: none; gap: .5rem; }
   html:not([data-kiosk]):has(#hall-content) #event-actions:not(:empty) { margin-top: 0; }
@@ -253,20 +253,19 @@ footer p { margin: .3rem 0; }
 }
 /* Event page off phones (not kiosk; past-events.html is left alone): the phone layout's shape on a wide screen.
    One slim bar, then the hall filling the rest of the first screen with the sidebar beside it and the status strip under it.
-   Bar, in order: title, badge, event name, total, scene event (these three ellipsize), nav, actions, clock, time controls.
+   Bar, in order: title, badge, event name, scene event (these two ellipsize), nav, actions, clock, time controls.
    Under 1100px the nav and actions drop to a second bar line. The camera buttons and help float over the canvas's bottom corners
    (the scene is a grid: canvas and both overlays share row 1, the timeline takes row 2), clear of the back-wall banner and plaques. */
 @media not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px))) {
-  html:not([data-kiosk]):has(#hall-content) { --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 2.75rem; --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
   html:not([data-kiosk]):has(#hall-content) #record-note, html:not([data-kiosk]):has(#hall-content) .site-nav a:first-child:not(:last-child) { display: none; }
   html:not([data-kiosk]):has(#hall-content) .masthead { max-width: none; height: var(--desk-bar); display: flex; flex-wrap: nowrap; align-content: center; align-items: center; gap: .4rem 1rem; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
   html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
   html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 1; white-space: nowrap; }
   html:not([data-kiosk]):has(#hall-content) .badge { order: 2; flex: none; line-height: 1; white-space: nowrap; }
-  html:not([data-kiosk]):has(#hall-content) .orientation, html:not([data-kiosk]):has(#hall-content) .fundraising-total, html:not([data-kiosk]):has(#hall-content) #scene-event {
+  html:not([data-kiosk]):has(#hall-content) .orientation, html:not([data-kiosk]):has(#hall-content) #scene-event {
     flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html:not([data-kiosk]):has(#hall-content) .orientation { order: 3; }
-  html:not([data-kiosk]):has(#hall-content) .fundraising-total { order: 4; }
   html:not([data-kiosk]):has(#hall-content) #scene-event { order: 5; font-size: .8rem; }
   html:not([data-kiosk]):has(#hall-content) .site-nav { order: 6; flex: none; flex-wrap: nowrap; gap: 1.25rem; margin: 0 0 0 auto; font-size: .8rem; }
   html:not([data-kiosk]):has(#hall-content) #event-actions { order: 7; flex: none; flex-wrap: nowrap; margin: 0; }
@@ -279,8 +278,8 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
   html:not([data-kiosk]):has(#hall-content) .hall-layout { gap: var(--desk-gap); padding: var(--desk-gap) 0 0; align-items: stretch; }
   html:not([data-kiosk]):has(#hall-content) .scene-wrap, html:not([data-kiosk]):has(#hall-content) .hall-sidebar {
-    height: max(20rem, calc(100vh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
-    height: max(20rem, calc(100svh - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
+    height: max(20rem, calc(100vh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
+    height: max(20rem, calc(100svh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
   html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); }
   html:not([data-kiosk]):has(#hall-content) .hall-sidebar { overflow-y: auto; }
   html:not([data-kiosk]):has(#hall-content) #hall { grid-area: 1 / 1; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }
@@ -308,22 +307,19 @@ footer p { margin: .3rem 0; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
 
-.fundraising-total { margin: -.4rem 0 1rem; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
-
 /* Kiosk mode (`?kiosk=1`): a slim bar and the scene filling the viewport; the wall plaques carry the QR codes. */
-html[data-kiosk] { --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
+html[data-kiosk] { --fund-strip: 3.5rem; --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
 html[data-kiosk] body { overflow: hidden; }
 html[data-kiosk][data-idle] body { cursor: none; }
 html[data-kiosk] .skip-link, html[data-kiosk] .site-nav, html[data-kiosk] #event-actions, html[data-kiosk] #record-note,
 html[data-kiosk] .event-console .controls, html[data-kiosk] #table-list, html[data-kiosk] #table-list details,
 html[data-kiosk] #hall-sidebar, html[data-kiosk] .camera-controls, html[data-kiosk] #camera-help,
 html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer { display: none; }
-html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
 html[data-kiosk] .identity { display: contents; }
 html[data-kiosk] h1 { margin: 0; font-size: 2rem; white-space: nowrap; }
 html[data-kiosk] .orientation { margin: 0; max-width: none; font-size: 1.2rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html[data-kiosk] .fundraising-total { grid-column: 3; justify-self: center; margin: 0; color: var(--gold); font-size: 1.6rem; text-align: center; white-space: nowrap; }
-html[data-kiosk] .event-console { grid-column: 4; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+html[data-kiosk] .event-console { grid-column: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 html[data-kiosk] .readout { flex-wrap: nowrap; gap: 1rem; font-size: 1.4rem; white-space: nowrap; }
 html[data-kiosk] .readout time { font-size: 1.4rem; }
 html[data-kiosk] #scene-event { font-size: 1.1rem; }
@@ -332,4 +328,30 @@ html[data-kiosk] main { max-width: none; padding: 0 var(--gutter); }
 html[data-kiosk] .status { height: var(--kiosk-status); padding: .35rem 0 0; border-top: 0; font-size: 1.3rem; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html[data-kiosk] .hall-explorer { margin: 0; border: 0; border-radius: 0; background: none; }
 html[data-kiosk] .hall-layout { grid-template-columns: minmax(0, 1fr); gap: var(--kiosk-gap); padding: 0; align-items: stretch; }
-html[data-kiosk] canvas { height: calc(100vh - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
+html[data-kiosk] canvas { height: calc(100vh - var(--fund-strip) - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
+
+/* Live fundraising stays in one row and never animates. */
+html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
+.fundraising-strip { width: 100%; height: var(--fund-strip); overflow: hidden; display: flex; align-items: center; gap: .75rem; padding: 0 max(16px, var(--gutter)); background: var(--panel); border-bottom: 1px solid var(--line); }
+.thermometer { flex: 1 1 12rem; min-width: 4rem; display: flex; align-items: center; }
+.thermometer-bulb { flex: none; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--raised); }
+.thermometer-tube { flex: 1; min-width: 0; height: .6rem; border-radius: .3rem; background: var(--panel-2); border: 1px solid var(--line); margin-left: -.2rem; overflow: hidden; }
+.thermometer-fill { display: block; width: 0; height: 100%; border-radius: .3rem; background: var(--raised); }
+.fundraising-total { margin: 0; font-size: .9rem; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fundraising-total .raised { color: var(--gold); font-weight: 700; }
+.fundraising-total .reached { color: var(--gold); }
+.fundraising-donate { flex: none; padding: .4rem .85rem; font-size: .8rem; white-space: nowrap; }
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  .fundraising-total .brand { display: none; }
+  /* The total is the point of the strip: it keeps its width and the tube gives way. */
+  .thermometer { flex-basis: 3rem; min-width: 3rem; }
+  .fundraising-total { flex-shrink: 0; }
+  .fundraising-donate { min-height: 44px; padding: 0 .75rem; line-height: 44px; }
+}
+@media (pointer: coarse) {
+  .fundraising-donate { min-height: 44px; }
+}
+html[data-kiosk] .fundraising-total { font-size: 1.6rem; color: var(--gold); }
+html[data-kiosk] .thermometer-tube { height: .9rem; }
+html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
+html[data-kiosk] .fundraising-donate { display: none; }

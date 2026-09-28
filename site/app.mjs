@@ -2,7 +2,7 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { DISCORD_INVITE, INFO_SPEECH, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=d09ead689160";
+import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=6913252ca788";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
 import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
@@ -778,6 +778,13 @@ function overJukebox(point) {
 
 // This visit belongs to the viewer, so seeking and replay speed never reset or accelerate it.
 function infoRunning() { return state.infoVisit != null && state.infoVisit.phase !== "idle"; }
+function infoSpeechKey() {
+  if (state.archive || state.data?.phase === "final") return "record";
+  if (state.stage === "day") return "during";
+  if (state.stage === "after") return "after";
+  return "before";
+}
+function infoSpeech() { return INFO_SPEECHES[infoRunning() ? state.infoVisit.speechKey : infoSpeechKey()]; }
 function infoPosition() { return infoRunning() ? state.infoVisit.position : infoStaffGeometry(state.layout).post; }
 function infoStageBusy(active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents), announcer = announcerForFrame()) {
   return !!(state.speech || state.stageQueue.length || announcer || active.spotlight);
@@ -799,7 +806,7 @@ function infoLine(line, now) {
   const visit = state.infoVisit;
   visit.phase = "speaking";
   visit.line = line;
-  if ($("info-speech")) $("info-speech").textContent = INFO_SPEECH[line];
+  if ($("info-speech")) $("info-speech").textContent = infoSpeech()[line];
 }
 function leaveInfoStaff(now) {
   const visit = state.infoVisit;
@@ -816,13 +823,13 @@ function clickInfoStaff() {
   }
   if (!infoRunning()) {
     const geometry = infoStaffGeometry(state.layout);
-    state.infoVisit = { phase: "approaching", position: { ...geometry.post }, lastAt: now };
+    state.infoVisit = { speechKey: infoSpeechKey(), phase: "approaching", position: { ...geometry.post }, lastAt: now };
     if (reducedMotion.matches) {
       state.infoVisit.position = { ...geometry.speakSpot };
       infoLine(0, now);
     }
   } else if (state.infoVisit.phase === "speaking") {
-    if (state.infoVisit.line + 1 < INFO_SPEECH.length) infoLine(state.infoVisit.line + 1, now);
+    if (state.infoVisit.line + 1 < infoSpeech().length) infoLine(state.infoVisit.line + 1, now);
     else leaveInfoStaff(now);
   }
 }
@@ -928,7 +935,7 @@ function drawRoom() {
     const rug = tableScenery(state.data, table, scenerySlot(table), layout, index, reducedMotion.matches).rug;
     if (!rug) return;
     const cell = layout.cells[index];
-    const rect = { x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 };
+    const rect = rugRect(cell);
     if (rug < 1) {
       ctx.save();
       ctx.beginPath();
@@ -989,6 +996,8 @@ function chairFor(offset) {
 // Before doors every table is shown ready for its game (furniture and props, no crew): people wait at them.
 function scenerySlot(table) { return upcoming() ? table.start : state.time; }
 
+function rugRect(cell) { return { x: cell.x - .5, y: cell.y + .5, w: 6, h: 4 }; }
+
 function drawTables() {
   state.data.tables.forEach((table, index) => {
     const cell = state.layout.cells[index];
@@ -998,7 +1007,8 @@ function drawTables() {
     const open = lifecycle.phase === "active";
     if (state.selectedId === table.id) {
       ctx.fillStyle = "rgba(255,210,122,.25)";
-      ctx.fillRect(cell.x * TILE * SCALE, cell.y * TILE * SCALE, state.layout.cellWidth * TILE * SCALE, state.layout.cellHeight * TILE * SCALE);
+      const rect = rugRect(cell);
+      ctx.fillRect(rect.x * TILE * SCALE, rect.y * TILE * SCALE, rect.w * TILE * SCALE, rect.h * TILE * SCALE);
     }
     for (const member of scenery.crew) drawStaff(member, `table-${cell.x}-${cell.y}-${member.member}`);
     const rugCarriers = scenery.crew.filter(member => member.load === "rug");
@@ -1472,8 +1482,8 @@ function render(now, active) {
     if (!infoRunning()) drawInfoSign();
     else if (state.infoVisit.phase === "speaking") {
       const { x, y } = infoPosition();
-      const last = state.infoVisit.line === INFO_SPEECH.length - 1;
-      state.infoBubble = drawBubble(INFO_SPEECH[state.infoVisit.line], x, y - 2.2, "#fff", "Staff", last ? INFO_FINISH_HINT : INFO_CONTINUE_HINT);
+      const last = state.infoVisit.line === infoSpeech().length - 1;
+      state.infoBubble = drawBubble(infoSpeech()[state.infoVisit.line], x, y - 2.2, "#fff", "Staff", last ? INFO_FINISH_HINT : INFO_CONTINUE_HINT);
     }
   }
   placeMusicPanel();
@@ -1803,7 +1813,10 @@ function updateSyncStatus() {
 
 function installTimeline(data, initial = false) {
   state.data = data;
-  if (initial && !state.sample && !state.archive) setupFundraising($("fundraising-total"));
+  if (initial && !state.sample && !state.archive) setupFundraising({
+    strip: $("fundraising-strip"), total: $("fundraising-total"), fill: $("thermometer-fill"),
+    thermometer: $("thermometer"), donate: $("fundraising-donate"),
+  });
   if (state.hostIconUrl !== data.event.host_icon_url) {
     const url = data.event.host_icon_url;
     state.hostIconUrl = url;
@@ -1994,7 +2007,12 @@ function pointerPoint(event) {
 }
 
 function canvasPoint(event) { return screenToWorld(state.camera, pointerPoint(event)); }
-function tableAt(point) { return state.layout.cells.findIndex((cell) => point.x >= cell.x && point.x < cell.x + 6 && point.y >= cell.y && point.y < cell.y + 6); }
+function tableAt(point) {
+  return state.layout.cells.findIndex((cell) => {
+    const rect = rugRect(cell);
+    return point.x >= rect.x && point.x < rect.x + rect.w && point.y >= cell.y && point.y < cell.y + 6;
+  });
+}
 function hideTooltip() { state.hover = null; $("tooltip").hidden = true; }
 function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.cursor = value; }
 const pointers = new Map();

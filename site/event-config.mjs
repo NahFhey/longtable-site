@@ -1,12 +1,38 @@
-export const INFO_SPEECH = Object.freeze([
-  "Welcome to Longtable!",
-  "Longtable is a 24-hour, in-person D&D marathon: 10 AM November 7 to 10 AM November 8.",
-  "DMs post tables, players claim seats, and this hall shows every table live all night.",
-  "We play for Extra Life, which raises money for kids' hospitals through Children's Miracle Network.",
-  "If you choose to donate, the money goes to Corewell Health Helen DeVos Children's Hospital in Grand Rapids. The Donate plaque's QR code takes you there.",
-  "To play, sign up on our Discord: scan the Discord plaque or use the link at the top of the page.",
-  "Hope to see you at the table on November 7!",
-]);
+export const INFO_SPEECHES = Object.freeze({
+  before: Object.freeze([
+    "Hey, welcome to Longtable! Glad you stopped by.",
+    "On November 7 we're playing D&D for 24 hours straight, in person, 10 AM to 10 AM.",
+    "See all these tables? Each one is a game we'll play during the event. A DM posted it, and players are grabbing seats.",
+    "Come back to this page during the event and you'll see the action live: who's at which table and what's happening in the hall.",
+    "We're doing it all for Extra Life. Donations go to Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
+    "That thermometer at the top of the page is our running total. Scan the Donate plaque on the wall to help fill it.",
+    "Want a seat at a table? Join our Discord: scan the Discord plaque or use the link up top.",
+    "That's all from me. See you on November 7!",
+  ]),
+  during: Object.freeze([
+    "Hey, welcome to Longtable! You picked a good time to drop in.",
+    "We're in the middle of 24 hours of D&D, live and in person, running until 10 AM on November 8.",
+    "Every table in this hall is a game on today's schedule, some playing right now and some starting later. Click one to see what it is.",
+    "The hall updates live, so keep the page open or check back through the night to see what's going on.",
+    "We're doing it all for Extra Life. Donations go to Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
+    "Watch the thermometer at the top of the page climb. Scan the Donate plaque on the wall to add to it.",
+    "Want to come play? Ask about open seats on our Discord: scan the Discord plaque or use the link up top.",
+    "That's all from me. Enjoy the show!",
+  ]),
+  after: Object.freeze([
+    "Hey, welcome to Longtable!",
+    "The marathon is over: 24 hours of D&D, 10 AM November 7 to 10 AM November 8. Thanks to everyone who played.",
+    "Every table in this hall is a game we played. Press Play at the top of the page to watch the day back.",
+    "It was all for Extra Life, raising money for Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
+    "The thermometer at the top of the page shows where our total stands. The Donate plaque on the wall still works.",
+    "Keep an eye on our Discord for the next Longtable. Thanks for stopping by!",
+  ]),
+  record: Object.freeze([
+    "Welcome to the Longtable record!",
+    "This hall is a saved copy of a past Longtable. Every table here was a game played that day.",
+    "Press Play at the top of the page to watch it back. Thanks for stopping by!",
+  ]),
+});
 
 // The current community invite is defined once and used by the header.
 export const DISCORD_INVITE = "https://discord.gg/tc9NqpjBrb";
@@ -54,10 +80,12 @@ export function eventActions(event, configurations = EVENT_CONFIG) {
 }
 
 // Extra Life's public API allows browser requests. Poll quietly; never animate totals.
-export function setupFundraising(node, { fetchTeam = globalThis.fetch, schedule = globalThis.setInterval,
+export function setupFundraising({ strip, total, fill, thermometer, donate } = {}, { fetchTeam = globalThis.fetch, schedule = globalThis.setInterval,
   visible = () => document.visibilityState !== "hidden", now = Date.now,
   onVisibilityChange = (listener) => globalThis.document?.addEventListener?.("visibilitychange", listener) } = {}) {
-  if (!node) return;
+  if (!strip) return;
+  donate.href = DONATE_URL;
+  thermometer.hidden = true;
   let pending = false;
   let lastText = "";
   let lastAt = -Infinity;
@@ -74,18 +102,32 @@ export function setupFundraising(node, { fetchTeam = globalThis.fetch, schedule 
           !Number.isFinite(team.fundraisingGoal) || team.fundraisingGoal < 0) throw new Error("Invalid team total");
       const money = value => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
         maximumFractionDigits: Number.isInteger(value) ? 0 : 2 }).format(value);
-      lastText = `${money(team.sumDonations)} raised` + (team.fundraisingGoal > 0 ? ` of ${money(team.fundraisingGoal)}` : "") + " · Extra Life";
-      node.textContent = lastText;
-      node.title = "Team total reported by Extra Life. Checks every minute; Extra Life may cache updates.";
+      const span = (className, text) => {
+        const child = total.ownerDocument.createElement("span");
+        child.className = className;
+        child.textContent = text;
+        total.append(child);
+      };
+      total.textContent = "";
+      span("raised", `${money(team.sumDonations)} raised`);
+      if (team.fundraisingGoal > 0) {
+        span("goal", ` of ${money(team.fundraisingGoal)}`);
+        if (team.sumDonations >= team.fundraisingGoal) span("reached", " · goal reached!");
+        fill.style.width = `${Math.round(Math.min(team.sumDonations / team.fundraisingGoal, 1) * 1000) / 10}%`;
+      }
+      span("brand", " · Extra Life");
+      thermometer.hidden = team.fundraisingGoal === 0;
+      lastText = total.textContent;
+      total.title = "Team total reported by Extra Life. Checks every minute; Extra Life may cache updates.";
     } catch {
-      node.textContent = lastText ? `${lastText} · last available total` : "Support our Extra Life team";
-      node.title = "The latest team total is temporarily unavailable. Donate still opens Extra Life.";
+      total.textContent = lastText ? `${lastText} · last available total` : "Support our Extra Life team";
+      total.title = "The latest team total is temporarily unavailable. Donate still opens Extra Life.";
     } finally {
-      node.hidden = false;
+      strip.hidden = false;
       pending = false;
     }
   };
-  // The boot fetch runs even while the page is hidden (a background tab, a hidden pane) so the line is
+  // The boot fetch runs even while the page is hidden (a background tab, a hidden pane) so the strip is
   // ready the first time the page is shown. Later polls run only while the page is visible, and showing
   // the page again refreshes a total at least a minute old instead of waiting for the next poll.
   void update();

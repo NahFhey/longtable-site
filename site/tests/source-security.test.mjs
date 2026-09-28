@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("runtime rendering does not use HTML-string injection sinks", async () => {
-  const source = await readFile(new URL("../app.mjs", import.meta.url), "utf8");
-  assert.doesNotMatch(source, /\.innerHTML\s*=/);
-  assert.doesNotMatch(source, /insertAdjacentHTML\s*\(/);
-  assert.doesNotMatch(source, /document\.write\s*\(/);
-  assert.match(source, /\.textContent\s*=/);
-  assert.match(source, /document\.createElement\s*\(/);
+  for (const file of ["app.mjs", "event-config.mjs"]) {
+    const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /\.innerHTML\s*=/);
+    assert.doesNotMatch(source, /insertAdjacentHTML\s*\(/);
+    assert.doesNotMatch(source, /document\.write\s*\(/);
+    assert.match(source, /\.textContent\s*=/);
+    assert.match(source, /(?:document|ownerDocument)\.createElement\s*\(/);
+  }
 });
 
 test("production loader is explicit, no-store, and never falls back to sample data", async () => {

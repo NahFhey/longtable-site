@@ -637,15 +637,29 @@ frozen with the two-track or older renderers keep their original files.
 A staff member stands near the north end of the stage under “Click me for Info”,
 clear of the QR plaques. Click the staffer or focus **Hear the staff welcome to
 Longtable** to hear about the event, Extra Life, Helen DeVos Children's Hospital
-and joining on Discord. The staffer walks to the microphone and speaks seven
-lines, each held until the viewer clicks the bubble, the staffer or the button
-("▸ click to continue"), then walks back after the last. The welcome uses real time
-in live, gathering, practice and replay views, yields to other stage activity,
-and is absent in kiosk mode. Reduced motion skips the walking, and each line is
-also announced through a polite live region.
+and joining on Discord. There are four speeches: **before** (eight lines),
+**during** (eight), **after** (six), and **record** (three). Archives and packages
+with phase `final` always use record; otherwise the wall-clock stage chooses
+during for day, after for after, and before for gathering, eve or no stage
+(including sample without `?now=`). Pressing Play before doors still uses before.
+The speech is chosen when a visit starts and stays fixed until that visit ends;
+the next visit chooses again. The staffer walks to the microphone and holds each
+line until the viewer clicks the bubble, the staffer or the button
+("▸ click to continue", or "▸ click to finish" on the last line), then walks back.
+The welcome uses real time in live, gathering, practice and replay views, yields
+to other stage activity, and is absent in kiosk mode. Reduced motion skips the
+walking, and each line is also announced through a polite live region.
 
-The current header links to Discord and Extra Life team 74917. Its public team
-amount/goal refreshes quietly every minute while the tab is visible. Extra Life
-can cache its API response; the display is not a guarantee of instant donation
-updates. Failed refreshes retain and label the last available amount. Samples and
-archived replays do not fetch or show live fundraising totals.
+The current header links to Discord and Extra Life team 74917. A full-width
+fundraising strip above it shows the running total, goal, thermometer and Donate
+link. The total comes from the public Extra Life team API at boot and every 60 s
+while the page is visible; returning to the page refreshes a total at least 60 s
+old. Extra Life can cache its API response, so the display is not a guarantee of
+instant donation updates. The fill caps at 100%, with “goal reached!” when the
+goal is met. A zero goal hides the thermometer and omits the goal from the text.
+A failed first fetch shows “Support our Extra Life team” with the thermometer
+hidden and Donate available. Later failures retain the last fill and thermometer
+state and label the text “last available total”. Totals never animate. Phones
+omit the Extra Life brand text; kiosks enlarge the strip and hide Donate because
+the wall plaques carry QR codes. Samples and archived replays do not fetch or
+show the strip.
