@@ -435,7 +435,7 @@ export function isPresent(person, slot, totalSlots) {
 
 const HALL_OCCUPANCY = new WeakMap();
 const CARETAKER_TOURS = new WeakMap();
-const CARETAKER_TILES_PER_SECOND = 1.2;
+export const CARETAKER_TILES_PER_SECOND = 1.2;
 const CARETAKER_LEGS = 40;
 const EXIT_SECONDS = 2;
 const SWITCHING_OFF = 'The hall is empty. Staff are switching off the lights.';
@@ -1228,6 +1228,41 @@ export function wallFixtures(layout, { plaques = 2, banner = true } = {}) {
   const plaquesStart = layout.width - 1 - 2 * plaque.w - 1;
   const bannerWidth = Math.max(8, Math.min(25, Number((plaquesStart - 10).toFixed(2))));
   return { banner: banner ? { x: 3, y: -4.7, w: bannerWidth, h: 3.5 } : null, plaques: rects };
+}
+
+const INFO_STAFF_GEOMETRY = new WeakMap();
+
+/** Northernmost clear welcome post, or null when none fits; floor boards, tint and light washes are not obstacles. */
+export function infoStaffGeometry(layout) {
+  if (!INFO_STAFF_GEOMETRY.has(layout)) INFO_STAFF_GEOMETRY.set(layout, findInfoStaffPost(layout));
+  return INFO_STAFF_GEOMETRY.get(layout);
+}
+
+function findInfoStaffPost(layout) {
+  const { stage, stageFront, backWall } = layout;
+  const px = 1 / 16;
+  // Physical decoration extents from stage-drawing: drape including ties, lip and stairs/shadow.
+  const stairs = stageGeometry(layout).stairs;
+  const decorations = [
+    { x: stage.x + stage.w - .85 - 2 * px, y: stage.y, w: .85 + 2 * px, h: stage.h },
+    { x: stage.x - 5 * px, y: stage.y, w: 7 * px, h: stage.h },
+    { x: stairs.x - 3 * px, y: stairs.y, w: stairs.w + 3 * px, h: stairs.h + 3 * px },
+  ];
+  for (let y = stage.y + 1; y < stage.y + stage.h - 3; y += 1.5) {
+    decorations.push({ x: stage.x + px, y: y - 2 * px, w: 4 * px, h: 5 * px });
+  }
+  const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  for (let y = stage.y + .5; y <= Math.min(stage.y + stage.h / 2, stageFront.y - 3); y += .25) {
+    const post = { x: stage.x + stage.w / 2, y };
+    const label = { x: post.x - 2.2, y: y - 2.4, w: 4.4, h: .9 };
+    const margin = { x: label.x - .2, y: label.y - .2, w: label.w + .4, h: label.h + .4 };
+    const figure = { x: post.x - .5, y: y - 1.5, w: 1, h: 1.5 };
+    if (margin.y < Math.max(0, backWall.y + backWall.h) || wallFixtures(layout).plaques.some(rect => overlaps(margin, rect))
+      || decorations.some(rect => overlaps(figure, rect))) continue;
+    return { post, label, hit: { x: label.x, y: label.y, w: label.w, h: post.y - label.y },
+      speakSpot: { x: stageFront.x, y: stageFront.y } };
+  }
+  return null;
 }
 
 /**

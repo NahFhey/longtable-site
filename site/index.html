@@ -71,8 +71,10 @@
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
         <button id="music-open" class="jukebox-key" type="button">Open the jukebox music player</button>
+        <button id="info-open" class="jukebox-key" type="button">Hear the staff welcome to Longtable</button>
+        <span id="info-speech" class="visually-hidden" role="status" aria-live="polite"></span>
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header. A jukebox stands against the back wall under a sign that offers music when clicked.</p>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header. A jukebox stands against the back wall under a sign that offers music when clicked. A staff member stands at the north end of the stage under a sign that offers information about Longtable when clicked.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
         <div id="music-panel" class="music-panel" role="dialog" aria-label="Jukebox" hidden>
           <audio id="hall-music" preload="none"></audio>
@@ -124,6 +126,6 @@
     </div>
     <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="./app.mjs?v=3758e4a54b71"></script>
+  <script type="module" src="./app.mjs?v=931619dddca1"></script>
 </body>
 </html>

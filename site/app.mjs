@@ -1,8 +1,8 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=2e69d47f35bc";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=8afc2b65b532";
 import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
-import { DISCORD_INVITE, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=bd27fc0ec456";
+import { DISCORD_INVITE, INFO_SPEECH, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=d09ead689160";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
 import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
@@ -13,6 +13,8 @@ import { cornerRoute } from "./food-routing.mjs?v=e52cc41290de";
 import { queueSpot } from "./food-layout.mjs?v=44523bdb9315";
 import {
   EVE_MS,
+  CARETAKER_TILES_PER_SECOND,
+  infoStaffGeometry,
   PALETTE_SIZE,
   activeEvents,
   accessibleEventText,
@@ -51,7 +53,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=f194ea561d72";
+} from "./model.mjs?v=e3b7a2b23866";
 
 const TILE = 16;
 const SCALE = 2;
@@ -88,14 +90,15 @@ const RPG = {
 
 const PLAQUE_SENTENCE = "Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header.";
 const JUKEBOX_SENTENCE = "A jukebox stands against the back wall under a sign that offers music when clicked.";
+const INFO_STAFF_SENTENCE = "A staff member stands at the north end of the stage under a sign that offers information about Longtable when clicked.";
 const JUKEBOX_TOOLTIP = "Jukebox — click for music";
 const KIOSK_CAMERA_RESET_MS = 45_000;   // a bumped mouse never leaves the projection zoomed into a corner
 const KIOSK_CURSOR_HIDE_MS = 3_000;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
-// The static prose describes the live page; the plaque and jukebox sentences are re-added per mode by updateHeader.
-const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").replace(JUKEBOX_SENTENCE, "").trim();
+// The static prose describes the live page; scenery sentences are re-added per mode by updateHeader.
+const hallDescription = $("canvas-description").textContent.replace(PLAQUE_SENTENCE, "").replace(JUKEBOX_SENTENCE, "").replace(INFO_STAFF_SENTENCE, "").trim();
 let ctx = null;
 try { ctx = canvas.getContext("2d"); } catch { /* The table list works without canvas. */ }
 // Phones in either orientation: a phone turned sideways is wider than 650px but short (landscape phones top out near 932px).
@@ -127,6 +130,7 @@ mobile.addEventListener?.("change", arrangeHall);
 // Null when the player panel is absent: the jukebox still draws with its sign, but a click does nothing.
 const music = setupHallMusic();
 $("music-open")?.addEventListener("click", () => music?.togglePanel());
+$("info-open")?.addEventListener("click", () => clickInfoStaff());
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 foodCorner.bindFoodDrawing({ ctx: () => ctx, rpg: () => state.images?.rpg, reduced: () => reducedMotion.matches });
@@ -173,6 +177,7 @@ const state = {
   speechQueue: [],
   speech: null,
   stageQueue: [],
+  infoVisit: null,
   ambience: null,
   leisure: new Map(),
   locations: new Map(),
@@ -198,6 +203,7 @@ const state = {
   lastInputAt: 0,
   lastPointerAt: 0,
 };
+if ($("info-open")) $("info-open").hidden = state.kiosk;
 if (state.kiosk) {
   if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
   $("hall-explorer").open = true;
@@ -310,7 +316,7 @@ function updateCamera(announcer) {
   state.viewport = size;
   // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
   const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
-  const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0 || announcer != null;
+  const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0 || announcer != null || infoRunning();
   // With no game in play (before doors, a replay's opening minutes, a gap between games) the view shows the whole room.
   const wholeRoom = upcoming() || !state.data.tables.some((table) => state.time >= table.start && state.time < table.end);
   const key = wholeRoom ? "room" : indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
@@ -765,6 +771,97 @@ function drawJukebox() {
 function overJukebox(point) {
   const inside = ({ x, y, w, h }) => point.x >= x && point.x < x + w && point.y >= y && point.y < y + h;
   return inside(jukeboxBounds(state.layout)) || inside(jukeboxSignBounds(state.layout));
+}
+
+// This visit belongs to the viewer, so seeking and replay speed never reset or accelerate it.
+function infoRunning() { return state.infoVisit != null && state.infoVisit.phase !== "idle"; }
+function infoPosition() { return infoRunning() ? state.infoVisit.position : infoStaffGeometry(state.layout).post; }
+function infoStageBusy(active = upcoming() ? NO_ACTIVE : activeEvents(state.data, state.time, state.adminEvents), announcer = announcerForFrame()) {
+  return !!(state.speech || state.stageQueue.length || announcer || active.spotlight);
+}
+function overInfoStaff(point) {
+  const geometry = state.layout && infoStaffGeometry(state.layout);
+  if (state.kiosk || !geometry) return false;
+  const inside = ({ x, y, w, h }) => point.x >= x && point.x < x + w && point.y >= y && point.y < y + h;
+  if (inside(geometry.hit)) return true;
+  const position = infoPosition();
+  return infoRunning() && inside({ x: position.x - .5, y: position.y - 1.5, w: 1, h: 1.5 });
+}
+function infoLine(line, now) {
+  const visit = state.infoVisit;
+  visit.phase = "speaking";
+  visit.line = line;
+  visit.until = now + clamp(INFO_SPEECH[line].split(/\s+/u).length * .35, 3.5, 9) * 1000;
+  if ($("info-speech")) $("info-speech").textContent = INFO_SPEECH[line];
+}
+function leaveInfoStaff(now) {
+  const visit = state.infoVisit;
+  visit.phase = reducedMotion.matches ? "idle" : "leaving";
+  visit.lastAt = now;
+  if ($("info-speech")) $("info-speech").textContent = "";
+}
+function clickInfoStaff() {
+  if (!state.layout || state.kiosk || !infoStaffGeometry(state.layout)) return;
+  const now = performance.now();
+  if (infoStageBusy()) {
+    if (infoRunning() && state.infoVisit.phase !== "leaving") leaveInfoStaff(now);
+    return;
+  }
+  if (!infoRunning()) {
+    const geometry = infoStaffGeometry(state.layout);
+    state.infoVisit = { phase: "approaching", position: { ...geometry.post }, lastAt: now };
+    if (reducedMotion.matches) {
+      state.infoVisit.position = { ...geometry.speakSpot };
+      infoLine(0, now);
+    }
+  } else if (state.infoVisit.phase === "speaking") {
+    if (state.infoVisit.line + 1 < INFO_SPEECH.length) infoLine(state.infoVisit.line + 1, now);
+    else leaveInfoStaff(now);
+  }
+}
+function advanceInfoStaff(now, active, announcer) {
+  if (state.kiosk || !infoRunning()) return;
+  const visit = state.infoVisit;
+  if (infoStageBusy(active, announcer) && visit.phase !== "leaving") leaveInfoStaff(now);
+  if (!infoRunning()) return;
+  if (visit.phase === "speaking") {
+    if (now >= visit.until) {
+      if (visit.line + 1 < INFO_SPEECH.length) infoLine(visit.line + 1, now);
+      else leaveInfoStaff(now);
+    }
+    return;
+  }
+  const { post, speakSpot } = infoStaffGeometry(state.layout);
+  const target = visit.phase === "approaching" ? speakSpot : post;
+  const dx = target.x - visit.position.x, dy = target.y - visit.position.y;
+  const distance = Math.hypot(dx, dy);
+  const step = reducedMotion.matches ? distance : Math.max(0, now - visit.lastAt) / 1000 * CARETAKER_TILES_PER_SECOND;
+  visit.lastAt = now;
+  if (step >= distance) {
+    visit.position = { ...target };
+    if (visit.phase === "approaching") infoLine(0, now);
+    else visit.phase = "idle";
+  } else {
+    visit.position = { x: visit.position.x + dx * step / distance, y: visit.position.y + dy * step / distance };
+  }
+}
+function drawInfoSign() {
+  const sign = infoStaffGeometry(state.layout).label;
+  ctx.save();
+  ctx.scale(TILE * SCALE, TILE * SCALE);
+  ctx.translate(sign.x, sign.y);
+  ctx.fillStyle = "#4a3524";
+  ctx.fillRect(0, 0, sign.w, sign.h);
+  ctx.lineWidth = .06;
+  ctx.strokeStyle = "#b89b5c";
+  ctx.strokeRect(.04, .04, sign.w - .08, sign.h - .08);
+  ctx.fillStyle = "#d8b86d";
+  for (const nail of [.2, sign.w - .2]) { ctx.beginPath(); ctx.arc(nail, .2, .07, 0, Math.PI * 2); ctx.fill(); }
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#e9d9ae";
+  fitFont("Click me for Info", .42, "Georgia, serif", sign.w - .5);
+  ctx.fillText("Click me for Info", sign.w / 2, sign.h / 2 + .03);
+  ctx.restore();
 }
 
 // The player sits just above-right of the jukebox in screen space, to its left when the right side has no room,
@@ -1302,6 +1399,7 @@ function announcerForFrame() {
 
 function render(now, active) {
   const announcer = announcerForFrame();
+  advanceInfoStaff(now, active, announcer);
   const gathering = gatheringScene();
   if (gathering) {
     state.ambience = gatheringAmbience(state.practiceData, state.layout,
@@ -1337,6 +1435,10 @@ function render(now, active) {
     && caretaker.y >= food.y - 1 && caretaker.y < food.y + food.h + .5;
   if (caretakerInFood) drawables.push({ y: caretaker.y, draw: () => drawStaff(caretaker) });
   if (announcer) drawables.push({ y: announcer.y, draw: () => drawStaff(announcer, "announcer") });
+  if (!state.kiosk && infoStaffGeometry(state.layout)) {
+    const position = infoPosition();
+    drawables.push({ y: position.y, draw: () => drawStaff(position, "info") });
+  }
   drawables.sort((a, b) => a.y - b.y).forEach(item => item.draw());
   state.foodPlates.forEach(draw => draw());
   if (!gathering) state.data.tables.forEach((table, index) => {
@@ -1358,6 +1460,13 @@ function render(now, active) {
   drawTableLabels();
   drawHoverName();
   drawEvents(active, now, announcer);
+  if (!state.kiosk && infoStaffGeometry(state.layout)) {
+    if (!infoRunning()) drawInfoSign();
+    else if (state.infoVisit.phase === "speaking") {
+      const { x, y } = infoPosition();
+      drawBubble(INFO_SPEECH[state.infoVisit.line], x, y - 2.2, "#fff", "Staff");
+    }
+  }
   placeMusicPanel();
 }
 
@@ -1472,7 +1581,7 @@ function updateHeader(active) {
   const gathered = state.gatheredCount;
   const gatheredSentence = gathered === 0 ? "Nobody has arrived yet." : `${gathered} ${gathered === 1 ? "person has" : "people have"} gathered so far.`;
   const plaqueSentence = state.archive ? "" : ` ${PLAQUE_SENTENCE}`;
-  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + ` ${JUKEBOX_SENTENCE}` + hostSuffix;
+  const description = (upcomingNow ? `${staffAction} ${gatheredSentence}` : `${hallDescription} ${staffAction} ${loungeDescription}`).trim() + plaqueSentence + ` ${JUKEBOX_SENTENCE}` + (state.kiosk ? "" : ` ${INFO_STAFF_SENTENCE}`) + hostSuffix;
   if ($("canvas-description").textContent !== description) $("canvas-description").textContent = description;
   // Two parts joined here, so the wording does not depend on the ICU version's date-time connector.
   const doorsText = `${formatDate(start, { weekday: "long", month: "long", day: "numeric" })}, ${formatDate(start, { hour: "numeric", minute: "2-digit" })}`;
@@ -1934,11 +2043,12 @@ canvas.addEventListener("pointermove", (event) => {
   state.hover = best;
   state.hoverTable = tableAt(point);
   const onJukebox = overJukebox(point);
-  setCursor(onJukebox || state.hoverTable >= 0 ? "pointer" : "");
+  const onInfo = !infoRunning() && overInfoStaff(point);
+  setCursor(onJukebox || onInfo || state.hoverTable >= 0 ? "pointer" : "");
   const tooltip = $("tooltip");
-  if (!best && !onJukebox) { tooltip.hidden = true; return; }
+  if (!best && !onJukebox && !onInfo) { tooltip.hidden = true; return; }
   // A person walking in front of the jukebox keeps their tooltip; the jukebox tip stays visible in kiosk mode.
-  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : JUKEBOX_TOOLTIP;
+  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : onJukebox ? JUKEBOX_TOOLTIP : infoStageBusy() ? "Staff: busy on stage, try again shortly" : "Staff: click for info about Longtable";
   tooltip.className = best ? "tooltip" : "tooltip jukebox-tip";
   const sceneRect = canvas.parentElement.getBoundingClientRect();
   tooltip.style.left = `${clamp(event.clientX - sceneRect.left + 12, 0, Math.max(0, sceneRect.width - 280))}px`;
@@ -1958,6 +2068,7 @@ canvas.addEventListener("click", (event) => {
   if (!state.camera || suppressClick) return;
   const point = canvasPoint(event);
   if (overJukebox(point)) { music?.togglePanel(); return; }
+  if (overInfoStaff(point)) { clickInfoStaff(); return; }
   const screen = pointerPoint(event);
   const label = state.labelBoxes?.findLast((box) => screen.x >= box.x && screen.x < box.x + box.w && screen.y >= box.y && screen.y < box.y + box.h);
   const index = label?.index ?? tableAt(point);

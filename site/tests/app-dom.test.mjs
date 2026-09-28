@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRoomLayout, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, tableLifecycle, tableScenery, wallFixtures } from "../model.mjs";
+import { createRoomLayout, infoStaffGeometry, CARETAKER_TILES_PER_SECOND, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, tableLifecycle, tableScenery, wallFixtures } from "../model.mjs";
 import { hallAmbience, practiceKitchenServices, practicePlaces, stageAnnouncer } from "../model.mjs";
 import { queueSpot } from "../food-layout.mjs";
 import { stageQueuePosition } from "../stage.mjs";
 import { fitBounds, worldToScreen } from "../camera.mjs";
-import { DISCORD_INVITE, WALL_PLAQUES } from "../event-config.mjs";
+import { DISCORD_INVITE, INFO_SPEECH, WALL_PLAQUES } from "../event-config.mjs";
 
 class FakeNode {
   constructor(tag = "div") {
@@ -45,9 +45,10 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
+  const ids = ["info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   nodes.get("fundraising-total").hidden = true;
+  nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
   nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
@@ -256,11 +257,11 @@ test("schema 3 draws the chosen layers and keeps hats exclusive to DMs", async (
     JSON.stringify(drawn.slice(i, i + layers.length)) === JSON.stringify(layers));
   assert.ok(hasLayers(player, [[0, 51], [238, 153], [323, 34]]), "chosen player layers survive furniture/staff depth sorting");
   assert.ok(!coordinates(player).some(([x]) => x >= 27 * 17 && x <= 31 * 17), "a player never draws a hat");
-  assert.equal(coordinates(player).length, 6, "player and caretaker each draw three layers");
+  assert.equal(coordinates(player).length, 9, "player, caretaker and info staff each draw three layers");
   sample.people[0].dm = true;
   const dm = await runApp([sample], "custom-dm");
   assert.ok(hasLayers(dm, [[0, 51], [238, 153], [323, 34], [510, 136]]), "the DM uses the chosen layers including the hat");
-  assert.equal(coordinates(dm).length, 7, "only the DM adds a hat layer");
+  assert.equal(coordinates(dm).length, 10, "only the DM adds a hat layer");
 });
 
 test("an unknown schema fails visibly instead of leaving a blank canvas", async () => {
@@ -760,13 +761,13 @@ test("staff scenery renders identically after seeking and reload without changin
     const expected = staff(seek);
     const layout = createRoomLayout(data.tables, data.room_layout);
     const crew = tableScenery(data, data.tables[0], slot, layout, 0).crew;
-    assert.equal(expected.length, crew.length * 3, "each crew member uses three character layers; the caretaker has gone home");
+    assert.equal(expected.length, (crew.length + 1) * 3, "crew and info staff use three layers each; the caretaker has gone home");
     assert.match(allText(seek.nodes.get("tables")), /0\/5/);
     assert.doesNotMatch(roster, /STAFF/);
     const fresh = await runApp([data], `staff-load-${slot}`, { search: `?sample=1&at=${slot}` });
     assert.deepEqual(staff(fresh), expected);
     const reduced = await runApp([data], `staff-reduced-${slot}`, { search: `?sample=1&at=${slot}`, reducedMotion: true });
-    assert.equal(staff(reduced).length, 0, "reduced motion omits the crew, and the caretaker has gone home");
+    assert.equal(staff(reduced).length, 3, "reduced motion leaves only the info staff; crew is omitted and the caretaker has gone home");
   }
 });
 
@@ -776,7 +777,7 @@ test("staff remain visible if character assets fail without adding attendees", a
   data.people = [];
   data.events = [];
   const app = await runApp([data], "staff-fallback", { assetsFailed: true });
-  assert.equal(app.rectCalls.filter(call => call.color === "#73afb5").length, 2);
+  assert.equal(app.rectCalls.filter(call => call.color === "#73afb5").length, 4);
   assert.equal(app.nodes.get("attendees-heading").textContent, "Attendees (0)");
   assert.deepEqual(app.errors, []);
 });
@@ -1406,8 +1407,8 @@ test("a closed, dark hall draws no caretaker and reports that staff have gone ho
   data.events = [];
   data.people.forEach(person => { person.presence = { planned: null, actual: { here: null, leaving: null } }; });
   const app = await runApp([data], "caretaker-gone", { search: "?sample=1&at=2" });
-  assert.equal(app.imageCalls.filter(call => call.src.includes("roguelikeChar")).length, 0, "no staff sprite layers");
-  assert.ok(!app.contextCalls.includes("STAFF"), "no STAFF label");
+  assert.equal(app.imageCalls.filter(call => call.src.includes("roguelikeChar")).length, 3, "only info staff sprite layers");
+  assert.equal(infoSprites(app, infoStaffGeometry(createRoomLayout(data.tables, data.room_layout)).post).length, 3, "the remaining staff is at the info post");
   assert.ok(app.rectCalls.some(call => call.color === "rgba(4, 7, 20, 0.76)"), "the hall is fully dark");
   assert.match(app.nodes.get("canvas-description").textContent, /Staff have gone home/);
   assert.deepEqual(app.errors, []);
@@ -1499,13 +1500,13 @@ test("at the start of the eve the caretaker stays in the lit hall while attendee
   assert.deepEqual(app.errors, []);
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
   assert.equal(app.nodes.get("scene-event").textContent, "24 hours away");
-  assert.equal(spritePositions(app).size, 1, "only the caretaker is drawn");
+  assert.equal(spritePositions(app).size, 2, "caretaker and info staff are drawn");
   assert.ok(!app.rectCalls.some((call) => call.color === "rgba(4, 7, 20, 0.76)"), "the caretaker keeps the hall lit");
   assert.match(app.nodes.get("canvas-description").textContent, /Staff are circulating.*44 people have gathered so far/);
   assert.match(app.nodes.get("status").textContent, /^44 gathered so far · \d+ games with signup space · Sign up on Discord$/);
   app.imageCalls.length = 0;
   app.frames.shift()?.(performance.now() + 3_000);
-  assert.equal(spritePositions(app).size, 1);
+  assert.equal(spritePositions(app).size, 2, "caretaker and info staff remain");
   assert.equal(app.nodes.get("mode-badge").textContent, "UPCOMING");
 });
 
@@ -1514,7 +1515,7 @@ test("after the empty eve closes the hall is dark with its dated caption and gat
   const start = Date.parse(sample.event.start);
   const app = await runApp([sample], "eve-dark-sample", { search: `?sample=1&${nowQuery(start - DAY + 120_000)}` });
   assert.deepEqual(app.errors, []);
-  assert.equal(spritePositions(app).size, 0);
+  assert.equal(spritePositions(app).size, 1, "only info staff remain in the dark hall");
   assert.ok(app.rectCalls.some(call => call.color === "rgba(4, 7, 20, 0.76)"));
   assert.match(app.nodes.get("canvas-description").textContent,
     /The hall is dark\. Doors open Saturday at 10:00 AM\..*44 people have gathered so far/);
@@ -1660,7 +1661,7 @@ test("the footer kiosk link opens the same view as a kiosk and is not offered on
 test("the jukebox and its sign draw in live, kiosk and archive views and the description names them", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   for (const [label, options] of [["jukebox-live", {}], ["jukebox-kiosk", { search: "?sample=1&kiosk=1" }], ["jukebox-archive", { search: "", archive: true }]]) {
-    const app = await runApp([sample], label, options);
+    const app = await runApp([sample], label, { ...options, canvasDescription: INFO_SENTENCE });
     assert.deepEqual(app.errors, [], label);
     assert.ok(app.contextCalls.includes("Click here for music"), `${label}: the sign invites a click while no music plays`);
     assert.match(app.nodes.get("canvas-description").textContent, /A jukebox stands against the back wall under a sign that offers music when clicked\./, label);
@@ -1904,10 +1905,10 @@ test("practising people are drawn at their practice position before doors and st
   assert.ok(eveDrawn.has(drawnKey(lenaPractice)), "Lena still practises in the eve");
   assert.ok(drawnNear(eveDrawn, tessPractice), "Tess still practises in the eve");
   assert.ok(!eveDrawn.has(drawnKey(seatPositionForPlan(layout, 0, 0))), "Mara, not practising, has left");
-  assert.equal(eveDrawn.size, 3, "the two practising people and caretaker remain");
+  assert.equal(eveDrawn.size, 4, "the two practising people, caretaker and info staff remain");
   eve.imageCalls.length = 0;
   eve.frames.shift()?.(performance.now() + 3_000);
-  assert.equal(spritePositions(eve).size, 3);
+  assert.equal(spritePositions(eve).size, 4);
 });
 
 test("each practice speech entry shows once at the person: never on load, not on repeat, and the next one alone", async () => {
@@ -2412,4 +2413,205 @@ test("live break speech has an announcer while upcoming slot-zero announcements 
   assert.ok(!spritePositions(upcoming).has(sprite));
   assert.ok(!upcoming.contextCalls.some(text => text.includes("Doors announcement.")));
   assert.deepEqual(upcoming.errors, []);
+});
+
+const INFO_SENTENCE = "A staff member stands at the north end of the stage under a sign that offers information about Longtable when clicked.";
+const infoSprites = (app, position) => app.imageCalls.filter(call => call.src.includes("roguelikeChar")
+  && call.logicalArgs[4] === Math.round((position.x - .5) * 32) && call.logicalArgs[5] === Math.round((position.y - .6) * 32));
+
+async function withInfoApp(label, options, check, prepare = () => {}) {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  sample.events = [];
+  prepare(sample);
+  const original = Object.getOwnPropertyDescriptor(performance, "now");
+  let now = 1000;
+  Object.defineProperty(performance, "now", { configurable: true, value: () => now });
+  try {
+    const app = await runApp([sample], label, { ...options, canvasDescription: INFO_SENTENCE });
+    assert.deepEqual(app.errors, []);
+    now += 20;
+    const layout = createRoomLayout(sample.tables, sample.room_layout);
+    const geometry = infoStaffGeometry(layout);
+    const step = (ms = 1) => {
+      now += ms;
+      for (const calls of [app.imageCalls, app.contextCalls, app.textCalls, app.transforms]) calls.length = 0;
+      app.frames.shift()(now);
+    };
+    const camera = () => {
+      const t = app.transforms.find(t => t[0] !== 1 || t[4] !== 0 || t[5] !== 0);
+      return { zoom: t[0] * 32, x: t[4], y: t[5] };
+    };
+    const pointEvent = p => {
+      const screen = worldToScreen(camera(), p);
+      return { pointerId: 8, clientX: screen.x, clientY: screen.y };
+    };
+    const click = p => app.nodes.get("hall").listeners.get("click")(pointEvent(p));
+    const hit = { x: geometry.hit.x + geometry.hit.w / 2, y: geometry.hit.y + geometry.hit.h / 2 };
+    const walkMs = Math.hypot(geometry.post.x - geometry.speakSpot.x, geometry.post.y - geometry.speakSpot.y) / CARETAKER_TILES_PER_SECOND * 1000;
+    await check({ app, sample, layout, geometry, step, camera, click, hit, pointEvent, walkMs });
+  } finally {
+    if (original) Object.defineProperty(performance, "now", original);
+    else delete performance.now;
+  }
+}
+
+test("info staff and sign appear in live, replay, gathering and practice, and neither appears in kiosk", async () => {
+  for (const [name, options] of [
+    ["sample", {}], ["replay", { archive: true, search: "?at=2" }],
+    ["live", { search: "?now=2026-11-07T18:00:00Z" }],
+    ["gathering", { search: "?now=2026-10-01T10:00:00Z" }],
+    ["practice", { search: "?now=2026-10-01T10:00:00Z" }],
+    ["kiosk", { search: "?sample=1&kiosk=1" }],
+  ]) await withInfoApp(`info-idle-${name}`, options, ({ app, geometry }) => {
+    const visible = name !== "kiosk";
+    assert.equal(app.contextCalls.includes("Click me for Info"), visible, name);
+    assert.equal(infoSprites(app, geometry.post).length, visible ? 3 : 0, name);
+    assert.equal(app.nodes.get("canvas-description").textContent.split(INFO_SENTENCE).length - 1, visible ? 1 : 0, name);
+    assert.equal(app.nodes.get("info-open").hidden, !visible);
+    if (!visible) {
+      app.nodes.get("info-open").listeners.get("click")();
+      assert.equal(app.nodes.get("info-speech").textContent, "");
+    }
+  }, sample => {
+    if (name === "practice") sample.practice = { people: { u_lena: { position: "table", table: "t01" } }, speech: [], moves: [] };
+  });
+});
+
+test("info hit starts a real-time walk, seven timed lines at the microphone, then returns home", async () => {
+  await withInfoApp("info-visit", {}, ({ app, geometry, step, click, hit, pointEvent, walkMs, camera }) => {
+    app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
+    assert.equal(app.nodes.get("hall").style.cursor, "pointer");
+    assert.equal(app.nodes.get("tooltip").textContent, "Staff: click for info about Longtable");
+    click(hit);
+    step(walkMs / 2);
+    assert.ok(!app.contextCalls.includes("Click me for Info"));
+    assert.equal(app.nodes.get("info-speech").textContent, "");
+    assert.equal(infoSprites(app, { x: (geometry.post.x + geometry.speakSpot.x) / 2, y: (geometry.post.y + geometry.speakSpot.y) / 2 }).length, 3);
+    click(hit); // Approaching ignores repeated clicks.
+    step(walkMs / 2 + 1);
+    assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
+    assert.ok(app.contextCalls.includes("Staff: Welcome to Longtable!"));
+    const bubble = app.textCalls.find(c => c.text === "Staff: Welcome to Longtable!");
+    const anchor = worldToScreen(camera(), { x: geometry.speakSpot.x, y: geometry.speakSpot.y - 2.2 });
+    assert.ok(Math.abs(bubble.x - 4 + (bubble.text.length * 5 + 8) / 2 - anchor.x) < 1);
+    for (let line = 0; line < INFO_SPEECH.length; line++) {
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line]);
+      const ms = Math.max(3.5, Math.min(9, INFO_SPEECH[line].split(/\s+/u).length * .35)) * 1000;
+      step(ms - 1);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line], "full readable duration");
+      step(1);
+    }
+    assert.equal(app.nodes.get("info-speech").textContent, "");
+    click(hit); // Leaving ignores repeated clicks.
+    step(walkMs + 1);
+    assert.equal(infoSprites(app, geometry.post).length, 3);
+    assert.ok(app.contextCalls.includes("Click me for Info"));
+  });
+});
+
+test("the keyboard starts the welcome and clicking the speaking staff skips each line", async () => {
+  await withInfoApp("info-keyboard", {}, ({ app, geometry, step, click, walkMs }) => {
+    app.nodes.get("info-open").listeners.get("click")();
+    step(walkMs + 1);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    for (let line = 1; line < INFO_SPEECH.length; line++) {
+      click({ x: geometry.speakSpot.x, y: geometry.speakSpot.y - .5 });
+      step();
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line]);
+    }
+    assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECH[6]}`));
+    app.nodes.get("info-open").listeners.get("click")();
+    step(walkMs + 1);
+    assert.ok(app.contextCalls.includes("Click me for Info"));
+  });
+});
+
+test("reduced motion speaks on the first frame and returns without walking", async () => {
+  await withInfoApp("info-reduced", { reducedMotion: true }, ({ app, geometry, click, hit, step }) => {
+    click(hit);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    step();
+    assert.ok(app.contextCalls.includes("Staff: Welcome to Longtable!"));
+    assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
+    for (let i = 0; i < INFO_SPEECH.length; i++) app.nodes.get("info-open").listeners.get("click")();
+    step();
+    assert.equal(infoSprites(app, geometry.post).length, 3);
+    assert.ok(app.contextCalls.includes("Click me for Info"));
+  });
+});
+
+test("a donation speech blocks info clicks and interrupts a welcome already speaking", async () => {
+  for (const during of [false, true]) await withInfoApp(`info-busy-${during}`, { search: "?sample=1&at=0" }, ({ app, geometry, hit, click, step, pointEvent, walkMs }) => {
+    if (during) {
+      click(hit);
+      step(walkMs + 1);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    }
+    app.nodes.get("play").listeners.get("click")();
+    // One replay frame crosses the donation at .01, starting its approach.
+    step(100);
+    assert.match(app.nodes.get("current-event").textContent, /walking to the stage microphone/);
+    assert.equal(app.nodes.get("info-speech").textContent, "");
+    assert.ok(!app.contextCalls.includes("Staff: Welcome to Longtable!"));
+    if (!during) {
+      app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
+      assert.equal(app.nodes.get("tooltip").textContent, "Staff: busy on stage, try again shortly");
+      click(hit);
+      step(1);
+      assert.ok(app.contextCalls.includes("Click me for Info"));
+    } else {
+      step(walkMs + 1);
+      assert.equal(infoSprites(app, geometry.post).length, 3);
+      assert.ok(app.contextCalls.includes("Click me for Info"));
+    }
+  }, sample => {
+    sample.events = [{ id: "info-interruption", kind: "donation", at: .01, duration: null,
+      text: "Donation takes priority", person: sample.people[0].id, by: sample.people[0].id }];
+  });
+});
+
+test("a running welcome frames the stage and survives seeking and replay speed changes", async () => {
+  await withInfoApp("info-camera", { search: "?sample=1&at=2" }, ({ app, geometry, layout, step, camera, walkMs }) => {
+    const idle = camera();
+    app.nodes.get("info-open").listeners.get("click")();
+    step(1);
+    assert.notDeepEqual(camera(), idle, "running visit changes the automatic frame");
+    const stage = worldToScreen(camera(), { x: layout.stage.x + layout.stage.w, y: layout.stage.y });
+    assert.ok(stage.x <= 960 && stage.x >= 0 && stage.y >= 0);
+    app.nodes.get("scrubber").listeners.get("input")({ target: { value: "3" } });
+    app.nodes.get("speed").listeners.get("change")({ target: { value: "1800" } });
+    step(walkMs + 1);
+    assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    step(3499);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    step(1);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[1]);
+  });
+});
+
+test("an announcer or spotlight blocks a welcome and sends an approaching staffer home", async () => {
+  for (const kind of ["announce", "spotlight"]) await withInfoApp(`info-${kind}`, { search: "?sample=1&at=2" }, ({ app, geometry, step, walkMs }) => {
+    app.nodes.get("info-open").listeners.get("click")();
+    step(walkMs / 2);
+    assert.ok(!app.contextCalls.includes("Click me for Info"));
+    app.nodes.get("scrubber").listeners.get("input")({ target: { value: "3" } });
+    step();
+    assert.equal(app.nodes.get("info-speech").textContent, "");
+    step(walkMs / 2 + 1);
+    assert.equal(infoSprites(app, geometry.post).length, 3);
+    assert.ok(app.contextCalls.includes("Click me for Info"));
+    app.nodes.get("info-open").listeners.get("click")();
+    step();
+    assert.ok(app.contextCalls.includes("Click me for Info"), "busy idle click does nothing");
+  }, sample => {
+    sample.events = [{ id: `info-${kind}`, kind, at: 3, duration: null, text: "Stage is busy",
+      person: kind === "spotlight" ? sample.people[0].id : null, by: "u_admin" }];
+  });
+});
+
+test("the welcome button has the jukebox styling and its own polite live region", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /<button id="info-open" class="jukebox-key" type="button">Hear the staff welcome to Longtable<\/button>/);
+  assert.match(html, /<span id="info-speech" class="visually-hidden" role="status" aria-live="polite"><\/span>/);
 });

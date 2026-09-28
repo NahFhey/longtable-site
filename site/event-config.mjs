@@ -1,3 +1,13 @@
+export const INFO_SPEECH = Object.freeze([
+  "Welcome to Longtable!",
+  "Longtable is a 24-hour, in-person D&D marathon: 10 AM November 7 to 10 AM November 8.",
+  "DMs post tables, players claim seats, and this hall shows every table live all night.",
+  "We play for Extra Life, which raises money for kids' hospitals through Children's Miracle Network.",
+  "If you choose to donate, the money goes to Corewell Health Helen DeVos Children's Hospital in Grand Rapids. The Donate plaque's QR code takes you there.",
+  "To play, sign up on our Discord: scan the Discord plaque or use the link at the top of the page.",
+  "Hope to see you at the table on November 7!",
+]);
+
 // The current community invite is defined once and used by the header.
 export const DISCORD_INVITE = "https://discord.gg/tc9NqpjBrb";
 

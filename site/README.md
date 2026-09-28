@@ -634,6 +634,15 @@ paused at the jukebox. Sources and licenses are in `assets/music/CREDITS.txt`.
 New archived renderers include the module, credits, and all five MP3s; archives
 frozen with the two-track or older renderers keep their original files.
 
+A staff member stands near the north end of the stage under “Click me for Info”,
+clear of the QR plaques. Click the staffer or focus **Hear the staff welcome to
+Longtable** to hear about the event, Extra Life, Helen DeVos Children's Hospital
+and joining on Discord. The staffer walks to the microphone, speaks seven lines,
+and returns; clicking while speaking advances a line. The welcome uses real time
+in live, gathering, practice and replay views, yields to other stage activity,
+and is absent in kiosk mode. Reduced motion skips the walking, and each line is
+also announced through a polite live region.
+
 The current header links to Discord and Extra Life team 74917. Its public team
 amount/goal refreshes quietly every minute while the tab is visible. Extra Life
 can cache its API response; the display is not a guarantee of instant donation
