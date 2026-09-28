@@ -3,8 +3,22 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 export const worldToScreen = (camera, point) => ({ x: point.x * camera.zoom + camera.x, y: point.y * camera.zoom + camera.y });
 export const screenToWorld = (camera, point) => ({ x: (point.x - camera.x) / camera.zoom, y: (point.y - camera.y) / camera.zoom });
 
+export const minZoom = (viewport, world) => Math.min(viewport.width / world.width, viewport.height / world.height);
+export const atMinZoom = (camera, viewport, world, epsilon = 1e-6) => camera.zoom <= minZoom(viewport, world) * (1 + epsilon);
+
+// A plain wheel at minimum zoom hands off to the page: down scrolls it, and up scrolls it back to the top before zooming in.
+// A burst of wheel events keeps the intent it started with until the wheel rests for WHEEL_REST_MS, so backing out
+// to the minimum never scrolls the page in the same burst, and scrolling back to the top never starts a zoom. Pinch (ctrl) always zooms.
+export const WHEEL_REST_MS = 700;
+export function wheelIntent({ deltaY, ctrlKey = false, atMinimum, scrollY = 0, previous = null, sincePrevious = Infinity }) {
+  if (ctrlKey) return "zoom";
+  if (previous && sincePrevious < WHEEL_REST_MS) return previous;
+  if (!atMinimum) return "zoom";
+  return deltaY > 0 || (deltaY < 0 && scrollY > 0) ? "scroll" : "zoom";
+}
+
 export function constrainCamera(camera, viewport, world) {
-  const minimum = Math.min(viewport.width / world.width, viewport.height / world.height);
+  const minimum = minZoom(viewport, world);
   const zoom = clamp(camera.zoom, minimum, Math.max(96, minimum));
   const axis = (offset, size, extent, origin = 0) => (size * zoom <= extent ? (extent - size * zoom) / 2 : clamp(offset + origin * zoom, extent - size * zoom, 0)) - origin * zoom;
   return { zoom, x: axis(camera.x, world.width, viewport.width, world.x), y: axis(camera.y, world.height, viewport.height, world.y) };

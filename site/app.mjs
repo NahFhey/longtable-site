@@ -1,7 +1,7 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
-import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "./camera.mjs?v=c07fc77e79e9";
+import { atMinZoom, constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=aa730e0710fe";
 import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=6913252ca788";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
@@ -2018,6 +2018,7 @@ function setCursor(value) { if (canvas.style.cursor !== value) canvas.style.curs
 const pointers = new Map();
 let gesture = null;
 let suppressClick = false;
+let lastWheel = null;  // { intent, at } of the last hall wheel event, so one burst of wheel clicks keeps one intent
 let lastTap = null;   // { id, at } of the last table click, so a second quick click on it zooms
 const DOUBLE_TAP_MS = 400;
 function gesturePosition() {
@@ -2112,6 +2113,11 @@ canvas.addEventListener("click", (event) => {
 });
 canvas.addEventListener("wheel", (event) => {
   if (!state.camera) return;
+  const at = event.timeStamp ?? performance.now();
+  const intent = wheelIntent({ deltaY: event.deltaY, ctrlKey: event.ctrlKey, atMinimum: atMinZoom(state.camera, viewport(), hallBounds()),
+    scrollY: globalThis.scrollY || 0, previous: lastWheel?.intent, sincePrevious: at - (lastWheel?.at ?? -Infinity) });
+  lastWheel = { intent, at };
+  if (intent === "scroll") return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport().height : 1;
   zoomCamera(Math.exp(-clamp(event.deltaY * unit, -300, 300) * .002), pointerPoint(event));

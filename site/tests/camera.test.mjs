@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, worldToScreen, zoomAt } from "../camera.mjs";
+import { atMinZoom, constrainCamera, fitBounds, minZoom, panCamera, relevantTableIndices, screenToWorld, tableBounds, WHEEL_REST_MS, wheelIntent, worldToScreen, zoomAt } from "../camera.mjs";
 import { createSeatingPlan } from "../model.mjs";
 const world = { width: 72, height: 30 };
 const viewport = { width: 960, height: 480 };
@@ -69,4 +69,36 @@ test('the taller back wall remains reachable without moving floor coordinates', 
   assert.ok(bottom.y <= viewport.height);
   const zoomed = constrainCamera({ zoom: 96, x: 0, y: 99999 }, viewport, bounds);
   near(worldToScreen(zoomed, { x: 0, y: -6 }).y, 0);
+});
+
+test("minimum zoom is detected after zooming all the way out, and not a step before", () => {
+  near(minZoom(viewport, world), 960 / 72);
+  let camera = { zoom: 32, x: -200, y: -180 };
+  for (let i = 0; i < 20; i += 1) camera = zoomAt(camera, { x: 300, y: 200 }, .8, viewport, world);
+  assert.equal(atMinZoom(camera, viewport, world), true);
+  assert.equal(atMinZoom({ ...camera, zoom: camera.zoom * (1 + 1e-9) }, viewport, world), true);
+  assert.equal(atMinZoom(zoomAt(camera, { x: 300, y: 200 }, 1.01, viewport, world), viewport, world), false);
+  assert.equal(atMinZoom(fitBounds({ x: 30, y: 10, width: 4, height: 3 }, viewport, world), viewport, world), false);
+});
+
+test("the wheel hands off to the page only at minimum zoom", () => {
+  // Wheel down at the minimum scrolls the page; above it, the wheel zooms even if the next step would reach the minimum.
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: true, scrollY: 0 }), "scroll");
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: false, scrollY: 0 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: false, scrollY: 400 }), "zoom");
+  // Wheel up at the minimum scrolls back to the top first, then zooms in.
+  assert.equal(wheelIntent({ deltaY: -100, atMinimum: true, scrollY: 400 }), "scroll");
+  assert.equal(wheelIntent({ deltaY: -100, atMinimum: true, scrollY: 0 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: -100, atMinimum: false, scrollY: 400 }), "zoom");
+  // A burst keeps its intent: backing out to the minimum does not scroll the page until the wheel rests.
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: true, previous: "zoom", sincePrevious: 80 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: true, previous: "zoom", sincePrevious: WHEEL_REST_MS - 1 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: 100, atMinimum: true, previous: "zoom", sincePrevious: WHEEL_REST_MS }), "scroll");
+  // Scrolling back to the top does not start a zoom in the same burst either.
+  assert.equal(wheelIntent({ deltaY: -100, atMinimum: true, scrollY: 0, previous: "scroll", sincePrevious: 80 }), "scroll");
+  assert.equal(wheelIntent({ deltaY: -100, atMinimum: true, scrollY: 0, previous: "scroll", sincePrevious: WHEEL_REST_MS }), "zoom");
+  // Pinch arrives as ctrl+wheel and always zooms.
+  assert.equal(wheelIntent({ deltaY: 100, ctrlKey: true, atMinimum: true, scrollY: 0 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: -100, ctrlKey: true, atMinimum: true, scrollY: 400 }), "zoom");
+  assert.equal(wheelIntent({ deltaY: 100, ctrlKey: true, atMinimum: true, previous: "scroll", sincePrevious: 10 }), "zoom");
 });

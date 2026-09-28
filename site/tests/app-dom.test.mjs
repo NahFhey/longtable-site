@@ -536,6 +536,35 @@ test("a page that boots hidden still fetches the total once, and showing it does
   assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
 });
 
+test("the wheel scrolls the page at minimum zoom, but only after the wheel rests", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "wheel-handoff");
+  const wheel = app.nodes.get("hall").listeners.get("wheel");
+  let clock = 1000;
+  const send = (deltaY, { ctrlKey = false, after = 50 } = {}) => {
+    let prevented = false;
+    clock += after;
+    wheel({ clientX: 480, clientY: 240, deltaY, ctrlKey, deltaMode: 0, timeStamp: clock, preventDefault() { prevented = true; } });
+    return prevented;
+  };
+  app.frames.shift()?.(performance.now() + 30);
+  assert.ok(send(-300), "wheel up zooms in");
+  assert.ok(send(300, { after: 1000 }), "above the minimum, wheel down zooms out");
+  for (let i = 0; i < 30; i += 1) send(300);
+  assert.ok(send(300), "the burst that backed out to the minimum does not scroll the page");
+  assert.ok(send(300, { after: 600 }), "nor does a short pause inside that burst");
+  assert.equal(send(300, { after: 1000 }), false, "after the wheel rests, wheel down reaches the page");
+  assert.ok(send(300, { ctrlKey: true, after: 1000 }), "pinch still zooms at the minimum");
+  globalThis.scrollY = 400;
+  try {
+    assert.equal(send(-300, { after: 1000 }), false, "wheel up scrolls the page back before zooming in");
+    globalThis.scrollY = 0;
+    assert.equal(send(-300), false, "reaching the top does not start a zoom in the same burst");
+  } finally { delete globalThis.scrollY; }
+  assert.ok(send(-300, { after: 1000 }), "after the wheel rests at the top, wheel up zooms in");
+  assert.ok(send(-300), "and keeps zooming once above the minimum");
+});
+
 test("wheel, pinch, and keyboard navigation change the camera and survive time changes", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "camera-controls");
