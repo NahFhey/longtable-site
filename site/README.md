@@ -637,8 +637,9 @@ frozen with the two-track or older renderers keep their original files.
 A staff member stands near the north end of the stage under “Click me for Info”,
 clear of the QR plaques. Click the staffer or focus **Hear the staff welcome to
 Longtable** to hear about the event, Extra Life, Helen DeVos Children's Hospital
-and joining on Discord. The staffer walks to the microphone, speaks seven lines,
-and returns; clicking while speaking advances a line. The welcome uses real time
+and joining on Discord. The staffer walks to the microphone and speaks seven
+lines, each held until the viewer clicks the bubble, the staffer or the button
+("▸ click to continue"), then walks back after the last. The welcome uses real time
 in live, gathering, practice and replay views, yields to other stage activity,
 and is absent in kiosk mode. Reduced motion skips the walking, and each line is
 also announced through a polite live region.

@@ -1259,7 +1259,7 @@ function findInfoStaffPost(layout) {
     const figure = { x: post.x - .5, y: y - 1.5, w: 1, h: 1.5 };
     if (margin.y < Math.max(0, backWall.y + backWall.h) || wallFixtures(layout).plaques.some(rect => overlaps(margin, rect))
       || decorations.some(rect => overlaps(figure, rect))) continue;
-    return { post, label, hit: { x: label.x, y: label.y, w: label.w, h: post.y - label.y },
+    return { post, label, hit: { x: label.x, y: label.y, w: label.w, h: post.y + .4 - label.y },
       speakSpot: { x: stageFront.x, y: stageFront.y } };
   }
   return null;

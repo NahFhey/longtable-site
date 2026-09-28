@@ -30,7 +30,7 @@ for (const [name, layout] of [
     assert.ok(figure.x > stage.x + 5 / 16, "clear of lip and footlights at every y");
     assert.ok(figure.x + figure.w < stage.x + stage.w - .85 - 2 / 16, "clear of drape and ties");
     assert.ok(!overlaps(figure, stageGeometry(layout).stairs));
-    assert.deepEqual(hit, { x: label.x, y: label.y, w: label.w, h: post.y - label.y });
+    assert.deepEqual(hit, { x: label.x, y: label.y, w: label.w, h: post.y + .4 - label.y }, "the sign and the whole sprite");
     assert.deepEqual(speakSpot, layout.stageFront);
   });
 }

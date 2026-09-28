@@ -2477,7 +2477,7 @@ test("info staff and sign appear in live, replay, gathering and practice, and ne
   });
 });
 
-test("info hit starts a real-time walk, seven timed lines at the microphone, then returns home", async () => {
+test("info hit starts a real-time walk, seven click-to-continue lines at the microphone, then returns home", async () => {
   await withInfoApp("info-visit", {}, ({ app, geometry, step, click, hit, pointEvent, walkMs, camera }) => {
     app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
     assert.equal(app.nodes.get("hall").style.cursor, "pointer");
@@ -2495,11 +2495,15 @@ test("info hit starts a real-time walk, seven timed lines at the microphone, the
     const anchor = worldToScreen(camera(), { x: geometry.speakSpot.x, y: geometry.speakSpot.y - 2.2 });
     assert.ok(Math.abs(bubble.x - 4 + (bubble.text.length * 5 + 8) / 2 - anchor.x) < 1);
     for (let line = 0; line < INFO_SPEECH.length; line++) {
-      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line]);
-      const ms = Math.max(3.5, Math.min(9, INFO_SPEECH[line].split(/\s+/u).length * .35)) * 1000;
-      step(ms - 1);
-      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line], "full readable duration");
-      step(1);
+      const hint = line === INFO_SPEECH.length - 1 ? "▸ click to finish" : "▸ click to continue";
+      step(60_000);
+      assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line], "a line waits for the viewer");
+      const hintCall = app.textCalls.find(c => c.text === hint);
+      assert.ok(hintCall, `line ${line} shows "${hint}"`);
+      app.nodes.get("hall").listeners.get("pointermove")({ pointerId: 8, clientX: hintCall.x + 1, clientY: hintCall.y + 1 });
+      assert.equal(app.nodes.get("hall").style.cursor, "pointer", "the bubble is clickable");
+      app.nodes.get("hall").listeners.get("click")({ pointerId: 8, clientX: hintCall.x + 1, clientY: hintCall.y + 1 });
+      step();
     }
     assert.equal(app.nodes.get("info-speech").textContent, "");
     click(hit); // Leaving ignores repeated clicks.
@@ -2515,7 +2519,8 @@ test("the keyboard starts the welcome and clicking the speaking staff skips each
     step(walkMs + 1);
     assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
     for (let line = 1; line < INFO_SPEECH.length; line++) {
-      click({ x: geometry.speakSpot.x, y: geometry.speakSpot.y - .5 });
+      // Alternate the upper sprite and its feet, which sit .4 below the position.
+      click({ x: geometry.speakSpot.x, y: geometry.speakSpot.y + (line % 2 ? -.5 : .3) });
       step();
       assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[line]);
     }
@@ -2583,8 +2588,9 @@ test("a running welcome frames the stage and survives seeking and replay speed c
     step(walkMs + 1);
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
     assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
-    step(3499);
-    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0]);
+    step(60_000);
+    assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[0], "fast replay does not advance the welcome");
+    app.nodes.get("info-open").listeners.get("click")();
     step(1);
     assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECH[1]);
   });
