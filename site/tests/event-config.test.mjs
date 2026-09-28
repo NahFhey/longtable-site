@@ -75,7 +75,7 @@ function fundraisingNodes() {
     };
   } };
   return { strip: { hidden: true }, total: ownerDocument.createElement(), fill: { style: {} },
-    thermometer: { hidden: false }, donate: {} };
+    thermometer: { hidden: false } };
 }
 
 test('fundraising refreshes valid totals, retains stale values, and rejects invalid data', async () => {
@@ -91,7 +91,6 @@ test('fundraising refreshes valid totals, retains stale values, and rejects inva
   assert.equal(nodes.fill.style.width, "0.8%");
   assert.equal(nodes.thermometer.hidden, false);
   assert.equal(nodes.strip.hidden, false);
-  assert.equal(nodes.donate.href, DONATE_URL);
   assert.match(node.title, /Checks every minute/);
   team.sumDonations = 125.50;
   await callback();
@@ -191,8 +190,7 @@ test("first failure shows support text and Donate; recovery restores the spans a
     assert.equal(nodes.strip.hidden, false);
     assert.equal(nodes.total.textContent, "Support our Extra Life team");
     assert.equal(nodes.thermometer.hidden, true);
-    assert.equal(nodes.donate.href, DONATE_URL);
-    response = { ok: true, json: async () => ({ teamID: 74917, sumDonations: 0, fundraisingGoal: 2500 }) };
+      response = { ok: true, json: async () => ({ teamID: 74917, sumDonations: 0, fundraisingGoal: 2500 }) };
     await update();
     assert.equal(nodes.thermometer.hidden, false);
     assert.equal(nodes.fill.style.width, "0%");
@@ -213,5 +211,6 @@ test("the fundraising strip sits before the masthead with one total and an acces
   assert.match(html, /class="skip-link"[^>]*>[^<]*<\/a>\s*<section id="fundraising-strip"/);
   assert.match(html, /id="fundraising-strip"[^>]*aria-label="Extra Life fundraising"[^>]*hidden/);
   assert.match(html, /id="thermometer"[^>]*aria-hidden="true"/);
-  assert.match(html, /id="fundraising-donate"[^>]*>Donate<\/a>\s*<\/section>\s*<header class="masthead">/);
+  assert.match(html, /id="fundraising-total"[^>]*><\/p>\s*<\/section>\s*<header class="masthead">/);
+  assert.doesNotMatch(html, /fundraising-donate/);
 });

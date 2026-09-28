@@ -85,10 +85,10 @@ Legacy schemas 1–3 keep their index-based geometry. Layout and seating helpers
 recorded dice are implemented; audio is a later milestone.
 See `data/TIMELINE.md` for geometry, migration, and overflow reservation rules.
 
-On desktop the hall precedes the table list. Table details and a compact,
-scrollable event activity log share the sidebar beside the hall (stacked below
-it at 800px and below). At 650px and below, the actual DOM order becomes list,
-sidebar, then an initially collapsed **The Great Hall**.
+On desktop the hall precedes the table list. Table details slide in over the hall
+when a table is picked. The **Activity** button under the map opens the log in
+the same drawer. At phone widths, **The Great Hall** stays open above the status,
+camera help, timeline, and table list; the drawer stays over the canvas.
 
 The collapsible attendee list shows every published person once; DM takes
 precedence over Player and Visitor when roles overlap. Hidden attendees remain
@@ -328,8 +328,9 @@ renderer and schema. The schema-7 reader must be live before restarting the bot.
 
 ### Transitional event actions
 
-The header carries **Find a game** and **Discord**; **Past events** is in the
-footer. **Donate** appears only in the fundraising strip above the header. The
+The header carries **Find a game**, **Discord** and **Donate**, with Donate
+beside Discord; **Past events** is in the footer. The fundraising strip above
+the header carries no link. The
 wall plaques carry the QR codes. Update `DISCORD_INVITE` and `DONATE_URL` in `event-config.mjs`
 to change their destinations; they are shared across current events without
 depending on their names or dates. Samples and archived replays suppress the
@@ -653,16 +654,16 @@ The welcome uses real time in live, gathering, practice and replay views, yields
 to other stage activity, and is absent in kiosk mode. Reduced motion skips the
 walking, and each line is also announced through a polite live region.
 
-The current header links to Discord. A full-width fundraising strip above it
-shows the running total, goal, thermometer and a Donate link for Extra Life
+The current header links to Discord and Donate. A full-width fundraising strip
+above it shows the running total, goal and thermometer for Extra Life
 team 74917. The total comes from the public Extra Life team
 API at boot and every 60 s while the page is visible; returning to the page refreshes a total at least 60 s
 old. Extra Life can cache its API response, so the display is not a guarantee of
 instant donation updates. The fill caps at 100%, with “goal reached!” when the
 goal is met. A zero goal hides the thermometer and omits the goal from the text.
 A failed first fetch shows “Support our Extra Life team” with the thermometer
-hidden and Donate available. Later failures retain the last fill and thermometer
+hidden; the header's Donate stays available. Later failures retain the last fill and thermometer
 state and label the text “last available total”. Totals never animate. Phones
-omit the Extra Life brand text; kiosks enlarge the strip and hide Donate because
-the wall plaques carry QR codes. Samples and archived replays do not fetch or
+omit the Extra Life brand text; kiosks enlarge the strip and hide the header
+actions because the wall plaques carry QR codes. Samples and archived replays do not fetch or
 show the strip.

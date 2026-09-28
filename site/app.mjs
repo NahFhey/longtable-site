@@ -2,7 +2,7 @@ import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
 import { atMinZoom, constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=aa730e0710fe";
-import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=3dc1b3e40388";
+import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=e5ce603f951c";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
 import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
@@ -109,20 +109,18 @@ $("hall-explorer").open = true;
 function arrangeHall() {
   const main = $("hall-content");
   const explorer = $("hall-explorer");
-  const sidebar = $("hall-sidebar") ?? $("detail");
   const scene = canvas.parentElement;
   const cameraHelp = $("camera-help");
   const timeline = $("timeline-controls");
   if (mobile.matches) {
     // The hall's summary never shows at any width, so the hall stays open; this only re-asserts it.
     // The camera buttons stay in the scene, where styles.css lays them over the bottom of the canvas.
-    // Below the canvas, in reading order: status, camera help, timeline, sidebar, table list.
+    // Below the canvas, in reading order: status, camera help, timeline, table list.
     // styles.css lifts the explorer above the status; kiosk hides everything moved here.
     explorer.open = true;
-    main.append(...(cameraHelp ? [cameraHelp] : []), ...(timeline ? [timeline] : []), sidebar, $("table-list"));
+    main.append(...(cameraHelp ? [cameraHelp] : []), ...(timeline ? [timeline] : []), $("table-list"));
   } else {
     main.insertBefore($("table-list"), explorer.nextSibling);
-    $("hall-layout").append(sidebar);
     if (cameraHelp && cameraHelp.parentElement !== scene) scene.insertBefore(cameraHelp, $("music-open") ?? canvas);
     if (timeline && timeline.parentElement !== scene) scene.append(timeline);
   }
@@ -154,6 +152,7 @@ const state = {
   viewport: null,
   speed: 600,
   selectedId: null,
+  drawer: null,
   manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
   hoverName: null,  // the hovered person's name label, drawn after the plates
@@ -373,7 +372,6 @@ function renderActions() {
   const host = $("event-actions");
   host.replaceChildren();
   for (const action of state.sample || state.archive ? [] : eventActions(state.data.event)) {
-    if (action.url === DONATE_URL) continue;
     // Header actions are plain links; the QR codes live on the wall plaques.
     const link = append(host, "a", action.label);
     link.href = action.url;
@@ -1525,12 +1523,43 @@ function renderDetail(focus = false) {
   if (focus) heading.focus();
 }
 
+function setDrawer(view) {
+  if (state.kiosk) return;
+  if (state.drawer !== view) state.drawer = view;
+  const drawer = $("hall-sidebar");
+  if (drawer.getAttribute("data-view") !== view) {
+    if (view === null) drawer.removeAttribute("data-view");
+    else drawer.setAttribute("data-view", view);
+  }
+  const expanded = String(view === "activity");
+  if ($("activity-toggle").getAttribute("aria-expanded") !== expanded) $("activity-toggle").setAttribute("aria-expanded", expanded);
+  const label = view === "activity" ? "Close activity" : "Close table details";
+  if ($("drawer-close").getAttribute("aria-label") !== label) $("drawer-close").setAttribute("aria-label", label);
+}
+
+function closeDrawer() {
+  const view = state.drawer;
+  if (!view) return;
+  const restoreFocus = $("hall-sidebar").contains(document.activeElement);
+  if (view === "detail") selectTable(null);
+  else setDrawer(null);
+  if (restoreFocus) (view === "detail" ? canvas : $("activity-toggle")).focus();
+}
+
+function drawerKeydown(event) {
+  if (event.key !== "Escape" || !state.drawer) return;
+  closeDrawer();
+  event.preventDefault();
+}
+
 // Selecting shows the details; only a double click in the hall (or the table list) also zooms to the table.
 function selectTable(id, focus = false, zoom = false) {
   state.selectedId = id;
   state.manualSelection = true;
   const index = state.data.tables.findIndex((table) => table.id === id);
   if (zoom && index >= 0) frameTables([index], true);
+  // Reveal the heading before renderDetail tries to focus it from the table list.
+  setDrawer(id === null ? null : "detail");
   renderDetail(focus && state.selectedId !== null);
 }
 
@@ -1819,7 +1848,7 @@ function installTimeline(data, initial = false) {
   state.data = data;
   if (initial && !state.sample && !state.archive) setupFundraising({
     strip: $("fundraising-strip"), total: $("fundraising-total"), fill: $("thermometer-fill"),
-    thermometer: $("thermometer"), donate: $("fundraising-donate"),
+    thermometer: $("thermometer"),
   });
   if (state.hostIconUrl !== data.event.host_icon_url) {
     const url = data.event.host_icon_url;
@@ -1869,7 +1898,10 @@ function installTimeline(data, initial = false) {
   state.activity = publicActivity(data);
   state.activityKey = null;
   state.activitySecond = null;
-  if (state.selectedId && !data.tables.some((table) => table.id === state.selectedId)) state.selectedId = null;
+  if (state.selectedId && !data.tables.some((table) => table.id === state.selectedId)) {
+    state.selectedId = null;
+    if (state.drawer === "detail") setDrawer(null);
+  }
   renderTableList();
   renderDetail();
   if (initial) state.time = 0;
@@ -2136,7 +2168,11 @@ $("zoom-in").addEventListener("click", () => zoomCamera(1.25));
 $("zoom-out").addEventListener("click", () => zoomCamera(.8));
 $("recenter").addEventListener("click", recenter);
 $("fit-active").addEventListener("click", () => { if (state.data) frameTables(relevantTableIndices(state.data.tables, state.time), true); });
+$("activity-toggle").addEventListener("click", () => setDrawer(state.drawer === "activity" ? null : "activity"));
+$("drawer-close").addEventListener("click", closeDrawer);
+$("hall-sidebar").addEventListener("keydown", drawerKeydown);
 canvas.addEventListener("keydown", (event) => {
+  drawerKeydown(event);
   const keys = { ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60] };
   if (keys[event.key]) { event.preventDefault(); moveCamera(...keys[event.key]); }
   else if (["+", "=", "-", "Home"].includes(event.key)) {

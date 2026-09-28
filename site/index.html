@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=6c5a739dba3c">
+  <link rel="stylesheet" href="./styles.css?v=7844c97fcf3c">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
@@ -18,7 +18,6 @@
       <span class="thermometer-tube"><span id="thermometer-fill" class="thermometer-fill"></span></span>
     </div>
     <p id="fundraising-total" class="fundraising-total"></p>
-    <a id="fundraising-donate" class="fundraising-donate">Donate</a>
   </section>
   <header class="masthead">
     <div class="identity">
@@ -59,6 +58,7 @@
           <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
           <button id="recenter" type="button">Recenter</button>
           <button id="fit-active" type="button">Fit active tables</button>
+          <button id="activity-toggle" type="button" aria-expanded="false" aria-controls="hall-sidebar">Activity</button>
         </div>
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
@@ -105,20 +105,21 @@
             <span id="end-label">—</span>
           </div>
         </div>
+        <aside id="hall-sidebar" class="hall-sidebar hall-drawer" aria-label="Table details and activity">
+          <button id="drawer-close" class="drawer-close" type="button" aria-label="Close panel">×</button>
+          <section id="detail" class="detail" aria-live="polite">
+            <h2>Table details</h2>
+            <p class="muted">Select a table in the hall or in the table list.</p>
+          </section>
+          <section class="activity-panel" aria-labelledby="activity-heading">
+            <h2 id="activity-heading">Activity</h2>
+            <p id="activity-note" class="muted"></p>
+            <ol id="activity-log" class="activity-log" tabindex="0" aria-label="Event activity"></ol>
+            <p id="activity-empty" class="muted">No public actions at this time.</p>
+            <button id="activity-more" type="button" hidden>Show older actions</button>
+          </section>
+        </aside>
       </div>
-      <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
-        <section id="detail" class="detail" aria-live="polite">
-          <h2>Table details</h2>
-          <p class="muted">Select a table in the hall or in the table list.</p>
-        </section>
-        <section class="activity-panel" aria-labelledby="activity-heading">
-          <h2 id="activity-heading">Activity</h2>
-          <p id="activity-note" class="muted"></p>
-          <ol id="activity-log" class="activity-log" tabindex="0" aria-label="Event activity"></ol>
-          <p id="activity-empty" class="muted">No public actions at this time.</p>
-          <button id="activity-more" type="button" hidden>Show older actions</button>
-        </section>
-      </aside>
     </section>
     </details>
   </main>
@@ -134,6 +135,6 @@
     <p><a href="./past-events.html">Past events</a></p>
     <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="./app.mjs?v=301062e4392b"></script>
+  <script type="module" src="./app.mjs?v=2d86f2fbb7d4"></script>
 </body>
 </html>

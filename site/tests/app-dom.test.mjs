@@ -42,7 +42,12 @@ class FakeNode {
   addEventListener(kind, listener) { this.listeners.set(kind, listener); }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
-  focus() { this.focused = true; }
+  removeAttribute(name) { this.attributes.delete(name); }
+  focus() {
+    this.focused = true;
+    this.ownerDocument.activeElement = this;
+    this.drawerViewOnFocus = this.ownerDocument.getElementById("hall-sidebar")?.getAttribute("data-view");
+  }
   getBoundingClientRect() { return { left: 0, top: 0, width: 960, height: 480 }; }
 }
 
@@ -55,7 +60,7 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-donate", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
+  const ids = ["drawer-close", "activity-toggle", "info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   // Derive header and timeline ancestry from the shipped markup so placement tests catch HTML regressions.
   for (const fragment of [pageHtml.match(/<header class="masthead">[\s\S]*?<\/header>/)[0],
@@ -71,8 +76,10 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   }
   nodes.get("fundraising-strip").hidden = true;
   nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
-  nodes.get("hall-sidebar").append(nodes.get("detail"), nodes.get("activity-panel"));
+  nodes.get("hall-sidebar").append(nodes.get("drawer-close"), nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
+  nodes.get("activity-toggle").setAttribute("aria-expanded", "false");
+  nodes.get("drawer-close").setAttribute("aria-label", "Close panel");
   if (options.liveFeed) nodes.get("live-feed").setAttribute("content", options.liveFeed);
   if (options.backupFeed) nodes.get("backup-feed").setAttribute("content", options.backupFeed);
   const contextCalls = [];
@@ -115,7 +122,8 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     },
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
-  scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"));
+  scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"), nodes.get("hall-sidebar"));
+  nodes.get("camera-controls").append(nodes.get("activity-toggle"));
   nodes.get("hall").parentElement = scene;
   nodes.get("hall").width = options.viewport?.width ?? 960;
   nodes.get("hall").height = options.viewport?.height ?? 480;
@@ -395,19 +403,21 @@ for (const options of [{ noContext: true }, { contextThrows: true }]) {
     const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
     button.listeners.get("click")();
     assert.match(allText(app.nodes.get("detail")), new RegExp(sample.tables[0].name));
+    assert.equal(app.nodes.get("hall-sidebar").getAttribute("data-view"), "detail");
+    assert.equal(document.activeElement, app.nodes.get("detail").children[0]);
     assert.match(app.nodes.get("status").textContent, /use the table list/);
   });
 }
 
-test("mobile begins paused with the hall open, camera buttons in the scene, and help, details and tables below it in reading order", async () => {
+test("mobile begins paused with the hall open, camera buttons in the scene, and help, timeline and tables below it in reading order", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const app = await runApp([sample], "mobile", { mobile: true });
   assert.equal(app.nodes.get("hall-explorer").open, true, "phones hide the summary, so the hall is always open");
   assert.deepEqual(app.nodes.get("hall-content").children.map((node) => [...app.nodes].find(([, value]) => value === node)?.[0]),
-    ["camera-help", "timeline-controls", "hall-sidebar", "table-list"]);
+    ["camera-help", "timeline-controls", "table-list"]);
   assert.equal(app.nodes.get("camera-controls").parentElement, app.nodes.get("hall").parentElement, "phones lay the camera buttons over the canvas");
   assert.equal(app.nodes.get("play").textContent, "Play");
-  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-content"));
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall").parentElement);
   assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("activity-panel").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("table-list").parentElement, app.nodes.get("hall-content"));
@@ -419,7 +429,178 @@ test("desktop keeps the camera tools and timeline inside the scene with the hall
   const scene = app.nodes.get("hall").parentElement;
   for (const id of ["camera-controls", "camera-help", "timeline-controls"]) assert.equal(app.nodes.get(id).parentElement, scene, id);
   assert.equal(app.nodes.get("hall-explorer").open, true);
-  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-layout"));
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall").parentElement);
+});
+
+async function drawerFixture(label, options = {}) {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.events = [];
+  data.tables = data.tables.slice(0, 2).map(table => ({ ...table, start: 0, end: data.event.slots, signups: [] }));
+  const app = await runApp([data], label, options);
+  assert.deepEqual(app.errors, []);
+  app.nodes.get("fit-active").listeners.get("click")();
+  return { ...app, data };
+}
+
+function drawerTap(app, x = 680, y = 240) {
+  const events = app.nodes.get("hall").listeners;
+  events.get("pointerdown")({ pointerId: 1, clientX: x, clientY: y, button: 0 });
+  events.get("pointerup")({ pointerId: 1 });
+  events.get("click")({ clientX: x, clientY: y });
+}
+
+const drawerView = app => app.nodes.get("hall-sidebar").getAttribute("data-view");
+const drawerButton = (app, id) => app.nodes.get(id).listeners.get("click")();
+
+test("drawer: canvas table click opens details and empty floor closes without moving focus", async () => {
+  const app = await drawerFixture("drawer-floor");
+  app.nodes.get("activity-toggle").focus();
+  drawerTap(app);
+  assert.equal(drawerView(app), "detail");
+  assert.equal(document.activeElement, app.nodes.get("activity-toggle"));
+  drawerTap(app, 2, 2);
+  assert.equal(drawerView(app), null);
+  assert.equal(document.activeElement, app.nodes.get("activity-toggle"));
+});
+
+test("drawer: clicking the selected table again closes details", async () => {
+  const app = await drawerFixture("drawer-reselect");
+  drawerTap(app);
+  assert.equal(drawerView(app), "detail");
+  await new Promise(resolve => setTimeout(resolve, 450));
+  drawerTap(app);
+  assert.equal(drawerView(app), null);
+  assert.match(allText(app.nodes.get("detail")), /Select a table/);
+});
+
+test("drawer: a drag followed by an empty-floor click keeps details open", async () => {
+  const app = await drawerFixture("drawer-drag");
+  drawerTap(app);
+  const events = app.nodes.get("hall").listeners;
+  events.get("pointerdown")({ pointerId: 2, clientX: 600, clientY: 240, button: 0 });
+  events.get("pointermove")({ pointerId: 2, clientX: 650, clientY: 240 });
+  events.get("pointerup")({ pointerId: 2 });
+  events.get("click")({ clientX: 2, clientY: 2 });
+  assert.equal(drawerView(app), "detail");
+});
+
+test("drawer: Activity toggles its view and expanded state without changing selection", async () => {
+  const app = await drawerFixture("drawer-activity");
+  drawerTap(app);
+  const detail = allText(app.nodes.get("detail"));
+  drawerButton(app, "activity-toggle");
+  assert.equal(drawerView(app), "activity");
+  assert.equal(app.nodes.get("activity-toggle").getAttribute("aria-expanded"), "true");
+  assert.equal(allText(app.nodes.get("detail")), detail);
+  drawerButton(app, "activity-toggle");
+  assert.equal(drawerView(app), null);
+  assert.equal(app.nodes.get("activity-toggle").getAttribute("aria-expanded"), "false");
+  assert.equal(allText(app.nodes.get("detail")), detail);
+});
+
+test("drawer: a table click switches Activity to details", async () => {
+  const app = await drawerFixture("drawer-activity-table");
+  drawerButton(app, "activity-toggle");
+  assert.equal(drawerView(app), "activity");
+  drawerTap(app);
+  assert.equal(drawerView(app), "detail");
+  assert.equal(app.nodes.get("activity-toggle").getAttribute("aria-expanded"), "false");
+});
+
+test("drawer: an empty-floor click closes Activity", async () => {
+  const app = await drawerFixture("drawer-activity-floor");
+  drawerButton(app, "activity-toggle");
+  assert.equal(drawerView(app), "activity");
+  drawerTap(app, 2, 2);
+  assert.equal(drawerView(app), null);
+});
+
+test("drawer: close deselects details and restores focus for each view", async () => {
+  const app = await drawerFixture("drawer-close");
+  drawerTap(app);
+  assert.equal(drawerView(app), "detail");
+  assert.equal(app.nodes.get("drawer-close").getAttribute("aria-label"), "Close table details");
+  app.nodes.get("drawer-close").focus();
+  drawerButton(app, "drawer-close");
+  assert.equal(drawerView(app), null);
+  assert.match(allText(app.nodes.get("detail")), /Select a table/);
+  assert.equal(document.activeElement, app.nodes.get("hall"));
+  drawerButton(app, "activity-toggle");
+  assert.equal(app.nodes.get("drawer-close").getAttribute("aria-label"), "Close activity");
+  app.nodes.get("activity-log").focus();
+  drawerButton(app, "drawer-close");
+  assert.equal(drawerView(app), null);
+  assert.equal(document.activeElement, app.nodes.get("activity-toggle"));
+});
+
+test("drawer: Escape closes from canvas or drawer and is ignored while closed", async () => {
+  const app = await drawerFixture("drawer-escape");
+  drawerTap(app);
+  assert.equal(drawerView(app), "detail");
+  let prevented = 0;
+  const escape = { key: "Escape", preventDefault() { prevented += 1; } };
+  app.nodes.get("hall").focus();
+  app.nodes.get("hall").listeners.get("keydown")(escape);
+  assert.equal(drawerView(app), null);
+  assert.equal(prevented, 1);
+  const detail = allText(app.nodes.get("detail"));
+  app.nodes.get("hall").listeners.get("keydown")(escape);
+  assert.equal(drawerView(app), null);
+  assert.equal(allText(app.nodes.get("detail")), detail);
+  assert.equal(prevented, 1);
+  drawerButton(app, "activity-toggle");
+  app.nodes.get("activity-log").focus();
+  app.nodes.get("hall-sidebar").listeners.get("keydown")(escape);
+  assert.equal(drawerView(app), null);
+  assert.equal(document.activeElement, app.nodes.get("activity-toggle"));
+  assert.equal(prevented, 2);
+  assert.equal(app.documentListeners.has("keydown"), false);
+});
+
+test("drawer: automatic single-table selection leaves the drawer closed", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.events = [];
+  data.tables = data.tables.slice(0, 1).map(table => ({ ...table, start: 0, end: data.event.slots, signups: [] }));
+  const app = await runApp([data], "drawer-automatic");
+  assert.equal(app.nodes.get("detail").children[0].textContent, data.tables[0].name);
+  assert.equal(drawerView(app), null);
+  assert.equal(app.nodes.get("activity-toggle").getAttribute("aria-expanded"), "false");
+});
+
+test("drawer: refresh removing the selected table closes details", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.events = [];
+  data.generated_at = new Date(Date.now() - 10000).toISOString();
+  const next = structuredClone(data);
+  next.generated_at = new Date().toISOString();
+  next.tables.shift();
+  const app = await runApp([data, next], "drawer-refresh", { search: "" });
+  app.nodes.get("tables").children[0].children[0].children[0].children[0].listeners.get("click")();
+  assert.equal(drawerView(app), "detail");
+  drawerButton(app, "refresh-now");
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(drawerView(app), null);
+  assert.match(allText(app.nodes.get("detail")), /Select a table/);
+});
+
+test("drawer: table-list button opens details before focusing the heading", async () => {
+  const app = await drawerFixture("drawer-list");
+  const button = app.nodes.get("tables").children[0].children[0].children[0].children[0];
+  button.listeners.get("click")();
+  assert.equal(drawerView(app), "detail");
+  assert.equal(document.activeElement, app.nodes.get("detail").children[0]);
+  assert.equal(document.activeElement.textContent, app.data.tables[0].name);
+  assert.equal(document.activeElement.drawerViewOnFocus, "detail");
+});
+
+test("drawer: kiosk table and Activity clicks leave the drawer closed", async () => {
+  const app = await drawerFixture("drawer-kiosk", { search: "?sample=1&kiosk=1" });
+  drawerTap(app);
+  assert.equal(app.nodes.get("detail").children[0].textContent, app.data.tables[1].name);
+  assert.equal(drawerView(app), null);
+  drawerButton(app, "activity-toggle");
+  assert.equal(drawerView(app), null);
+  assert.equal(app.nodes.get("activity-toggle").getAttribute("aria-expanded"), "false");
 });
 
 test("one relevant game is selected automatically, while two are framed without a selected game", async () => {
@@ -497,11 +678,12 @@ test("production has one community link and no repeated Discord signup instructi
   production.event.start = "2026-09-19T10:30:00-04:00";
   const app = await runApp([production], "configured-actions", { search: "" });
   const actions = app.nodes.get("event-actions");
-  // Discord is the only header action; Donate is in the fundraising strip.
-  assert.equal(actions.children.length, 1);
+  // Discord and Donate sit side by side in the header; the fundraising strip carries no link.
+  assert.equal(actions.children.length, 2);
   assert.equal(actions.children[0].href, DISCORD_INVITE);
   assert.equal(actions.children[0].textContent, "Discord");
-  assert.equal(app.nodes.get("fundraising-donate").href, DONATE_URL);
+  assert.equal(actions.children[1].href, DONATE_URL);
+  assert.equal(actions.children[1].textContent, "Donate");
   assert.ok(actions.children.every((child) => child.tagName === "A"));
   assert.doesNotMatch(allText(actions), /Show QR/);
   assert.doesNotMatch(allText(app.nodes.get("tables")), /Discord|Sign up using Join/);
@@ -523,8 +705,7 @@ test("a live page fetches the Extra Life total once at boot and shows the strip"
   assert.equal(line.textContent, "$20 raised of $2,500 · Extra Life");
   assert.equal(app.nodes.get("thermometer").hidden, false);
   assert.equal(app.nodes.get("thermometer-fill").style.width, "0.8%");
-  assert.equal(app.nodes.get("fundraising-donate").href, DONATE_URL);
-  // No header Donate remains to compare target/rel against; the strip destination is asserted above.
+  assert.equal(app.nodes.get("event-actions").children[1].href, DONATE_URL);
   // A later timeline refresh reinstalls the timeline without a second setup or fetch.
   app.nodes.get("refresh-now").listeners.get("click")();
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1192,7 +1373,7 @@ test("the timestamped activity log follows replay and paginates older public cha
   data.tables[0].name = "<script>literal text</script>";
   const app = await runApp([data], "activity-log", { search: "" });
   const log = app.nodes.get("activity-log");
-  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall-layout"));
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall").parentElement);
   assert.equal(app.nodes.get("detail").parentElement, app.nodes.get("hall-sidebar"));
   assert.equal(app.nodes.get("activity-panel").parentElement, app.nodes.get("hall-sidebar"));
   const firstEntry = log.children[0];
@@ -1805,7 +1986,9 @@ test("?kiosk=1 flags the document, opens the hall on mobile, adds no side rail a
   assert.equal(document.documentElement.dataset.kiosk, "1");
   assert.equal(app.nodes.get("hall-explorer").open, true);
   assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED", "kiosk never changes the derived mode (mobile begins paused)");
-  // The QR codes are the wall plaques on the canvas; no DOM rail is added beside the scene.
+  // The harness does not append the scene to hall-layout; zero children means no extra rail was added.
+  // The drawer remains inside the scene and kiosk CSS hides it.
+  assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall").parentElement);
   assert.equal(app.nodes.get("hall-layout").children.length, 0);
   const drawn = app.imageCalls.filter((call) => /-qr\.png$/.test(call.src)).map((call) => call.src);
   assert.deepEqual(drawn, WALL_PLAQUES.map((plaque) => new URL(plaque.qr, new URL("../app.mjs", import.meta.url)).href));

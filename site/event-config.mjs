@@ -80,11 +80,10 @@ export function eventActions(event, configurations = EVENT_CONFIG) {
 }
 
 // Extra Life's public API allows browser requests. Poll quietly; never animate totals.
-export function setupFundraising({ strip, total, fill, thermometer, donate } = {}, { fetchTeam = globalThis.fetch, schedule = globalThis.setInterval,
+export function setupFundraising({ strip, total, fill, thermometer } = {}, { fetchTeam = globalThis.fetch, schedule = globalThis.setInterval,
   visible = () => document.visibilityState !== "hidden", now = Date.now,
   onVisibilityChange = (listener) => globalThis.document?.addEventListener?.("visibilitychange", listener) } = {}) {
   if (!strip) return;
-  donate.href = DONATE_URL;
   thermometer.hidden = true;
   let pending = false;
   let lastText = "";
@@ -121,7 +120,7 @@ export function setupFundraising({ strip, total, fill, thermometer, donate } = {
       total.title = "Team total reported by Extra Life. Checks every minute; Extra Life may cache updates.";
     } catch {
       total.textContent = lastText ? `${lastText} · last available total` : "Support our Extra Life team";
-      total.title = "The latest team total is temporarily unavailable. Donate still opens Extra Life.";
+      total.title = "The latest team total is temporarily unavailable. Donate in the header still opens Extra Life.";
     } finally {
       strip.hidden = false;
       pending = false;

@@ -75,9 +75,9 @@ h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
 .record-note { margin: .75rem 0 0; color: var(--gold); }
 .event-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .event-actions:not(:empty) { margin: 1rem 0; }
-.event-actions a, .fundraising-donate { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
+.event-actions a { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
 
-main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
+main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); overflow-x: clip; } /* the closed hall drawer waits off the scene's right edge */
 #hall-content { display: flex; flex-direction: column; }
 .status { margin: 0; padding: 1rem 0 .3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; min-height: 1.5rem; }
 .status.error { color: var(--error); font-weight: 700; }
@@ -88,7 +88,7 @@ main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 /* The hall is always open: app.mjs opens the <details> and nothing on the page can close it, since its summary never shows. */
 .hall-explorer { margin-top: 1rem; border: 1px solid var(--line); border-radius: .6rem; background: #18241f; }
 .hall-explorer > summary { display: none; }
-.hall-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem); gap: 1.25rem; padding: 1.25rem; align-items: start; }
+.hall-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding: 1.25rem; align-items: start; }
 .scene-wrap { position: relative; min-width: 0; }
 .camera-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .camera-controls button { min-height: 2.5rem; font-size: .75rem; background: #21332a; }
@@ -127,9 +127,19 @@ html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 
 #music-volume-value { min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
 #music-status { margin-top: .2rem; color: var(--muted); font-size: .7rem; }
 
-.hall-sidebar { min-width: 0; border: 1px solid #655e45; border-top: 3px solid var(--gold); border-radius: .3rem; background: var(--panel); }
+.hall-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 4; width: min(22rem, calc(100% - 3rem));
+  display: flex; flex-direction: column; overflow-y: auto;
+  background: var(--panel); border: 1px solid #655e45; border-top: 3px solid var(--gold); border-radius: .3rem 0 0 .3rem; box-shadow: -.5rem 0 1.5rem #00000066;
+  transform: translateX(calc(100% + 1.5rem)); visibility: hidden;
+  transition: transform .22s ease-out, visibility 0s linear .22s;
+}
+.hall-drawer[data-view] { transform: none; visibility: visible; transition: transform .22s ease-out; }
+.hall-drawer[data-view="detail"] .activity-panel, .hall-drawer[data-view="activity"] #detail { display: none; }
+.drawer-close { position: sticky; top: 0; align-self: flex-end; min-width: 2.5rem; min-height: 2.5rem; margin: .35rem .35rem -2.85rem 0; font-size: 1.15rem; line-height: 1; z-index: 1; }
+@media (pointer: coarse) { .drawer-close { width: 44px; height: 44px; } }
 .detail { min-width: 0; padding: 1.1rem; }
-.detail h2 { margin: 0 0 .6rem; font-size: 1.65rem; overflow-wrap: anywhere; }
+.detail h2 { padding-right: 2.75rem; margin: 0 0 .6rem; font-size: 1.65rem; overflow-wrap: anywhere; }
 .detail h3 { margin: 1.3rem 0 .4rem; padding-top: .85rem; border-top: 1px solid var(--line); font-size: .7rem; color: var(--gold); text-transform: uppercase; letter-spacing: .12em; }
 .detail p { margin: .6rem 0; overflow-wrap: anywhere; font-size: .87rem; }
 .detail ul { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .83rem; color: var(--muted); }
@@ -159,10 +169,10 @@ html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 
 .attendee-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: .45rem 1.5rem; list-style: none; margin: 0; padding: .2rem 1.1rem 1rem; max-height: 16rem; overflow-y: auto; }
 .attendee-list li { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
 .attendee-role { flex-shrink: 0; color: var(--muted); font-size: .72rem; }
-.activity-panel { margin: 0 1.1rem; border-top: 1px solid var(--line); padding: 1rem 0; }
+.activity-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.1rem; }
 .activity-panel h2 { margin: 0 0 .4rem; font: 650 .9rem system-ui, sans-serif; }
 #activity-note, #activity-empty { margin: .4rem 0; color: var(--muted); font-size: .7rem; }
-.activity-log { list-style: none; padding: 0; margin: .6rem 0 0; max-height: 14rem; overflow-y: auto; overflow-wrap: anywhere; scrollbar-color: var(--line) transparent; }
+.activity-log { list-style: none; padding: 0; margin: .6rem 0 0; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scrollbar-color: var(--line) transparent; }
 .activity-log li { display: grid; grid-template-columns: 1fr; gap: .2rem; padding: .6rem .4rem; border-bottom: 1px solid var(--line); font-size: .78rem; }
 .activity-log li:nth-child(odd) { background: #111d1750; }
 .activity-log time { color: var(--muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
@@ -185,9 +195,6 @@ footer p { margin: .3rem 0; }
   .masthead { gap: 2rem; grid-template-columns: minmax(0, 1fr) 19rem; }
 
 }
-@media (max-width: 800px) {
-  .hall-layout { grid-template-columns: 1fr; }
-}
 @media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   .site-bar { min-height: 68px; flex-wrap: wrap; gap: .5rem 1rem; }
   .wordmark { font-size: 1.25rem; }
@@ -202,10 +209,10 @@ footer p { margin: .3rem 0; }
   .readout time { flex-basis: auto; font-size: 1.05rem; }
   .event-actions details { display: none; }
   .table-list { padding-top: 1.75rem; }
-  #hall-content > .hall-sidebar { margin: .5rem 0 1rem; }
   .hall-explorer { margin-top: 1rem; }
   .hall-layout { padding: .75rem; }
-  .camera-controls button { min-height: 44px; }
+  .camera-controls button { min-width: 44px; min-height: 44px; }
+  .drawer-close { width: 44px; height: 44px; }
   .timeline-controls { padding: .75rem; }
   .timeline-meta { font-size: .65rem; }
   .table-card { padding: 1.1rem; }
@@ -233,7 +240,8 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) .timeline-head .controls label { margin-left: auto; }
   html:not([data-kiosk]):has(#hall-content) .timeline-head .controls button, html:not([data-kiosk]):has(#hall-content) .timeline-head .controls select { min-height: 44px; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
-  html:not([data-kiosk]):has(#hall-content) .hall-layout { grid-template-columns: 1fr; padding: 0; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { padding: 0; }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { right: calc(-1 * var(--gutter)); } /* flush with the full-bleed canvas */
   html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0; min-height: 0; max-height: none;
     height: max(10rem, calc(100vh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip)));
     height: max(10rem, calc(100svh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip))); }
@@ -253,7 +261,7 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #event-actions { order: 5; flex: none; gap: .5rem; margin-left: auto; }
   html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; padding: 0 1rem; }
 }
-/* Event page off phones (not kiosk): a fixed 3.5rem bar, hall and sidebar, then status strip.
+/* Event page off phones (not kiosk): a fixed 3.5rem bar, hall, then status strip.
    Bar order: title, event name, badge, scene text, nav and Discord.
    Under 1100px the bar stays on one line. The camera buttons and help float over the canvas's bottom corners
    (the scene is a grid: canvas and both overlays share row 1, the timeline takes row 2). */
@@ -274,11 +282,11 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) main { max-width: none; }
   html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
   html:not([data-kiosk]):has(#hall-content) .hall-layout { gap: var(--desk-gap); padding: var(--desk-gap) 0 0; align-items: stretch; }
-  html:not([data-kiosk]):has(#hall-content) .scene-wrap, html:not([data-kiosk]):has(#hall-content) .hall-sidebar {
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap {
     height: max(20rem, calc(100vh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
     height: max(20rem, calc(100svh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
   html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); }
-  html:not([data-kiosk]):has(#hall-content) .hall-sidebar { overflow-y: auto; }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { grid-area: 1 / 1 / 2 / 2; } /* explicit end lines: an absolute grid item reads "auto" as the container edge */
   html:not([data-kiosk]):has(#hall-content) #hall { grid-area: 1 / 1; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }
   html:not([data-kiosk]):has(#hall-content) #camera-controls { grid-area: 1 / 1; align-self: end; justify-self: start; z-index: 1; margin: .5rem; pointer-events: none; }
   html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
@@ -287,10 +295,6 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) .timeline-controls { grid-row: 2; margin-top: .6rem; padding: .45rem .85rem; }
   html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
-}
-/* One column (under 800px): the sidebar sits under the hall at its own height. */
-@media (not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px)))) and (max-width: 800px) {
-  html:not([data-kiosk]):has(#hall-content) .hall-sidebar { height: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
@@ -329,18 +333,12 @@ html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
 .fundraising-total { margin: 0; font-size: .9rem; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .fundraising-total .raised { color: var(--gold); font-weight: 700; }
 .fundraising-total .reached { color: var(--gold); }
-.fundraising-donate { flex: none; padding: .4rem .85rem; font-size: .8rem; white-space: nowrap; }
 @media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   .fundraising-total .brand { display: none; }
   /* The total is the point of the strip: it keeps its width and the tube gives way. */
   .thermometer { flex-basis: 3rem; min-width: 3rem; }
   .fundraising-total { flex-shrink: 0; }
-  .fundraising-donate { min-height: 44px; padding: 0 .75rem; line-height: 44px; }
-}
-@media (pointer: coarse) {
-  .fundraising-donate { min-height: 44px; }
 }
 html[data-kiosk] .fundraising-total { font-size: 1.6rem; color: var(--gold); }
 html[data-kiosk] .thermometer-tube { height: .9rem; }
 html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
-html[data-kiosk] .fundraising-donate { display: none; }
