@@ -6,6 +6,8 @@
   --panel-2: #273731;
   --line: #3b4b40;
   --gold: #dfba76;
+  --raised: #d9604c;
+  --fund-strip: 2.75rem;
   --focus: #9cdbcd;
   --error: #ffb2a7;
   --live: #285b43;
@@ -67,7 +69,6 @@ h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
 .badge.live { background: var(--live); border-color: #578867; }
 .badge.live::before { content: ""; display: inline-block; width: .4rem; height: .4rem; border-radius: 50%; background: #b5e6be; margin-right: .45rem; vertical-align: .06rem; }
 .controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; font-size: .8rem; }
-.event-console .controls { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .controls label { color: var(--muted); margin-left: auto; }
 #play { min-width: 5rem; color: #17251d; background: var(--gold); border-color: var(--gold); font-weight: 750; }
 #play:hover:not(:disabled) { background: #f1d299; }
@@ -76,7 +77,7 @@ h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
 .event-actions:not(:empty) { margin: 1rem 0; }
 .event-actions a { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
 
-main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
+main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); overflow-x: clip; } /* the closed hall drawer waits off the scene's right edge */
 #hall-content { display: flex; flex-direction: column; }
 .status { margin: 0; padding: 1rem 0 .3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; min-height: 1.5rem; }
 .status.error { color: var(--error); font-weight: 700; }
@@ -84,13 +85,10 @@ main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 .status a { color: var(--gold); font-weight: 700; }
 .sync-controls { margin: 1rem 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem 1rem; color: var(--muted); font-size: .72rem; }
 .sync-controls button { min-height: 2rem; padding: .2rem .6rem; background: transparent; font-size: .72rem; }
+/* The hall is always open: app.mjs opens the <details> and nothing on the page can close it, since its summary never shows. */
 .hall-explorer { margin-top: 1rem; border: 1px solid var(--line); border-radius: .6rem; background: #18241f; }
-.hall-explorer > summary { display: flex; align-items: center; flex-wrap: wrap; gap: .8rem; padding: 1.1rem 1.3rem; color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-size: 1.4rem; list-style: none; }
-.hall-explorer > summary::-webkit-details-marker { display: none; }
-.hall-explorer > summary::before { content: "+"; font: 400 1.3rem system-ui, sans-serif; color: var(--gold); }
-.hall-explorer[open] > summary::before { content: "−"; }
-.hall-explorer[open] > summary { border-bottom: 1px solid var(--line); }
-.hall-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem); gap: 1.25rem; padding: 1.25rem; align-items: start; }
+.hall-explorer > summary { display: none; }
+.hall-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding: 1.25rem; align-items: start; }
 .scene-wrap { position: relative; min-width: 0; }
 .camera-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .camera-controls button { min-height: 2.5rem; font-size: .75rem; background: #21332a; }
@@ -98,9 +96,18 @@ main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); }
 .camera-help { color: var(--muted); font-size: .7rem; margin: .5rem 0 .8rem; }
 canvas { display: block; width: 100%; height: clamp(320px, 39vw, 540px); touch-action: none; cursor: grab; border: 1px solid #766749; border-radius: .3rem; background: #100f15; image-rendering: pixelated; image-rendering: crisp-edges; }
 canvas:active { cursor: grabbing; }
+/* Off phones and the kiosk the view takes the hall's shape (app.mjs sets --hall-aspect from the room), so each row
+   of tables the hall gains makes the view taller. The cap keeps the whole view on one screen; past it, the camera pans. */
+html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 / 1); min-height: 320px; max-height: max(320px, calc(100vh - var(--fund-strip) - var(--desk-bar, 3.5rem) - 2.5rem)); }
 .tooltip { position: absolute; z-index: 5; pointer-events: none; max-width: min(24rem, 80vw); padding: .4rem .65rem; border: 1px solid #ffffff52; border-radius: .3rem; background: #070d0beb; color: white; font-size: .82rem; }
 .timeline-controls { margin-top: 1rem; padding: .85rem 1rem; background: #111d17; border: 1px solid var(--line); border-radius: .35rem; }
-.timeline-controls > label { display: block; color: var(--gold); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
+.timeline-head > label { color: var(--gold); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
+.timeline-head { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; }
+.timeline-head time { font-size: .95rem; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; }
+.timeline-head .controls { margin-left: auto; flex-wrap: nowrap; }
+.timeline-head .controls label { margin-left: .25rem; }
+.timeline-head .controls button, .timeline-head .controls select { min-height: 2rem; padding: .15rem .7rem; }
+@media (pointer: coarse) { .timeline-head .controls button, .timeline-head .controls select { min-height: 44px; } }
 #scrubber { display: block; width: 100%; margin: .7rem 0; accent-color: var(--gold); }
 .timeline-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem 1rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
 #now-marker { color: var(--gold); }
@@ -120,9 +127,19 @@ canvas:active { cursor: grabbing; }
 #music-volume-value { min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
 #music-status { margin-top: .2rem; color: var(--muted); font-size: .7rem; }
 
-.hall-sidebar { min-width: 0; border: 1px solid #655e45; border-top: 3px solid var(--gold); border-radius: .3rem; background: var(--panel); }
+.hall-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 4; width: min(22rem, calc(100% - 3rem));
+  display: flex; flex-direction: column; overflow-y: auto;
+  background: var(--panel); border: 1px solid #655e45; border-top: 3px solid var(--gold); border-radius: .3rem 0 0 .3rem; box-shadow: -.5rem 0 1.5rem #00000066;
+  transform: translateX(calc(100% + 1.5rem)); visibility: hidden;
+  transition: transform .22s ease-out, visibility 0s linear .22s;
+}
+.hall-drawer[data-view] { transform: none; visibility: visible; transition: transform .22s ease-out; }
+.hall-drawer[data-view="detail"] .activity-panel, .hall-drawer[data-view="activity"] #detail { display: none; }
+.drawer-close { position: sticky; top: 0; align-self: flex-end; min-width: 2.5rem; min-height: 2.5rem; margin: .35rem .35rem -2.85rem 0; font-size: 1.15rem; line-height: 1; z-index: 1; }
+@media (pointer: coarse) { .drawer-close { width: 44px; height: 44px; } }
 .detail { min-width: 0; padding: 1.1rem; }
-.detail h2 { margin: 0 0 .6rem; font-size: 1.65rem; overflow-wrap: anywhere; }
+.detail h2 { padding-right: 2.75rem; margin: 0 0 .6rem; font-size: 1.65rem; overflow-wrap: anywhere; }
 .detail h3 { margin: 1.3rem 0 .4rem; padding-top: .85rem; border-top: 1px solid var(--line); font-size: .7rem; color: var(--gold); text-transform: uppercase; letter-spacing: .12em; }
 .detail p { margin: .6rem 0; overflow-wrap: anywhere; font-size: .87rem; }
 .detail ul { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .83rem; color: var(--muted); }
@@ -152,10 +169,10 @@ canvas:active { cursor: grabbing; }
 .attendee-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: .45rem 1.5rem; list-style: none; margin: 0; padding: .2rem 1.1rem 1rem; max-height: 16rem; overflow-y: auto; }
 .attendee-list li { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
 .attendee-role { flex-shrink: 0; color: var(--muted); font-size: .72rem; }
-.activity-panel { margin: 0 1.1rem; border-top: 1px solid var(--line); padding: 1rem 0; }
+.activity-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.1rem; }
 .activity-panel h2 { margin: 0 0 .4rem; font: 650 .9rem system-ui, sans-serif; }
 #activity-note, #activity-empty { margin: .4rem 0; color: var(--muted); font-size: .7rem; }
-.activity-log { list-style: none; padding: 0; margin: .6rem 0 0; max-height: 14rem; overflow-y: auto; overflow-wrap: anywhere; scrollbar-color: var(--line) transparent; }
+.activity-log { list-style: none; padding: 0; margin: .6rem 0 0; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scrollbar-color: var(--line) transparent; }
 .activity-log li { display: grid; grid-template-columns: 1fr; gap: .2rem; padding: .6rem .4rem; border-bottom: 1px solid var(--line); font-size: .78rem; }
 .activity-log li:nth-child(odd) { background: #111d1750; }
 .activity-log time { color: var(--muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
@@ -178,10 +195,7 @@ footer p { margin: .3rem 0; }
   .masthead { gap: 2rem; grid-template-columns: minmax(0, 1fr) 19rem; }
 
 }
-@media (max-width: 800px) {
-  .hall-layout { grid-template-columns: 1fr; }
-}
-@media (max-width: 650px) {
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
   .site-bar { min-height: 68px; flex-wrap: wrap; gap: .5rem 1rem; }
   .wordmark { font-size: 1.25rem; }
   .wordmark img { width: 27px; height: 27px; }
@@ -193,39 +207,112 @@ footer p { margin: .3rem 0; }
   .orientation { font-size: .9rem; }
   .event-console { padding: 1rem; }
   .readout time { flex-basis: auto; font-size: 1.05rem; }
-  .event-console .controls { padding-top: .75rem; margin-top: .75rem; }
   .event-actions details { display: none; }
   .table-list { padding-top: 1.75rem; }
-  #hall-content > .hall-sidebar { margin: .5rem 0 1rem; }
   .hall-explorer { margin-top: 1rem; }
-  .hall-explorer > summary { font-size: 1.2rem; padding: 1rem; }
   .hall-layout { padding: .75rem; }
-  .camera-controls button { min-height: 44px; }
+  .camera-controls button { min-width: 44px; min-height: 44px; }
+  .drawer-close { width: 44px; height: 44px; }
   .timeline-controls { padding: .75rem; }
   .timeline-meta { font-size: .65rem; }
   .table-card { padding: 1.1rem; }
+}
+/* Event page on phones (not kiosk): two bar lines, then the hall and status strip.
+   Line 1: title and Discord. Line 2: event name, badge and scene text.
+   Height: .4rem padding + 44px Discord row + 1.5rem second row + .4rem padding.
+   Without actions the title row is 2.4rem, giving 4.7rem total. The status strip is 3rem;
+   the canvas has a 10rem floor. Time controls sit below the map on their own row. */
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 3.25rem; --phone-bar: calc(2.3rem + 44px); --phone-strip: 3rem; }
+  html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-bar: 4.7rem; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav, html:not([data-kiosk]):has(#hall-content) #record-note { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { height: var(--phone-bar); display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 0 .75rem; padding: .4rem var(--gutter); overflow: hidden; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { content: ""; flex-basis: 100%; height: 0; }
+  html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 2.4rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 5; flex: none; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 4; flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 2; flex: none; flex-wrap: nowrap; margin: 0 0 0 auto; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; min-height: 44px; padding: 0 1rem; line-height: 44px; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 6; flex: 0 1 auto; min-width: 0; font-size: .8rem; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls { flex: 1 0 100%; margin-left: 0; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls label { margin-left: auto; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls button, html:not([data-kiosk]):has(#hall-content) .timeline-head .controls select { min-height: 44px; }
+  html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { padding: 0; }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { right: calc(-1 * var(--gutter)); } /* flush with the full-bleed canvas */
+  html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0; min-height: 0; max-height: none;
+    height: max(10rem, calc(100vh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip)));
+    height: max(10rem, calc(100svh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip))); }
+  html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; left: .5rem; right: .5rem; bottom: .5rem; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
+}
+/* Landscape phones: one row of title, event name, badge, scene text and Discord (44px + .8rem padding). */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  html:not([data-kiosk]):has(#hall-content), html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-bar: calc(44px + .8rem); }
+  html:not([data-kiosk]):has(#hall-content) .masthead { flex-wrap: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { display: none; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 2; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 4; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 5; flex: none; gap: .5rem; margin-left: auto; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; padding: 0 1rem; }
+}
+/* Event page off phones (not kiosk): a fixed 3.5rem bar, hall, then status strip.
+   Bar order: title, event name, badge, scene text, nav and Discord.
+   Under 1100px the bar stays on one line. The camera buttons and help float over the canvas's bottom corners
+   (the scene is a grid: canvas and both overlays share row 1, the timeline takes row 2). */
+@media not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px))) {
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 2.75rem; --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
+  html:not([data-kiosk]):has(#hall-content) #record-note { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { max-width: none; height: var(--desk-bar); display: flex; flex-wrap: nowrap; align-content: center; align-items: center; gap: .4rem 1rem; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+  html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 3; flex: none; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .orientation, html:not([data-kiosk]):has(#hall-content) #scene-event {
+    flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 2; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 4; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav { order: 5; flex: none; flex-wrap: nowrap; gap: 1.25rem; margin: 0 0 0 auto; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 6; flex: none; flex-wrap: nowrap; margin: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { padding: .4rem .85rem; font-size: .8rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) main { max-width: none; }
+  html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { gap: var(--desk-gap); padding: var(--desk-gap) 0 0; align-items: stretch; }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap {
+    height: max(20rem, calc(100vh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
+    height: max(20rem, calc(100svh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { grid-area: 1 / 1 / 2 / 2; } /* explicit end lines: an absolute grid item reads "auto" as the container edge */
+  html:not([data-kiosk]):has(#hall-content) #hall { grid-area: 1 / 1; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { grid-area: 1 / 1; align-self: end; justify-self: start; z-index: 1; margin: .5rem; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
+  html:not([data-kiosk]):has(#hall-content) #camera-help { grid-area: 1 / 1; align-self: end; justify-self: end; z-index: 1; margin: .5rem; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) .jukebox-key:focus { grid-area: 1 / 1; align-self: start; justify-self: start; z-index: 1; margin: .5rem; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-controls { grid-row: 2; margin-top: .6rem; padding: .45rem .85rem; }
+  html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
+  html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
 
-.fundraising-total { margin: -.4rem 0 1rem; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
-
 /* Kiosk mode (`?kiosk=1`): a slim bar and the scene filling the viewport; the wall plaques carry the QR codes. */
-html[data-kiosk] { --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
+html[data-kiosk] { --fund-strip: 3.5rem; --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
 html[data-kiosk] body { overflow: hidden; }
 html[data-kiosk][data-idle] body { cursor: none; }
 html[data-kiosk] .skip-link, html[data-kiosk] .site-nav, html[data-kiosk] #event-actions, html[data-kiosk] #record-note,
-html[data-kiosk] .event-console .controls, html[data-kiosk] #table-list, html[data-kiosk] #table-list details,
+html[data-kiosk] #table-list, html[data-kiosk] #table-list details,
 html[data-kiosk] #hall-sidebar, html[data-kiosk] .camera-controls, html[data-kiosk] #camera-help,
-html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer,
-html[data-kiosk] .hall-explorer > summary { display: none; }
-html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer { display: none; }
+html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
 html[data-kiosk] .identity { display: contents; }
 html[data-kiosk] h1 { margin: 0; font-size: 2rem; white-space: nowrap; }
 html[data-kiosk] .orientation { margin: 0; max-width: none; font-size: 1.2rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html[data-kiosk] .fundraising-total { grid-column: 3; justify-self: center; margin: 0; color: var(--gold); font-size: 1.6rem; text-align: center; white-space: nowrap; }
-html[data-kiosk] .event-console { grid-column: 4; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+html[data-kiosk] .event-console { grid-column: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 html[data-kiosk] .readout { flex-wrap: nowrap; gap: 1rem; font-size: 1.4rem; white-space: nowrap; }
 html[data-kiosk] .readout time { font-size: 1.4rem; }
 html[data-kiosk] #scene-event { font-size: 1.1rem; }
@@ -234,4 +321,24 @@ html[data-kiosk] main { max-width: none; padding: 0 var(--gutter); }
 html[data-kiosk] .status { height: var(--kiosk-status); padding: .35rem 0 0; border-top: 0; font-size: 1.3rem; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html[data-kiosk] .hall-explorer { margin: 0; border: 0; border-radius: 0; background: none; }
 html[data-kiosk] .hall-layout { grid-template-columns: minmax(0, 1fr); gap: var(--kiosk-gap); padding: 0; align-items: stretch; }
-html[data-kiosk] canvas { height: calc(100vh - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
+html[data-kiosk] canvas { height: calc(100vh - var(--fund-strip) - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
+
+/* Live fundraising stays in one row and never animates. */
+html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
+.fundraising-strip { width: 100%; height: var(--fund-strip); overflow: hidden; display: flex; align-items: center; gap: .75rem; padding: 0 max(16px, var(--gutter)); background: var(--panel); border-bottom: 1px solid var(--line); }
+.thermometer { flex: 1 1 12rem; min-width: 4rem; display: flex; align-items: center; }
+.thermometer-bulb { flex: none; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--raised); }
+.thermometer-tube { flex: 1; min-width: 0; height: .6rem; border-radius: .3rem; background: var(--panel-2); border: 1px solid var(--line); margin-left: -.2rem; overflow: hidden; }
+.thermometer-fill { display: block; width: 0; height: 100%; border-radius: .3rem; background: var(--raised); }
+.fundraising-total { margin: 0; font-size: .9rem; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fundraising-total .raised { color: var(--gold); font-weight: 700; }
+.fundraising-total .reached { color: var(--gold); }
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  .fundraising-total .brand { display: none; }
+  /* The total is the point of the strip: it keeps its width and the tube gives way. */
+  .thermometer { flex-basis: 3rem; min-width: 3rem; }
+  .fundraising-total { flex-shrink: 0; }
+}
+html[data-kiosk] .fundraising-total { font-size: 1.6rem; color: var(--gold); }
+html[data-kiosk] .thermometer-tube { height: .9rem; }
+html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }

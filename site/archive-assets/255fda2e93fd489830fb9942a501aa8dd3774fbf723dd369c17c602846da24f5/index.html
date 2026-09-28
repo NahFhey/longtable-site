@@ -8,41 +8,32 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Longtable</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=0d8a3b6c0801">
+  <link rel="stylesheet" href="./styles.css?v=7844c97fcf3c">
 </head>
 <body>
   <a class="skip-link" href="#hall-content">Skip to the event</a>
+  <section id="fundraising-strip" class="fundraising-strip" aria-label="Extra Life fundraising" hidden>
+    <div id="thermometer" class="thermometer" aria-hidden="true">
+      <span class="thermometer-bulb"></span>
+      <span class="thermometer-tube"><span id="thermometer-fill" class="thermometer-fill"></span></span>
+    </div>
+    <p id="fundraising-total" class="fundraising-total"></p>
+  </section>
   <header class="masthead">
     <div class="identity">
       <h1 class="event-title"><a href="./">Longtable<span class="title-dot" aria-hidden="true">.</span></a></h1>
       <p id="event-name" class="orientation"></p>
       <nav class="site-nav" aria-label="Page navigation">
-        <a href="#hall-explorer">The hall</a>
         <a href="#table-list">Find a game</a>
-        <a href="./past-events.html">Past events <span aria-hidden="true">↗</span></a>
       </nav>
       <div id="event-actions" class="event-actions" aria-label="Event actions"></div>
-      <p id="fundraising-total" class="fundraising-total" hidden></p>
       <p id="record-note" class="record-note" hidden>This is the final event record.</p>
     </div>
     <div class="event-console">
       <div class="readout">
         <span id="mode-badge" class="badge">LOADING</span>
-        <time id="clock">—</time>
         <span id="scene-event"></span>
         <span id="current-event" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
-      </div>
-      <div class="controls" aria-label="Event time controls">
-        <button id="play" type="button" disabled>Play</button>
-        <button id="return-now" type="button" hidden>Return to Now</button>
-        <label for="speed">Speed</label>
-        <select id="speed" disabled>
-          <option value="1">1×</option>
-          <option value="30">30×</option>
-          <option value="120">120×</option>
-          <option value="600" selected>600×</option>
-          <option value="1800">1800×</option>
-        </select>
       </div>
     </div>
   </header>
@@ -62,17 +53,20 @@
     <section id="hall-layout" class="hall-layout" aria-labelledby="hall-heading">
       <div class="scene-wrap">
         <h2 id="hall-heading" class="visually-hidden">Animated event hall</h2>
-        <div class="camera-controls" aria-label="Hall camera controls">
+        <div id="camera-controls" class="camera-controls" aria-label="Hall camera controls">
           <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
           <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
           <button id="recenter" type="button">Recenter</button>
           <button id="fit-active" type="button">Fit active tables</button>
+          <button id="activity-toggle" type="button" aria-expanded="false" aria-controls="hall-sidebar">Activity</button>
         </div>
         <p id="camera-help" class="camera-help">Drag to pan · Scroll or pinch to zoom<span class="visually-hidden">. With the hall focused, use arrow keys and +/−. Home shows the whole room.</span></p>
 
         <button id="music-open" class="jukebox-key" type="button">Open the jukebox music player</button>
+        <button id="info-open" class="jukebox-key" type="button">Hear the staff welcome to Longtable</button>
+        <span id="info-speech" class="visually-hidden" role="status" aria-live="polite"></span>
         <canvas id="hall" tabindex="0" width="960" height="480" aria-label="Animated view of the Longtable event hall" aria-describedby="canvas-description camera-help table-list-heading"></canvas>
-        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are in the page header. A jukebox stands against the back wall under a sign that offers music when clicked.</p>
+        <p id="canvas-description" class="visually-hidden">People enter through the left door, move between the lounge and tables, and respond to event announcements. Food visits include both serving tables, a plate, five minutes eating, and a trip to the trash before returning. Lounge visitors read, chat, or play cards according to the number of people there. Staff announce scheduled breaks from the stage. Custom-message speakers queue below the stage stairs, walk to the microphone, and return after speaking. Anonymous staff prepare food, operate the lights, circulate through the room, and set up or pack away furniture; they are scenery and are not counted as attendees. The full table state is available in the table list. Two plaques on the back wall carry QR codes for the Discord invite and the Extra Life donation page; the links are at the top of the page. A jukebox stands against the back wall under a sign that offers music when clicked. A staff member stands at the north end of the stage under a sign that offers information about Longtable when clicked.</p>
         <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
         <div id="music-panel" class="music-panel" role="dialog" aria-label="Jukebox" hidden>
           <audio id="hall-music" preload="none"></audio>
@@ -87,8 +81,23 @@
           <output id="music-volume-value" for="music-volume">50%</output>
           <span id="music-status" role="status" aria-live="polite"></span>
         </div>
-        <div class="timeline-controls">
-          <label for="scrubber">Event time</label>
+        <div id="timeline-controls" class="timeline-controls">
+          <div class="timeline-head">
+            <label for="scrubber">Event time</label>
+            <time id="clock">—</time>
+            <div class="controls" aria-label="Event time controls">
+              <button id="return-now" type="button" hidden>Return to Now</button>
+              <button id="play" type="button" disabled>Play</button>
+              <label for="speed">Speed</label>
+              <select id="speed" disabled>
+                <option value="1">1×</option>
+                <option value="30">30×</option>
+                <option value="120">120×</option>
+                <option value="600" selected>600×</option>
+                <option value="1800">1800×</option>
+              </select>
+            </div>
+          </div>
           <input id="scrubber" type="range" min="0" max="1" step="any" value="0" disabled>
           <div class="timeline-meta">
             <span id="start-label">—</span>
@@ -96,20 +105,21 @@
             <span id="end-label">—</span>
           </div>
         </div>
+        <aside id="hall-sidebar" class="hall-sidebar hall-drawer" aria-label="Table details and activity">
+          <button id="drawer-close" class="drawer-close" type="button" aria-label="Close panel">×</button>
+          <section id="detail" class="detail" aria-live="polite">
+            <h2>Table details</h2>
+            <p class="muted">Select a table in the hall or in the table list.</p>
+          </section>
+          <section class="activity-panel" aria-labelledby="activity-heading">
+            <h2 id="activity-heading">Activity</h2>
+            <p id="activity-note" class="muted"></p>
+            <ol id="activity-log" class="activity-log" tabindex="0" aria-label="Event activity"></ol>
+            <p id="activity-empty" class="muted">No public actions at this time.</p>
+            <button id="activity-more" type="button" hidden>Show older actions</button>
+          </section>
+        </aside>
       </div>
-      <aside id="hall-sidebar" class="hall-sidebar" aria-label="Table information and activity">
-        <section id="detail" class="detail" aria-live="polite">
-          <h2>Table details</h2>
-          <p class="muted">Select a table in the hall or in the table list.</p>
-        </section>
-        <section class="activity-panel" aria-labelledby="activity-heading">
-          <h2 id="activity-heading">Activity</h2>
-          <p id="activity-note" class="muted"></p>
-          <ol id="activity-log" class="activity-log" tabindex="0" aria-label="Event activity"></ol>
-          <p id="activity-empty" class="muted">No public actions at this time.</p>
-          <button id="activity-more" type="button" hidden>Show older actions</button>
-        </section>
-      </aside>
     </section>
     </details>
   </main>
@@ -122,8 +132,9 @@
       <span id="sync-status" role="status" aria-live="polite"></span>
       <button id="refresh-now" type="button">Check for updates</button>
     </div>
+    <p><a href="./past-events.html">Past events</a></p>
     <p><a id="kiosk-link" class="kiosk-link" href="?kiosk=1">Kiosk mode</a></p>
   </footer>
-  <script type="module" src="./app.mjs?v=0fc22179f847"></script>
+  <script type="module" src="./app.mjs?v=2d86f2fbb7d4"></script>
 </body>
 </html>
