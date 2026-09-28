@@ -1,14 +1,22 @@
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRoomLayout, infoStaffGeometry, CARETAKER_TILES_PER_SECOND, foodGeometry, gatheringLocations, jukeboxBounds, loungeActivities, seatPositionForPlan, tableLifecycle, tableScenery, wallFixtures } from "../model.mjs";
 import { hallAmbience, practiceKitchenServices, practicePlaces, stageAnnouncer } from "../model.mjs";
 import { queueSpot } from "../food-layout.mjs";
 import { stageQueuePosition } from "../stage.mjs";
-import { fitBounds, worldToScreen } from "../camera.mjs";
-import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES } from "../event-config.mjs";
+import { fitBounds, overviewFrame, minZoom, tableBounds, screenToWorld, worldToScreen } from "../camera.mjs";
+import { DISCORD_INVITE, DONATE_URL, INFO_SPEECHES, WALL_PLAQUES, shortUrl } from "../event-config.mjs";
 
 const pageHtml = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const activeHarnesses = [];
+afterEach(() => {
+  // Imported app instances remain cached. Release their large drawing traces after each test.
+  for (const harness of activeHarnesses) {
+    for (const key of ["contextCalls", "textCalls", "imageCalls", "rectCalls", "canvasCalls", "transforms"]) harness[key].length = 0;
+  }
+  activeHarnesses.length = 0;
+});
 
 class FakeNode {
   constructor(tag = "div") {
@@ -29,8 +37,21 @@ class FakeNode {
   }
   get textContent() { return this._textContent + this.children.map(node => node.textContent).join(""); }
   set textContent(value) { this.children = []; this._textContent = String(value); this.textContentWrites += 1; }
-  append(...nodes) { for (const node of nodes) { node.parentElement = this; this.children.push(node); } }
-  insertBefore(node) { this.append(node); }
+  append(...nodes) {
+    for (const node of nodes) {
+      if (node.parentElement) node.parentElement.children = node.parentElement.children.filter(child => child !== node);
+      node.parentElement = this;
+      this.children.push(node);
+    }
+  }
+  insertBefore(node, reference) {
+    if (!reference) return this.append(node);
+    if (node === reference) return;
+    if (node.parentElement) node.parentElement.children = node.parentElement.children.filter(child => child !== node);
+    node.parentElement = this;
+    this.children.splice(this.children.indexOf(reference), 0, node);
+  }
+  get nextSibling() { return this.nextElementSibling; }
   after(node) {
     if (node.parentElement) node.parentElement.children.splice(node.parentElement.children.indexOf(node), 1);
     node.parentElement = this.parentElement;
@@ -39,7 +60,10 @@ class FakeNode {
   get nextElementSibling() { return this.parentElement?.children[this.parentElement.children.indexOf(this) + 1] ?? null; }
   contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   replaceChildren(...nodes) { this._textContent = ""; this.children = []; this.append(...nodes); }
-  addEventListener(kind, listener) { this.listeners.set(kind, listener); }
+  addEventListener(kind, listener) {
+    const previous = this.listeners.get(kind);
+    this.listeners.set(kind, previous ? (event) => { previous(event); listener(event); } : listener);
+  }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
   removeAttribute(name) { this.attributes.delete(name); }
@@ -60,22 +84,27 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["drawer-close", "activity-toggle", "info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
+  const ids = ["camera-toggle", "drawer-close", "activity-toggle", "info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
+  const body = new FakeNode("body");
   // Derive header and timeline ancestry from the shipped markup so placement tests catch HTML regressions.
-  for (const fragment of [pageHtml.match(/<header class="masthead">[\s\S]*?<\/header>/)[0],
+  for (const fragment of [pageHtml.match(/<section id="fundraising-strip"[\s\S]*?<\/section>/)[0], pageHtml.match(/<header class="masthead">[\s\S]*?<\/header>/)[0],
     pageHtml.slice(pageHtml.indexOf('<div id="timeline-controls"'), pageHtml.indexOf('<aside id="hall-sidebar"'))]) {
     const stack = [];
     for (const [, closing, tag, attributes] of fragment.matchAll(/<(\/?)([a-z][a-z0-9-]*)\b([^>]*)>/gi)) {
       if (closing) { stack.pop(); continue; }
       const id = attributes.match(/\bid="([^"]+)"/)?.[1];
       const node = nodes.get(id) ?? new FakeNode(tag);
-      stack.at(-1)?.append(node);
+      (stack.at(-1) ?? body).append(node);
       if (!["input", "br", "img"].includes(tag)) stack.push(node);
     }
   }
+  body.append(nodes.get("hall-content"));
+  nodes.get("hall-content").append(nodes.get("status"), nodes.get("hall-explorer"), nodes.get("table-list"));
+  const originalParents = new Map(["status", "current-event", "fundraising-total", "event-name", "mode-badge", "fundraising-strip"].map(id => [id, nodes.get(id).parentElement]));
   nodes.get("fundraising-strip").hidden = true;
   nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
+  nodes.get("hall-sidebar").offsetWidth = options.drawerWidth ?? 0;
   nodes.get("hall-sidebar").append(nodes.get("drawer-close"), nodes.get("detail"), nodes.get("activity-panel"));
   nodes.get("activity-panel").append(nodes.get("activity-log"));
   nodes.get("activity-toggle").setAttribute("aria-expanded", "false");
@@ -98,6 +127,8 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
     measureText(value) { return { width: String(value).length * 5 }; },
     fillText(value, x, y) { contextCalls.push(String(value)); textCalls.push({ text: String(value), x, y }); },
+    createLinearGradient(...args) { return { args, stops: [], addColorStop(...stop) { this.stops.push(stop); } }; },
+    strokeRect(...args) { if (options.trackSurround) canvasCalls.push({ op: "strokeRect", color: this.strokeStyle, width: this.lineWidth, args }); },
     fillRect(...args) { rectCalls.push({ color: this.fillStyle, args }); },
     save() { scopes.push({}); canvasCalls.push({ op: "save" }); },
     restore() { if (scopes.length > 1) scopes.pop(); canvasCalls.push({ op: "restore" }); },
@@ -123,7 +154,9 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   }, { get(target, key) { return key in target ? target[key] : () => {}; }, set(target, key, value) { target[key] = value; return true; } });
   const scene = new FakeNode("div");
   scene.append(nodes.get("camera-controls"), nodes.get("camera-help"), nodes.get("timeline-controls"), nodes.get("hall-sidebar"));
-  nodes.get("camera-controls").append(nodes.get("activity-toggle"));
+  nodes.get("camera-controls").append(...["camera-toggle", "zoom-in", "zoom-out", "recenter", "fit-active", "activity-toggle"].map(id => nodes.get(id)));
+  const toggleMarkup = pageHtml.match(/<button id="camera-toggle"[^>]*>/)?.[0];
+  if (toggleMarkup) nodes.get("camera-toggle").setAttribute("aria-expanded", toggleMarkup.match(/aria-expanded="([^"]+)"/)[1]);
   nodes.get("hall").parentElement = scene;
   nodes.get("hall").width = options.viewport?.width ?? 960;
   nodes.get("hall").height = options.viewport?.height ?? 480;
@@ -152,9 +185,13 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
       const previous = documentListeners.get(kind);
       documentListeners.set(kind, previous ? (event) => { previous(event); listener(event); } : listener);
     },
-    documentElement: { dataset: { source: options.archive ? "archive" : "live" } },
+    body,
+    documentElement: Object.assign(new FakeNode("html"), { dataset: { source: options.archive ? "archive" : "live" } }),
     title: "",
-    getElementById(id) { return nodes.get(id); },
+    getElementById(id) {
+      const find = node => node.id === id ? node : node.children.map(find).find(Boolean);
+      return nodes.get(id) ?? find(body);
+    },
     createElement(tag) { return new FakeNode(tag); },
   };
   for (const node of nodes.values()) node.ownerDocument = globalThis.document;
@@ -165,7 +202,18 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   const urlWrites = [];
   globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
   globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
-  globalThis.matchMedia = (query) => ({ matches: query.includes("650") ? !!options.mobile : !!options.reducedMotion, addEventListener() {} });
+  const phoneMedia = { matches: !!options.mobile, addEventListener(kind, listener) { this.change = listener; } };
+  const kioskMedia = { matches: !!options.wideKiosk, addEventListener(kind, listener) { this.change = listener; } };
+  globalThis.matchMedia = (query) => query === "(min-aspect-ratio: 3/2)" ? kioskMedia : query.includes("650") ? phoneMedia : { matches: !!options.reducedMotion, addEventListener() {} };
+  const storage = options.storage ?? new Map();
+  const storageCalls = [];
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, get() {
+    if (options.storageThrows) throw new Error("Storage unavailable");
+    return {
+      getItem(key) { storageCalls.push(["get", key]); return storage.get(key) ?? null; },
+      setItem(key, value) { storageCalls.push(["set", key]); storage.set(key, value); },
+    };
+  } });
   const intervals = [];
   globalThis.setInterval = callback => { intervals.push(callback); return intervals.length; };
   const frames = [];
@@ -198,11 +246,12 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, frames, intervals, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, originalParents, frames, intervals, phoneMedia, kioskMedia, storage, storageCalls, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
   const harness = installDom(dataSequence, options.search ?? "?sample=1", options);
+  activeHarnesses.push(harness);
   const errors = [];
   const originalError = console.error;
   console.error = (...values) => errors.push(values.join(" "));
@@ -414,7 +463,7 @@ test("mobile begins paused with the hall open, camera buttons in the scene, and 
   const app = await runApp([sample], "mobile", { mobile: true });
   assert.equal(app.nodes.get("hall-explorer").open, true, "phones hide the summary, so the hall is always open");
   assert.deepEqual(app.nodes.get("hall-content").children.map((node) => [...app.nodes].find(([, value]) => value === node)?.[0]),
-    ["camera-help", "timeline-controls", "table-list"]);
+    ["status", "hall-explorer", "camera-help", "timeline-controls", "table-list"]);
   assert.equal(app.nodes.get("camera-controls").parentElement, app.nodes.get("hall").parentElement, "phones lay the camera buttons over the canvas");
   assert.equal(app.nodes.get("play").textContent, "Play");
   assert.equal(app.nodes.get("hall-sidebar").parentElement, app.nodes.get("hall").parentElement);
@@ -664,10 +713,12 @@ test("with no game in play the first view shows the whole room, and a game in pl
     const nextFrame = () => { app.transforms.length = 0; app.frames.shift()?.(performance.now() + 30); return JSON.stringify(app.transforms[1]); };
     const first = nextFrame();
     app.nodes.get("recenter").listeners.get("click")();
-    return { first, room: nextFrame() };
+    const hall = cameraHall(createRoomLayout(data.tables, data.room_layout));
+    const overview = overviewFrame({ width: 960, height: 480 }, hall, .2);
+    return { first, room: nextFrame(), overview: JSON.stringify([overview.zoom / 32, 0, 0, overview.zoom / 32, overview.x, overview.y]) };
   };
   const waiting = await frameOf(4, "room-before-games");
-  assert.equal(waiting.first, waiting.room, "before any game starts the view matches Recenter");
+  assert.equal(waiting.first, waiting.overview, "before games the view uses the bounded desktop overview");
   const playing = await frameOf(0, "room-games-running");
   assert.notEqual(playing.first, playing.room, "a running game is framed closer than the whole room");
 });
@@ -2033,12 +2084,12 @@ test("kiosk returns a manual camera to automatic framing after 45 s idle, hides 
   assert.deepEqual(frameAt(1_000), zoomed);
   assert.equal(dataset.idle, undefined, "movement brings the cursor back");
   assert.deepEqual(frameAt(46_000), automatic, "after 45 s without input the projection reframes automatically");
-  // The projector's automatic frame is the whole room, wall to lounge, not a close-up of the relevant tables.
+  // The projector returns to the top-anchored overview with at most a quarter of the hall cropped.
   const layout = createRoomLayout(sample.tables, sample.room_layout);
   const room = { x: 0, y: layout.backWall.y, width: layout.width, height: layout.height - layout.backWall.y };
-  const whole = fitBounds(room, { width: 960, height: 480 }, room, 0);
+  const whole = overviewFrame({ width: 960, height: 480 }, room, 0);
   // The camera transform draws tiles at 32 px per unit (TILE * SCALE), so its scale is the zoom over 32.
-  assert.deepEqual(automatic, [whole.zoom / 32, 0, 0, whole.zoom / 32, whole.x, whole.y], "kiosk frames the whole hall");
+  assert.deepEqual(automatic, [whole.zoom / 32, 0, 0, whole.zoom / 32, whole.x, whole.y], "kiosk uses the uncropped contain overview");
   const plain = await runApp([sample], "plain-idle", { search: "?sample=1" });
   const held = (() => { plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 30); return plain.transforms[1]; })();
   plain.nodes.get("hall").listeners.get("wheel")({ clientX: 480, clientY: 240, deltaY: -180, deltaMode: 0, preventDefault() {} });
@@ -2097,11 +2148,13 @@ test("the plaques join the automatic frame before doors and on the projector; or
   assert.ok(rightEdge(following) < plaques[0].x, "follow-now on the public page keeps zooming to the relevant tables");
   const kiosk = await runApp([live], "frame-follow-now-kiosk", { search: "?kiosk=1", liveFeed: "https://feed.example/timeline.json" });
   assert.equal(kiosk.nodes.get("mode-badge").textContent, "LIVE");
-  assert.ok(rightEdge(kiosk) >= plaques[1].x + plaques[1].w, "the projector frames the whole room including both plaques");
+  assert.deepEqual(drawnCamera(kiosk), overviewFrame({ width: 960, height: 480 }, cameraHall(layout), 0));
+  assert.ok(rightEdge(kiosk) >= plaques[1].x + plaques[1].w, "the projector overview includes both plaques");
   const start = Date.parse(sample.event.start);
   const upcomingApp = await runApp([sample], "frame-upcoming", { search: `?sample=1&${nowQuery(start - 40 * DAY)}` });
   assert.equal(upcomingApp.nodes.get("mode-badge").textContent, "UPCOMING");
   assert.equal(upcomingApp.nodes.get("mode-badge").hidden, true);
+  assert.deepEqual(drawnCamera(upcomingApp), overviewFrame({ width: 960, height: 480 }, cameraHall(layout), .2));
   assert.ok(rightEdge(upcomingApp) >= plaques[1].x + plaques[1].w, "before doors the public page frames the plaques too");
 });
 
@@ -2481,7 +2534,7 @@ test("practice food advances per frame using corrected wall time, without anothe
   } finally { Date.now = originalNow; }
 });
 
-test("the staff break bubble draws above the announcer and table labels, with the stage framed", async () => {
+test("the staff break bubble draws above the announcer and table labels, with desktop stage widening and kiosk overview", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const brk = sample.events.find((event) => event.kind === "break");
   const slot = brk.at + .1;
@@ -2507,7 +2560,8 @@ test("the staff break bubble draws above the announcer and table labels, with th
     assert.equal(atPosition(caretaker).length, 3, "caretaker follows its own schedule away from the mic");
     const world = app.transforms.find(t => t[0] !== 1 || t[4] !== 0 || t[5] !== 0);
     const camera = { zoom: world[0] * 32, x: world[4], y: world[5] };
-    for (const point of [{ x: layout.stage.x, y: layout.stage.y },
+    if (kiosk) assert.deepEqual(camera, overviewFrame({ width: 960, height: 480 }, cameraHall(layout), 0));
+    else for (const point of [{ x: layout.stage.x, y: layout.stage.y },
       { x: layout.stage.x + layout.stage.w, y: layout.stage.y + layout.stage.h }]) {
       const screen = worldToScreen(camera, point);
       assert.ok(screen.x >= 0 && screen.x <= 960 && screen.y >= 0 && screen.y <= 480, "stage is in frame");
@@ -2545,8 +2599,8 @@ test("a full sample break draws 40 seated and four standing with matching access
   assert.ok(app.imageRequests.some(url=>url.endsWith("roguelikeIndoor_transparent.png")));
 });
 
-// Detects a whole-room frame still based on the old five-row lounge, on either viewport shape.
-test("the taller lounge and wall signs fit desktop and phone kiosk and pre-game frames", async () => {
+// Automatic profiles use the current lounge bounds; Recenter still includes every corner.
+test("the taller lounge defines overview and table-first frames while Recenter includes the wall and lounge", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const layout = createRoomLayout(sample.tables,sample.room_layout);
   for (const [mobile,viewport] of [[false,{width:960,height:480}],[true,{width:360,height:640}]]) {
@@ -2555,7 +2609,14 @@ test("the taller lounge and wall signs fit desktop and phone kiosk and pre-game 
       const app=await runApp([sample],`lounge-frame-${mobile}-${kiosk}`,{search,mobile,viewport,reducedMotion:true});
       assert.deepEqual(app.errors,[]);
       const world=app.transforms.find(t=>t[0]!==1||t[4]!==0||t[5]!==0);
-      const camera={zoom:world[0]*32,x:world[4],y:world[5]};
+      const automatic={zoom:world[0]*32,x:world[4],y:world[5]};
+      const hall = cameraHall(layout);
+      const expected = mobile && !kiosk ? fitBounds(tableBounds(layout, [0]), viewport, hall, 16)
+        : overviewFrame(viewport, hall, kiosk ? 0 : .2);
+      assert.deepEqual(automatic, expected);
+      app.nodes.get("recenter").listeners.get("click")();
+      const camera = cameraFrame(app);
+      assert.deepEqual(camera, fitBounds(hall, viewport, hall, 0));
       for(const p of [{x:0,y:-6},{x:layout.width,y:layout.height},
         {x:layout.lounge.x,y:layout.lounge.y+layout.lounge.h}]) {
         const screen=worldToScreen(camera,p);
@@ -3006,4 +3067,538 @@ test("kiosk moves only the clock into the bar after the badge", async () => {
   assert.equal(app.nodes.get("timeline-controls").contains(app.nodes.get("clock")), false);
   for (const id of ["play", "return-now", "speed"]) assert.ok(app.nodes.get("timeline-controls").contains(app.nodes.get(id)));
   assert.deepEqual(app.errors, []);
+});
+
+// Camera regressions inspect the renderer transform, without exposing application state.
+const cameraHall = (layout) => ({ x: 0, y: layout.backWall.y, width: layout.width, height: layout.height - layout.backWall.y });
+function drawnCamera(app) {
+  const [scale, , , , x, y] = app.transforms[1];
+  return { zoom: scale * 32, x, y };
+}
+function cameraFrame(app, now = performance.now() + 100) {
+  app.transforms.length = 0;
+  app.frames.shift()(now);
+  return drawnCamera(app);
+}
+function panForMemory(app) {
+  const events = app.nodes.get("hall").listeners;
+  events.get("pointerdown")({ pointerId: 1, button: 0, clientX: 300, clientY: 200 });
+  events.get("pointermove")({ pointerId: 1, clientX: 260, clientY: 160 });
+  events.get("pointerup")({ pointerId: 1 });
+}
+const cameraSample = async () => JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+
+test("desktop before doors uses the overview while Recenter keeps contain", async () => {
+  const sample = await cameraSample();
+  const app = await runApp([sample], "desktop-overview", { search: `?sample=1&${nowQuery(Date.parse(sample.event.start) - DAY)}` });
+  const hall = cameraHall(createRoomLayout(sample.tables, sample.room_layout));
+  const size = { width: 960, height: 480 };
+  assert.equal(document.documentElement.dataset.view, "desktop");
+  assert.deepEqual(drawnCamera(app), overviewFrame(size, hall, .2));
+  app.nodes.get("recenter").listeners.get("click")();
+  assert.deepEqual(cameraFrame(app), fitBounds(hall, size, hall, 0));
+});
+
+test("mobile before doors frames and selects one table without opening the drawer", async () => {
+  const sample = await cameraSample();
+  const size = { width: 375, height: 812 };
+  const app = await runApp([sample], "mobile-table-first", { mobile: true, viewport: size,
+    search: `?sample=1&${nowQuery(Date.parse(sample.event.start) - DAY)}` });
+  const layout = createRoomLayout(sample.tables, sample.room_layout), hall = cameraHall(layout);
+  const bounds = tableBounds(layout, [0]);
+  const camera = drawnCamera(app);
+  assert.equal(document.documentElement.dataset.view, "mobile");
+  assert.deepEqual(camera, fitBounds(bounds, size, hall, 16));
+  assert.ok(camera.zoom > minZoom(size, hall) * 2);
+  const top = worldToScreen(camera, bounds), bottom = worldToScreen(camera, { x: bounds.x + bounds.width, y: bounds.y + bounds.height });
+  assert.ok(top.x >= 0 && top.y >= 0 && bottom.x <= size.width && bottom.y <= size.height);
+  assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[0].name, "automatic selectedId renders this table's detail");
+  assert.equal(drawerView(app), null);
+  const detailHeading = app.nodes.get("detail").children[0];
+  cameraFrame(app);
+  assert.equal(app.nodes.get("detail").children[0], detailHeading, "steady frame does not rebuild details");
+  app.nodes.get("fit-active").listeners.get("click")();
+  assert.deepEqual(cameraFrame(app), camera);
+  assert.equal(drawerView(app), null);
+});
+
+test("mobile follows the next relevant table until a manual pan holds the camera", async () => {
+  const sample = await cameraSample();
+  sample.events = [];
+  const size = { width: 375, height: 812 };
+  const app = await runApp([sample], "mobile-next-table", { mobile: true, viewport: size, search: "?sample=1&at=2" });
+  const layout = createRoomLayout(sample.tables, sample.room_layout), hall = cameraHall(layout);
+  assert.deepEqual(drawnCamera(app), fitBounds(tableBounds(layout, [0]), size, hall, 16));
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "10" } });
+  assert.deepEqual(cameraFrame(app), fitBounds(tableBounds(layout, [2]), size, hall, 16));
+  assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[2].name);
+  assert.equal(drawerView(app), null);
+  panForMemory(app);
+  const manual = cameraFrame(app);
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "12" } });
+  assert.deepEqual(cameraFrame(app), manual);
+});
+
+test("desktop writes a resting manual pan after 500 ms and restores it on fresh boot", async () => {
+  const sample = await cameraSample();
+  const app = await runApp([sample], "camera-memory-write", { search: "?sample=1&at=0" });
+  const key = "longtable.camera.v1";
+  const time = performance.now() + 100;
+  assert.equal(app.storage.has(key), false, "automatic cameras are not stored");
+  panForMemory(app);
+  const camera = cameraFrame(app, time);
+  cameraFrame(app, time + 499);
+  assert.equal(app.storage.has(key), false);
+  // A second movement restarts the full quiet period.
+  panForMemory(app);
+  const moved = cameraFrame(app, time + 500);
+  assert.notDeepEqual(moved, camera);
+  cameraFrame(app, time + 999);
+  assert.equal(app.storage.has(key), false);
+  cameraFrame(app, time + 1000);
+  const saved = JSON.parse(app.storage.get(key));
+  assert.equal(saved.scope, "sample:1");
+  assert.equal(saved.zoom, moved.zoom);
+  assert.deepEqual({ x: saved.cx, y: saved.cy }, screenToWorld(moved, { x: 480, y: 240 }));
+  assert.ok(Math.abs(Date.now() - saved.savedAt) < 1000);
+  cameraFrame(app, time + 2000);
+  assert.equal(app.storageCalls.filter(([op]) => op === "set").length, 1, "unchanged camera writes only once");
+  const fresh = await runApp([sample], "camera-memory-restore", { storage: app.storage, search: "?sample=1&at=0" });
+  assert.deepEqual(drawnCamera(fresh), moved);
+  fresh.nodes.get("scrubber").listeners.get("input")({ target: { value: "12" } });
+  assert.deepEqual(cameraFrame(fresh), moved, "restored camera is manual");
+  assert.equal(fresh.storageCalls.filter(([op]) => op === "get").length, 1);
+});
+
+test("kiosk and mobile never access camera memory", async () => {
+  const sample = await cameraSample();
+  for (const view of ["kiosk", "mobile"]) {
+    const storage = new Map([["longtable.camera.v1", "invalid memory"]]);
+    const app = await runApp([sample], `camera-no-memory-${view}`, { mobile: true, storage,
+      search: `?sample=1${view === "kiosk" ? "&kiosk=1" : ""}` });
+    assert.equal(document.documentElement.dataset.view, view);
+    panForMemory(app);
+    const time = performance.now() + 100;
+    cameraFrame(app, time);
+    cameraFrame(app, time + 600);
+    assert.deepEqual(app.storageCalls.filter(([, key]) => key === "longtable.camera.v1"), []);
+    assert.equal(storage.get("longtable.camera.v1"), "invalid memory");
+  }
+});
+
+test("throwing localStorage still boots and frames desktop normally", async () => {
+  const sample = await cameraSample();
+  const app = await runApp([sample], "camera-storage-throws", { storageThrows: true, search: "?sample=1&at=0" });
+  const hall = cameraHall(createRoomLayout(sample.tables, sample.room_layout));
+  assert.deepEqual(drawnCamera(app), overviewFrame({ width: 960, height: 480 }, hall, .2));
+  panForMemory(app);
+  const time = performance.now() + 100;
+  const manual = cameraFrame(app, time);
+  assert.deepEqual(cameraFrame(app, time + 600), manual);
+  assert.deepEqual(app.errors, []);
+});
+
+test("view changes reframe automatic cameras and preserve manual cameras", async () => {
+  const sample = await cameraSample();
+  const size = { width: 960, height: 480 };
+  const app = await runApp([sample], "camera-mode-change", { viewport: size, search: "?sample=1&at=0" });
+  const layout = createRoomLayout(sample.tables, sample.room_layout), hall = cameraHall(layout);
+  app.phoneMedia.matches = true;
+  app.phoneMedia.change();
+  assert.equal(document.documentElement.dataset.view, "mobile");
+  assert.deepEqual(cameraFrame(app), fitBounds(tableBounds(layout, [0]), size, hall, 16));
+  size.width = 812; size.height = 375;
+  assert.deepEqual(cameraFrame(app), fitBounds(tableBounds(layout, [0]), size, hall, 16), "rotation reframes without a media-query change");
+  app.phoneMedia.matches = false;
+  app.phoneMedia.change();
+  assert.equal(document.documentElement.dataset.view, "desktop");
+  assert.deepEqual(cameraFrame(app), overviewFrame(size, hall, .2));
+  panForMemory(app);
+  const manual = cameraFrame(app);
+  app.phoneMedia.matches = true;
+  app.phoneMedia.change();
+  assert.deepEqual(cameraFrame(app), manual);
+});
+
+test("mobile empty hall frames the door and archives use mobile framing", async () => {
+  const sample = await cameraSample();
+  const size = { width: 375, height: 812 };
+  const archive = await runApp([sample], "camera-mobile-archive", { mobile: true, viewport: size, archive: true, search: "?at=0" });
+  const layout = createRoomLayout(sample.tables, sample.room_layout);
+  assert.deepEqual(drawnCamera(archive), fitBounds(tableBounds(layout, [0]), size, cameraHall(layout), 16));
+  assert.equal(drawerView(archive), null);
+  sample.tables = []; sample.events = [];
+  const empty = await runApp([sample], "camera-mobile-door", { mobile: true, viewport: size });
+  const doorLayout = createRoomLayout([], sample.room_layout);
+  assert.deepEqual(drawnCamera(empty), fitBounds(tableBounds(doorLayout, []), size, cameraHall(doorLayout), 16));
+  assert.equal(drawerView(empty), null);
+});
+
+test("mobile explicit selection and Fit active tables keep the selected target", async () => {
+  const sample = await cameraSample();
+  const size = { width: 375, height: 812 };
+  const app = await runApp([sample], "mobile-explicit-target", { mobile: true, viewport: size, search: "?sample=1&at=2" });
+  const layout = createRoomLayout(sample.tables, sample.room_layout), hall = cameraHall(layout);
+  const button = app.nodes.get("tables").children[0].children[1].children[0].children[0];
+  button.listeners.get("click")();
+  assert.equal(app.nodes.get("detail").children[0].textContent, sample.tables[1].name);
+  app.nodes.get("fit-active").listeners.get("click")();
+  const selected = fitBounds(tableBounds(layout, [1]), size, hall, 16);
+  assert.deepEqual(cameraFrame(app), selected);
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "12" } });
+  assert.deepEqual(cameraFrame(app), selected, "manual selection wins even after its game ends");
+  app.nodes.get("fit-active").listeners.get("click")();
+  assert.deepEqual(cameraFrame(app), selected);
+});
+
+test("wide kiosk columns preserve live nodes and restore the narrow layout on every change", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "kiosk-column-moves", { search: "?kiosk=1", wideKiosk: true });
+  const info = document.getElementById("kiosk-info");
+  assert.ok(info, "wide kiosks build the info column");
+  const identity = app.nodes.get("event-name").parentElement;
+  const readout = app.nodes.get("current-event").parentElement;
+  const strip = app.nodes.get("fundraising-strip");
+  const status = app.nodes.get("status");
+  assert.deepEqual(info.children, [identity, readout, strip, status]);
+  assert.equal(strip.hidden, false, "live fundraising remains visible");
+  for (const id of ["status", "current-event", "fundraising-total"]) {
+    assert.equal(document.getElementById(id), app.nodes.get(id), `${id} retains its pre-boot node`);
+    assert.ok(info.contains(app.nodes.get(id)), `${id} moves into the info column`);
+  }
+  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
+  for (let i = 0; i < 2; i += 1) {
+    app.kioskMedia.matches = false;
+    app.kioskMedia.change({ matches: false });
+    assert.equal(info.hidden, true);
+    assert.equal(document.getElementById("kiosk-codes").hidden, true);
+    for (const [id, parent] of app.originalParents) assert.equal(app.nodes.get(id).parentElement, parent, `${id} returns to its original parent`);
+    assert.equal(info.contains(status), false);
+    app.kioskMedia.matches = true;
+    app.kioskMedia.change({ matches: true });
+    assert.equal(info.hidden, false);
+    assert.deepEqual(info.children, [identity, readout, strip, status]);
+  }
+  const layout = createRoomLayout(data.tables, data.room_layout);
+  assert.equal(document.documentElement.style["--hall-ratio"], String(layout.width / (layout.height - layout.backWall.y)));
+  assert.deepEqual(app.errors, []);
+});
+
+test("kiosk QR cards follow plaque order, images, labels and URLs", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "kiosk-column-codes", { search: "?sample=1&kiosk=1", wideKiosk: true });
+  const codes = document.getElementById("kiosk-codes");
+  assert.ok(codes, "kiosks build the codes column");
+  assert.equal(codes.hidden, false);
+  assert.equal(codes.children.length, WALL_PLAQUES.length);
+  codes.children.forEach((card, index) => {
+    const plaque = WALL_PLAQUES[index];
+    const [mat, label, url] = card.children;
+    assert.equal(mat.children[0].tagName, "IMG");
+    assert.equal(mat.children[0].alt, plaque.label);
+    assert.equal(mat.children[0].src, new URL(plaque.qr, new URL("../app.mjs", import.meta.url)).href);
+    assert.equal(label.textContent, plaque.label);
+    assert.equal(url.textContent, shortUrl(plaque.url));
+  });
+  assert.equal(app.nodes.get("fundraising-strip").hidden, true, "samples still hide fundraising");
+});
+
+test("archive kiosk columns keep the codes column empty and hidden", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "kiosk-column-archive", { search: "?kiosk=1", archive: true, wideKiosk: true });
+  const codes = document.getElementById("kiosk-codes");
+  assert.ok(codes, "archive kiosks build an empty codes column");
+  assert.deepEqual(codes.children, []);
+  assert.equal(codes.hidden, true);
+  assert.equal(app.nodes.get("fundraising-strip").hidden, true);
+});
+
+test("narrow kiosk builds hidden columns without moving the bar nodes", async () => {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([data], "kiosk-column-narrow", { search: "?kiosk=1" });
+  const info = document.getElementById("kiosk-info");
+  assert.ok(info, "narrow kiosks prepare the info column at boot");
+  assert.equal(info.hidden, true);
+  assert.deepEqual(info.children, []);
+  for (const [id, parent] of app.originalParents) assert.equal(app.nodes.get(id).parentElement, parent);
+  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
+  assert.deepEqual(app.errors, []);
+});
+
+const clickControl = (app, id) => app.nodes.get(id).listeners.get("click")?.();
+function assertCameraMenu(app, open) {
+  assert.equal(app.nodes.get("camera-toggle").getAttribute("aria-expanded"), String(open));
+  assert.equal(app.nodes.get("camera-controls").getAttribute("data-open") !== null, open);
+}
+const mobileControls = { mobile: true, viewport: { width: 375, height: 640 }, search: "?sample=1&at=0" };
+
+test("mobile View starts collapsed and toggles both DOM states", async () => {
+  const app = await runApp([await cameraSample()], "controls-toggle", mobileControls);
+  assert.match(pageHtml, /id="camera-controls"[^>]*>\s*<button id="camera-toggle" type="button" aria-expanded="false" aria-controls="camera-controls">View<\/button>/);
+  assertCameraMenu(app, false);
+  clickControl(app, "camera-toggle");
+  assertCameraMenu(app, true);
+  clickControl(app, "camera-toggle");
+  assertCameraMenu(app, false);
+});
+
+test("mobile zoom action runs before collapse and returns hidden button focus", async () => {
+  const app = await runApp([await cameraSample()], "controls-zoom", mobileControls);
+  const before = drawnCamera(app).zoom;
+  clickControl(app, "camera-toggle");
+  app.nodes.get("zoom-in").focus();
+  clickControl(app, "zoom-in");
+  assert.ok(cameraFrame(app).zoom > before);
+  assertCameraMenu(app, false);
+  assert.equal(document.activeElement, app.nodes.get("camera-toggle"));
+  for (const id of ["zoom-out", "recenter", "fit-active"]) {
+    clickControl(app, "camera-toggle");
+    app.nodes.get("hall").focus();
+    clickControl(app, id);
+    assertCameraMenu(app, false);
+    assert.equal(document.activeElement, app.nodes.get("hall"), "focus elsewhere is preserved");
+  }
+});
+
+test("mobile outside pointer collapses without changing focus and inside pointer stays open", async () => {
+  const app = await runApp([await cameraSample()], "controls-outside", mobileControls);
+  clickControl(app, "camera-toggle");
+  app.nodes.get("zoom-in").focus();
+  app.documentListeners.get("pointerdown")({ target: app.nodes.get("zoom-in") });
+  assertCameraMenu(app, true);
+  app.documentListeners.get("pointerdown")({ target: app.nodes.get("hall") });
+  assertCameraMenu(app, false);
+  assert.equal(document.activeElement, app.nodes.get("zoom-in"));
+});
+
+test("mobile Escape collapses and focuses View only from inside the controls", async () => {
+  const app = await runApp([await cameraSample()], "controls-escape", mobileControls);
+  clickControl(app, "camera-toggle");
+  const keydown = app.nodes.get("camera-controls").listeners.get("keydown");
+  app.nodes.get("hall").focus();
+  keydown?.({ key: "Escape", preventDefault() { assert.fail("outside focus"); } });
+  assertCameraMenu(app, true);
+  app.nodes.get("zoom-in").focus();
+  let prevented = false;
+  keydown({ key: "Escape", preventDefault() { prevented = true; } });
+  assertCameraMenu(app, false);
+  assert.equal(prevented, true);
+  assert.equal(document.activeElement, app.nodes.get("camera-toggle"));
+});
+
+test("mobile activity opens before collapse and drawer close restores View focus", async () => {
+  const app = await runApp([await cameraSample()], "controls-drawer", mobileControls);
+  clickControl(app, "camera-toggle");
+  app.nodes.get("activity-toggle").focus();
+  clickControl(app, "activity-toggle");
+  assert.equal(app.nodes.get("hall-sidebar").getAttribute("data-view"), "activity");
+  assertCameraMenu(app, false);
+  app.nodes.get("drawer-close").focus();
+  clickControl(app, "drawer-close");
+  assert.equal(app.nodes.get("hall-sidebar").getAttribute("data-view"), null);
+  assert.equal(document.activeElement, app.nodes.get("camera-toggle"));
+});
+
+test("mobile to desktop media change collapses the camera menu", async () => {
+  const app = await runApp([await cameraSample()], "controls-mode", mobileControls);
+  clickControl(app, "camera-toggle");
+  assertCameraMenu(app, true);
+  app.phoneMedia.matches = false;
+  app.phoneMedia.change();
+  assertCameraMenu(app, false);
+  clickControl(app, "activity-toggle");
+  app.nodes.get("drawer-close").focus();
+  clickControl(app, "drawer-close");
+  assert.equal(document.activeElement, app.nodes.get("activity-toggle"));
+});
+
+test("direct drag pinch wheel and keyboard navigation dismiss camera help permanently", async () => {
+  for (const action of ["drag", "pinch", "wheel", "ArrowLeft", "+", "=", "-"]) {
+    const app = await runApp([await cameraSample()], `help-${action}`, { search: "?sample=1&at=0" });
+    const events = app.nodes.get("hall").listeners;
+    const help = app.nodes.get("camera-help");
+    assert.equal(help.getAttribute("data-dismissed"), null);
+    if (action === "drag" || action === "pinch") {
+      events.get("pointerdown")({ pointerId: 1, button: 0, clientX: 300, clientY: 200 });
+      events.get("pointermove")({ pointerId: 1, clientX: 303, clientY: 200 });
+      assert.equal(help.getAttribute("data-dismissed"), null, "subthreshold movement keeps help");
+      if (action === "pinch") events.get("pointerdown")({ pointerId: 2, button: 0, clientX: 400, clientY: 200 });
+      events.get("pointermove")({ pointerId: action === "pinch" ? 2 : 1, clientX: 450, clientY: 200 });
+    } else if (action === "wheel") {
+      events.get("wheel")({ clientX: 480, clientY: 240, deltaY: -100, deltaMode: 0, preventDefault() {} });
+    } else events.get("keydown")({ key: action, preventDefault() {} });
+    assert.equal(help.getAttribute("data-dismissed"), "", action);
+    clickControl(app, "recenter");
+    cameraFrame(app);
+    assert.equal(help.getAttribute("data-dismissed"), "", "framing never restores help");
+  }
+});
+
+test("camera buttons Home automatic framing and page scrolling preserve help until direct use", async () => {
+  const app = await runApp([await cameraSample()], "help-retained", { search: "?sample=1&at=0" });
+  const help = app.nodes.get("camera-help");
+  const events = app.nodes.get("hall").listeners;
+  assert.equal(help.getAttribute("data-dismissed"), null);
+  for (const id of ["zoom-in", "zoom-out", "recenter", "fit-active"]) {
+    clickControl(app, id);
+    assert.equal(help.getAttribute("data-dismissed"), null, id);
+  }
+  events.get("keydown")({ key: "Home", preventDefault() {} });
+  assert.equal(help.getAttribute("data-dismissed"), null);
+  events.get("wheel")({ clientX: 480, clientY: 240, deltaY: 100, deltaMode: 0, preventDefault() { assert.fail("should scroll"); } });
+  assert.equal(help.getAttribute("data-dismissed"), null);
+  events.get("keydown")({ key: "ArrowLeft", preventDefault() {} });
+  assert.equal(help.getAttribute("data-dismissed"), "", "only direct use dismisses help");
+});
+
+test("mobile regular status names the host before and during the event without prefixing stale status", async () => {
+  const sample = await cameraSample();
+  sample.event.host_name = "  Example Games  ";
+  for (const before of [true, false]) {
+    const search = `?sample=1&${nowQuery(Date.parse(sample.event.start) + (before ? -DAY : 60_000))}`;
+    const app = await runApp([sample], `host-mobile-${before}`, { ...mobileControls, search });
+    assert.match(app.nodes.get("status").textContent, /^Hosted by Example Games · /);
+    app.phoneMedia.matches = false;
+    app.phoneMedia.change();
+    cameraFrame(app);
+    assert.doesNotMatch(app.nodes.get("status").textContent, /^Hosted by/);
+    app.phoneMedia.matches = true;
+    app.phoneMedia.change();
+    cameraFrame(app);
+    assert.match(app.nodes.get("status").textContent, /^Hosted by Example Games · /);
+  }
+  const desktop = await runApp([sample], "host-desktop");
+  assert.doesNotMatch(desktop.nodes.get("status").textContent, /^Hosted by/);
+  for (const name of [undefined, "   "]) {
+    const unnamed = structuredClone(sample);
+    if (name === undefined) delete unnamed.event.host_name; else unnamed.event.host_name = name;
+    const app = await runApp([unnamed], `host-unnamed-${name}`, mobileControls);
+    assert.doesNotMatch(app.nodes.get("status").textContent, /^Hosted by/);
+  }
+  const stale = await runApp([sample, new Error("offline")], "host-stale", { ...mobileControls, search: "" });
+  clickControl(stale, "refresh-now");
+  await new Promise(resolve => setTimeout(resolve, 20));
+  cameraFrame(stale);
+  assert.match(stale.nodes.get("status").textContent, /^Update failed/);
+  assert.doesNotMatch(stale.nodes.get("status").textContent, /Hosted by/);
+});
+
+test("responsive controls CSS hides the toggle by default and preserves accessible dismissed help", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /(?:^|\n)#camera-toggle\s*\{[^}]*display:\s*none/);
+  assert.match(css, /html\[data-view="mobile"\] #camera-toggle\s*\{[^}]*display:\s*block/);
+  // Dismissed help shares the visually-hidden rule, so it leaves the layout without leaving the accessibility tree.
+  const dismissed = css.match(/\.visually-hidden, #camera-help\[data-dismissed\]\s*\{([^}]+)\}/)?.[1];
+  assert.ok(dismissed);
+  assert.match(dismissed, /clip: rect\(0, 0, 0, 0\)/);
+  assert.doesNotMatch(css, /#camera-help\[data-dismissed\][^{]*\{[^}]*display:\s*none/);
+  // The new view-mode blocks win by selector, not by !important.
+  const viewBlocks = css.slice(css.indexOf("/* View controls follow the camera mode"), css.indexOf("@media (prefers-reduced-motion"));
+  assert.ok(viewBlocks.length > 100);
+  assert.doesNotMatch(viewBlocks, /!important/);
+});
+
+
+async function insetFixture(label, options = {}) {
+  const sample = await cameraSample();
+  const app = await runApp([sample], label, { drawerWidth: 320, reducedMotion: true,
+    search: `?sample=1&${nowQuery(Date.parse(sample.event.start) - DAY)}`, ...options });
+  return { app, hall: cameraHall(createRoomLayout(sample.tables, sample.room_layout)),
+    layout: createRoomLayout(sample.tables, sample.room_layout) };
+}
+function tapWorld(app, camera, point) {
+  const screen = worldToScreen(camera, point);
+  drawerTap(app, screen.x, screen.y);
+}
+const nearInset = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
+
+test("drawer inset table click shifts the hall left and empty floor restores its centre", async () => {
+  const { app, layout } = await insetFixture("inset-table");
+  const before = drawnCamera(app);
+  tapWorld(app, before, { x: layout.cells[0].x + 2, y: layout.cells[0].y + 2 });
+  assert.equal(drawerView(app), "detail");
+  const open = cameraFrame(app);
+  nearInset(open.x, before.x - 160);
+  assert.equal(open.zoom, before.zoom);
+  assert.equal(app.nodes.get("hall").width, 960, "inset never shrinks the drawing canvas");
+  tapWorld(app, open, { x: 1, y: 1 });
+  assert.equal(drawerView(app), null);
+  assert.deepEqual(cameraFrame(app), before);
+  assert.deepEqual(app.errors, []);
+});
+
+test("drawer inset follows the 220 ms CSS ease-out curve and settles", async () => {
+  const { app } = await insetFixture("inset-easing", { reducedMotion: false });
+  const before = drawnCamera(app), start = performance.now() + 100;
+  drawerButton(app, "activity-toggle");
+  assert.deepEqual(cameraFrame(app, start), before);
+  const middle = cameraFrame(app, start + 110);
+  // cubic-bezier(0, 0, .58, 1) gives 0.684643 at half the duration.
+  assert.ok(Math.abs(middle.x - (before.x - 160 * .684643)) < .01, "half-time inset uses CSS ease-out");
+  const open = cameraFrame(app, start + 221);
+  nearInset(open.x, before.x - 160);
+  assert.deepEqual(cameraFrame(app, start + 300), open);
+  drawerButton(app, "drawer-close");
+  cameraFrame(app, start + 310);
+  assert.deepEqual(cameraFrame(app, start + 531), before);
+});
+
+test("drawer inset preserves manual zoom through open, close and camera memory", async () => {
+  const { app, hall } = await insetFixture("inset-manual");
+  drawerButton(app, "recenter");
+  const before = cameraFrame(app), start = performance.now() + 200;
+  drawerButton(app, "activity-toggle");
+  const open = cameraFrame(app, start);
+  nearInset(open.x, before.x - 160);
+  assert.equal(open.zoom, before.zoom, "manual contain frame survives opening");
+  cameraFrame(app, start + 600);
+  const memory = JSON.parse(app.storage.get("longtable.camera.v1"));
+  nearInset(memory.cx, hall.width / 2);
+  drawerButton(app, "recenter");
+  assert.deepEqual(cameraFrame(app, start + 610), fitBounds(hall, { width: 640, height: 480 }, hall, 0));
+  drawerButton(app, "drawer-close");
+  assert.deepEqual(cameraFrame(app, start + 620), before, "closing retains the manual contain zoom");
+});
+
+test("drawer inset applies only on desktop and clears when switching to mobile", async () => {
+  for (const view of ["desktop", "mobile", "kiosk"]) {
+    const { app, hall } = await insetFixture(`inset-mode-${view}`, { mobile: view === "mobile",
+      ...(view === "kiosk" ? { search: "?sample=1&kiosk=1&at=0" } : {}) });
+    drawerButton(app, "recenter");
+    const before = cameraFrame(app);
+    drawerButton(app, "activity-toggle");
+    const open = cameraFrame(app);
+    nearInset(open.x, before.x - (view === "desktop" ? 160 : 0));
+    if (view === "desktop") {
+      app.phoneMedia.matches = true;
+      app.phoneMedia.change({ matches: true });
+      assert.deepEqual(cameraFrame(app), fitBounds(hall, { width: 960, height: 480 }, hall, 0));
+    } else assert.deepEqual(open, before);
+    assert.deepEqual(app.errors, []);
+  }
+});
+
+test("surround draws clipped running-bond masonry and linear fades outside the hall", async () => {
+  const { app, hall } = await insetFixture("surround-stone", { trackSurround: true });
+  const stone = app.rectCalls.filter(call => call.color === "#1a211e");
+  assert.ok(stone.length > 0, "surround stone is drawn");
+  const bricks = app.canvasCalls.filter(call => call.op === "strokeRect" && call.color === "#232c28");
+  assert.ok(bricks.length > 0);
+  for (const { args: [x, y, width, height], width: lineWidth } of bricks) {
+    assert.equal(lineWidth, 1);
+    assert.equal(width, 128); assert.equal(height, 32);
+    assert.ok((x / 32 - (y / 32 % 2 ? -2 : 0)) % 4 === 0);
+  }
+  const fades = app.rectCalls.filter(call => call.color?.stops);
+  assert.ok(fades.length > 0);
+  for (const { color } of fades) assert.deepEqual(color.stops, [[0, "#100f1500"], [1, "#100f15"]]);
+  const camera = drawnCamera(app), visible = screenToWorld(camera, { x: 0, y: 0 });
+  const bandClip = app.canvasCalls.find(call => call.op === "clip");
+  for (const [, x, y, width, height] of bandClip.path) {
+    assert.ok(x >= Math.max(-8, visible.x) * 32 - 1e-6);
+    assert.ok(y >= Math.max(hall.y - 8, visible.y) * 32 - 1e-6);
+    assert.ok(x + width <= (hall.width + 8) * 32);
+    assert.ok(x + width <= 0 || x >= hall.width * 32 || y + height <= hall.y * 32 || y >= (hall.y + hall.height) * 32,
+      "band excludes the hall itself");
+  }
 });

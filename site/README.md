@@ -357,21 +357,67 @@ art license or bot event is needed.
 ## Kiosk mode (projector)
 
 Open `https://longtable.party/?kiosk=1` in Chrome or Firefox on the projector
-laptop and press `f` (or F11) for fullscreen. The page strips itself to a slim
-bar (event name, Extra Life total, badge and clock), the doors countdown line,
-and the hall scene filling the rest of the screen, with the two wall plaques and
-their QR codes drawn at projector size. It needs no other setup: the same timeline,
+laptop and press `f` (or F11) for fullscreen. At aspect ratios of 3:2 or wider,
+event identity, badge, clock, scene, live Extra Life total and thermometer, and
+status occupy the left column. Large Discord and Donate QR cards occupy the
+right column. The hall fills the viewport height between the page gutters, with
+its width derived from the room including the back wall. At 1920×1080 the
+42×40 demo hall is about 1110×1057px and the QR images are about 300px square.
+Below 3:2 (including 1400×1050), the existing fundraising strip, header bar and
+status row return. Resizing moves the same live-region nodes between layouts.
+The in-world plaques remain scenery in both layouts; archives have no QR cards. It needs no other setup: the same timeline,
 polling and consent rules as the public page apply, and nothing new about any
 attendee appears. Keep the tab in the foreground (polling and the Extra Life
 total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
 the page also asks for a screen wake lock where the browser allows one. After
 45 seconds without input a moved camera returns to the kiosk's automatic frame,
-which is always the whole room from the back wall to the lounge (never the live
-page's close-up of the relevant tables), and the cursor hides after 3 seconds.
+which always contains the whole hall including the lounge, and the cursor hides after 3 seconds.
 
 `?sample=50&kiosk=1` is the dress rehearsal (the demo event in kiosk chrome);
 `?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
 combines with `?at=` and is kept when the clock rewrites the URL.
+
+### View modes
+
+The same hall and event state use three camera profiles. `?kiosk=1` takes
+precedence; otherwise the existing phone media query selects mobile, with
+desktop at other sizes. Automatic desktop whole-room frames crop at most 20%
+of the overflowing axis, never beyond a cover fit. Kiosk overviews use zero
+crop and contain the whole venue. Desktop vertical crops keep the back wall at
+the top; horizontal crops center.
+Recenter and the minimum zoom still show the entire hall.
+
+Outside the room, darker running-bond masonry extends eight tiles past the hall
+and back wall. It fades to the page colour from two to eight tiles out, remains
+undimmed at night, and has no hit targets. The surround appears in every mode,
+including newly preserved archives, wherever the canvas shows beyond the room;
+camera bounds still prevent panning into it.
+
+The desktop drawer remains an overlay. Its rendered width becomes a right camera
+inset over the same 220 ms ease-out as its slide (immediate with reduced motion).
+An under-filled hall shifts left by half that width and recentres when it closes.
+Framing, pan, zoom, Recenter and camera memory all use the uncovered width;
+the canvas and pointer coordinates keep their full dimensions. Manual cameras
+retain their zoom and are constrained as the inset changes; automatic cameras
+reframe. Mobile and kiosk have no drawer inset.
+
+Mobile opens on one table, including before doors, following the first relevant
+table unless the visitor selects one. Automatic selection shows its plate without
+opening the drawer; Fit active tables uses the same target. After all games end,
+it keeps the selected table or falls back to the first; an empty hall frames the
+door area. A manual
+camera survives mode changes; an automatic camera reframes.
+
+Desktop remembers a manual camera after 500 ms at rest, scoped to the live event,
+archive event, or sample variant. Matching memory expires after 12 hours. Storage
+failures are ignored. Kiosk and mobile never read or write camera memory.
+
+The phone's bottom-left “View” toggle opens the camera buttons and collapses after
+an action, an outside tap, Escape, or leaving mobile view. Desktop uses a compact
+joined camera group and, at widths ≥1100px, a one-row timeline. Camera help hides
+after the first direct canvas pan or zoom, remaining available to screen readers
+until reload. The phone status strip prefixes regular messages with “Hosted by”
+and the host name when one is supplied.
 
 ### Testing deployment and later launch
 
@@ -664,6 +710,7 @@ goal is met. A zero goal hides the thermometer and omits the goal from the text.
 A failed first fetch shows “Support our Extra Life team” with the thermometer
 hidden; the header's Donate stays available. Later failures retain the last fill and thermometer
 state and label the text “last available total”. Totals never animate. Phones
-omit the Extra Life brand text; kiosks enlarge the strip and hide the header
-actions because the wall plaques carry QR codes. Samples and archived replays do not fetch or
+omit the Extra Life brand text; kiosks enlarge the total and hide the header
+actions. Wide kiosks stack the total above the thermometer in the left column
+and provide large QR cards in the right column; narrow kiosks retain the strip. Samples and archived replays do not fetch or
 show the strip.

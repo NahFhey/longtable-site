@@ -189,7 +189,8 @@ footer p { margin: .3rem 0; }
 .archive-list li { padding: 1.5rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); }
 .archive-list a { font: 1.6rem Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
 .archive-list p { margin-bottom: 0; color: var(--muted); }
-.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+/* Dismissed camera help stays available to the canvas's aria-describedby. */
+.visually-hidden, #camera-help[data-dismissed] { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
 @media (max-width: 1050px) {
   .masthead { gap: 2rem; grid-template-columns: minmax(0, 1fr) 19rem; }
@@ -246,7 +247,7 @@ footer p { margin: .3rem 0; }
     height: max(10rem, calc(100vh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip)));
     height: max(10rem, calc(100svh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip))); }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
-  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; left: .5rem; right: .5rem; bottom: .5rem; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; z-index: 1; pointer-events: none; }
   html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
 }
 /* Landscape phones: one row of title, event name, badge, scene text and Discord (44px + .8rem padding). */
@@ -296,6 +297,47 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
 }
+/* View controls follow the camera mode, including phones held sideways. */
+#camera-toggle { display: none; }
+html[data-view="mobile"] #camera-toggle { display: block; }
+html[data-view="mobile"] #camera-controls { left: .5rem; bottom: .5rem; flex-direction: column-reverse; align-items: flex-start; flex-wrap: nowrap; }
+html[data-view="mobile"] #camera-controls:not([data-open]) button:not(#camera-toggle) { display: none; }
+html[data-view="mobile"] #camera-controls button { min-width: 44px; min-height: 44px; border-radius: .3rem; }
+@media (orientation: landscape) {
+  html[data-view="mobile"] #camera-controls { flex-direction: row; flex-wrap: nowrap; }
+}
+
+/* Desktop keeps the same actions in a compact joined group. */
+html[data-view="desktop"] #camera-controls { gap: 0; }
+html[data-view="desktop"] #camera-controls button { min-height: 1.9rem; padding: .2rem .6rem; font-size: .75rem; border-radius: 0; }
+html[data-view="desktop"] #camera-controls #zoom-in,
+html[data-view="desktop"] #camera-controls #zoom-out { font-size: 1.1rem; min-width: 1.9rem; }
+html[data-view="desktop"] #camera-controls #zoom-in { border-radius: .3rem 0 0 .3rem; }
+html[data-view="desktop"] #camera-controls #activity-toggle { border-radius: 0 .3rem .3rem 0; }
+html[data-view="desktop"] #camera-controls button:not(#camera-toggle):not(#zoom-in) { margin-left: -1px; }
+@media (pointer: coarse) {
+  html[data-view="desktop"] #camera-controls button { min-height: 44px; }
+}
+
+/* Wide desktops put all timeline items in one row; hidden items take no space. */
+@media (min-width: 1100px) {
+  html[data-view="desktop"] .timeline-controls { display: flex; align-items: center; gap: .4rem .9rem; flex-wrap: nowrap; }
+  html[data-view="desktop"] .timeline-head, html[data-view="desktop"] .timeline-meta { display: contents; }
+  html[data-view="desktop"] .timeline-head > label { order: 1; white-space: nowrap; }
+  html[data-view="desktop"] #clock { order: 2; }
+  html[data-view="desktop"] #start-label { order: 3; white-space: nowrap; }
+  html[data-view="desktop"] #hall-content #scrubber { order: 4; flex: 1 1 auto; min-width: 8rem; margin: 0; }
+  html[data-view="desktop"] #end-label { order: 5; white-space: nowrap; }
+  html[data-view="desktop"] #now-marker { order: 6; white-space: nowrap; }
+  html[data-view="desktop"] .timeline-head .controls { order: 7; margin-left: 0; }
+}
+@media (min-width: 1100px) and (pointer: fine) {
+  /* Allow for the panel's 2px border within the 3rem height target. */
+  html[data-view="desktop"] .timeline-head .controls button,
+  html[data-view="desktop"] .timeline-head .controls select { min-height: calc(2rem - 1px); }
+}
+
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
@@ -342,3 +384,53 @@ html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
 html[data-kiosk] .fundraising-total { font-size: 1.6rem; color: var(--gold); }
 html[data-kiosk] .thermometer-tube { height: .9rem; }
 html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
+
+/* Wide projectors give the hall its full height; narrower kiosks retain the bar layout above. */
+@media (min-aspect-ratio: 3/2) {
+  html[data-kiosk] { --kiosk-canvas-h: calc(100vh - 2 * var(--kiosk-gap)); }
+  html[data-kiosk] body {
+    display: grid;
+    grid-template-columns: minmax(16rem, 1fr) auto minmax(16rem, 1fr);
+    grid-template-rows: var(--kiosk-canvas-h);
+    gap: var(--kiosk-gap);
+    padding: var(--kiosk-gap) var(--gutter);
+  }
+  html[data-kiosk] .masthead { display: none; }
+  html[data-kiosk] #hall-content {
+    grid-area: 1 / 2;
+    width: min(calc(var(--kiosk-canvas-h) * var(--hall-ratio)), calc(100vw - 2 * var(--gutter) - 2 * 16rem - 2 * var(--kiosk-gap)));
+    min-width: 0;
+    height: var(--kiosk-canvas-h);
+    margin: 0;
+    padding: 0;
+  }
+  /* Sized from the variable, not 100%: a percentage cannot resolve through the <details> content slot. */
+  html[data-kiosk] #hall { height: var(--kiosk-canvas-h); border: 0; }
+  html[data-kiosk] #kiosk-info,
+  html[data-kiosk] #kiosk-codes { min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+  html[data-kiosk] #kiosk-info { grid-area: 1 / 1; }
+  html[data-kiosk] #kiosk-info .identity { display: block; }
+  html[data-kiosk] #kiosk-info #event-name {
+    margin-top: .75rem; font-size: 1.5rem; white-space: normal; text-overflow: clip;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  }
+  html[data-kiosk] #kiosk-info .readout { flex-direction: column; align-items: flex-start; gap: .5rem; white-space: normal; }
+  html[data-kiosk] #kiosk-info #clock { font-size: 2.2rem; font-variant-numeric: tabular-nums; }
+  html[data-kiosk] #kiosk-info #scene-event { font-size: 1.2rem; overflow-wrap: anywhere; }
+  html[data-kiosk] #kiosk-info #fundraising-strip {
+    height: auto; padding: 0; flex-direction: column; align-items: stretch; background: none; border: 0;
+  }
+  html[data-kiosk] #kiosk-info .fundraising-total { order: -1; white-space: normal; overflow-wrap: anywhere; }
+  html[data-kiosk] #kiosk-info .thermometer { flex: none; width: 100%; }
+  html[data-kiosk] #kiosk-info #status {
+    margin-top: auto; height: auto; font-size: 1.1rem; white-space: normal; text-overflow: clip;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4;
+  }
+  html[data-kiosk] #kiosk-codes { grid-area: 1 / 3; justify-content: center; align-items: center; }
+  html[data-kiosk] .kiosk-code { width: 100%; max-width: 22rem; padding: .5rem; background: #4a3524; border: 2px solid #b89b5c; }
+  html[data-kiosk] .kiosk-code-mat { padding: .5rem; background: white; }
+  html[data-kiosk] .kiosk-code img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+  html[data-kiosk] .kiosk-code p { margin: .5rem 0 0; overflow-wrap: anywhere; }
+  html[data-kiosk] .kiosk-code-label { color: #e9d9ae; font-size: 1.2rem; }
+  html[data-kiosk] .kiosk-code-url { color: var(--muted); font-size: .95rem; }
+}

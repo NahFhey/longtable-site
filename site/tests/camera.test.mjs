@@ -1,10 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { atMinZoom, constrainCamera, fitBounds, minZoom, panCamera, relevantTableIndices, screenToWorld, tableBounds, WHEEL_REST_MS, wheelIntent, worldToScreen, zoomAt } from "../camera.mjs";
+import { VIEW_PROFILES, viewMode, overviewFrame, mobileTarget, encodeCameraMemory, decodeCameraMemory, atMinZoom, constrainCamera, fitBounds, minZoom, panCamera, relevantTableIndices, screenToWorld, tableBounds, WHEEL_REST_MS, wheelIntent, worldToScreen, zoomAt } from "../camera.mjs";
 import { createSeatingPlan } from "../model.mjs";
 const world = { width: 72, height: 30 };
 const viewport = { width: 960, height: 480 };
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
+
+test("drawer inset clamps the available viewport width", async () => {
+  const { insetViewport } = await import("../camera.mjs");
+  assert.equal(typeof insetViewport, "function", "camera exports insetViewport");
+  assert.deepEqual(insetViewport(viewport, 320), { width: 640, height: 480 });
+  assert.deepEqual(insetViewport(viewport, 960), { width: 1, height: 480 });
+  assert.deepEqual(insetViewport(viewport, 2000), { width: 1, height: 480 });
+  assert.deepEqual(insetViewport(viewport, 0), viewport);
+});
+
+test("drawer inset centres an under-filled hall in the uncovered width", async () => {
+  const { insetViewport } = await import("../camera.mjs");
+  assert.equal(typeof insetViewport, "function", "camera exports insetViewport");
+  const hall = { x: 0, y: -6, width: 42, height: 46 };
+  const camera = { zoom: 12, x: 0, y: 72 };
+  const full = constrainCamera(camera, viewport, hall);
+  const inset = constrainCamera(camera, insetViewport(viewport, 320), hall);
+  near(inset.x, full.x - 160);
+  near(worldToScreen(inset, { x: 21, y: 0 }).x, 320);
+  near(inset.zoom, full.zoom);
+});
 
 test("camera transforms invert independently of display density and preserve the pointer during zoom", () => {
   const camera = { zoom: 32, x: -200, y: -180 };
@@ -101,4 +122,82 @@ test("the wheel hands off to the page only at minimum zoom", () => {
   assert.equal(wheelIntent({ deltaY: 100, ctrlKey: true, atMinimum: true, scrollY: 0 }), "zoom");
   assert.equal(wheelIntent({ deltaY: -100, ctrlKey: true, atMinimum: true, scrollY: 400 }), "zoom");
   assert.equal(wheelIntent({ deltaY: 100, ctrlKey: true, atMinimum: true, previous: "scroll", sincePrevious: 10 }), "zoom");
+});
+
+test("viewMode gives kiosk precedence and profiles are frozen", () => {
+  assert.equal(viewMode({ kiosk: true, phone: true }), "kiosk");
+  assert.equal(viewMode({ kiosk: false, phone: true }), "mobile");
+  assert.equal(viewMode({ kiosk: false, phone: false }), "desktop");
+  assert.ok(Object.isFrozen(VIEW_PROFILES));
+  assert.deepEqual(VIEW_PROFILES.desktop, { overviewCrop: .2, memory: true, frame: "relevant" });
+  assert.deepEqual(VIEW_PROFILES.kiosk, { overviewCrop: 0, memory: false, frame: "overview" });
+  assert.deepEqual(VIEW_PROFILES.mobile, { overviewCrop: 0, memory: false, frame: "table" });
+  for (const profile of Object.values(VIEW_PROFILES)) assert.ok(Object.isFrozen(profile));
+});
+
+test("overviewFrame crops twenty percent vertically and anchors the world top", () => {
+  const hall = { x: 0, y: -6, width: 42, height: 46 };
+  const camera = overviewFrame(viewport, hall, .2);
+  near(camera.zoom, 480 / (.8 * 46));
+  near(worldToScreen(camera, { x: 0, y: -6 }).y, 0);
+  near(camera.x, (960 - 42 * camera.zoom) / 2);
+});
+
+test("overviewFrame never exceeds cover on a nearly matching aspect", () => {
+  const hall = { x: 0, y: -6, width: 42, height: 46 };
+  const camera = overviewFrame({ width: 430, height: 460 }, hall, .2);
+  near(camera.zoom, 430 / 42);
+});
+
+test("overviewFrame crop zero equals contain and leaves minZoom unchanged", () => {
+  const hall = { x: 0, y: -6, width: 42, height: 46 };
+  for (const size of [viewport, { width: 375, height: 812 }]) {
+    assert.deepEqual(overviewFrame(size, hall, 0), fitBounds(hall, size, hall, 0));
+    near(minZoom(size, hall), Math.min(size.width / 42, size.height / 46));
+  }
+});
+
+test("overviewFrame centers horizontal overflow in portrait", () => {
+  const hall = { x: 3, y: -6, width: 42, height: 46 };
+  const size = { width: 375, height: 812 };
+  const camera = overviewFrame(size, hall, .2);
+  near(camera.zoom, 375 / (.8 * 42));
+  near(worldToScreen(camera, { x: 24, y: 17 }).x, size.width / 2);
+  near(worldToScreen(camera, { x: 24, y: 17 }).y, size.height / 2);
+});
+
+test("mobileTarget prefers selection then lowest relevant index then the door", () => {
+  const tables = [{ start: 4, end: 6 }, { start: 2, end: 4 }, { start: 2, end: 3 }];
+  assert.equal(mobileTarget(tables, 0, 2), 2);
+  assert.equal(mobileTarget(tables, 0, -1), 1);
+  assert.equal(mobileTarget(tables, 3, -1), 1);
+  assert.equal(mobileTarget(tables, 4, -1), 0);
+  assert.equal(mobileTarget(tables, 8, -1), 0);
+  assert.equal(mobileTarget([], 0, 0), -1);
+});
+
+test("decodeCameraMemory validates scope age version and finite numbers", () => {
+  const entry = { v: 1, scope: "live:event", zoom: 24, cx: 30, cy: 15, savedAt: 1000 };
+  const decode = (value, now = 2000) => decodeCameraMemory(JSON.stringify(value), "live:event", now, viewport, world);
+  assert.deepEqual(decode(entry), { zoom: 24, x: -240, y: -120 });
+  assert.equal(decode({ ...entry, scope: "archive:event" }), null);
+  assert.equal(decode(entry, 1000 + 12 * 60 * 60 * 1000), null);
+  assert.equal(decode(entry, 999), null);
+  assert.equal(decodeCameraMemory("not JSON", entry.scope, 2000, viewport, world), null);
+  assert.equal(decode({ ...entry, v: 2 }), null);
+  for (const field of ["zoom", "cx", "cy", "savedAt"]) {
+    for (const value of [Infinity, NaN, null, "24"]) assert.equal(decode({ ...entry, [field]: value }), null);
+  }
+  assert.equal(decode({ ...entry, zoom: 0 }), null);
+  assert.equal(decodeCameraMemory('{"v":1,"scope":"live:event","zoom":1e400,"cx":30,"cy":15,"savedAt":1000}', entry.scope, 2000, viewport, world), null);
+});
+
+test("camera memory round trip preserves the world center across viewport sizes", () => {
+  const camera = { zoom: 32, x: -480, y: -240 };
+  const raw = encodeCameraMemory(camera, viewport, "sample:50", 1000);
+  const center = screenToWorld(camera, { x: 480, y: 240 });
+  const size = { width: 640, height: 400 };
+  const decoded = decodeCameraMemory(raw, "sample:50", 1100, size, world);
+  assert.deepEqual(screenToWorld(decoded, { x: 320, y: 200 }), center);
+  assert.equal(decoded.zoom, camera.zoom);
 });

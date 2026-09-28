@@ -1,7 +1,7 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
 import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
-import { atMinZoom, constrainCamera, fitBounds, panCamera, relevantTableIndices, screenToWorld, tableBounds, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=aa730e0710fe";
+import { VIEW_PROFILES, atMinZoom, constrainCamera, decodeCameraMemory, encodeCameraMemory, fitBounds, insetViewport, mobileTarget, overviewFrame, panCamera, relevantTableIndices, screenToWorld, tableBounds, viewMode, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=d94bb0d105dc";
 import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=e5ce603f951c";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
 import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
@@ -57,6 +57,7 @@ import {
 
 const TILE = 16;
 const SCALE = 2;
+const SURROUND_TILES = 8;
 const STRIDE = 17;
 const WALK_TILES_PER_SECOND = 3.2;
 const SPEECH_SECONDS = { shout: 4, donation: 6 };
@@ -146,6 +147,7 @@ const state = {
   tableDiceNodes: new Map(),
   detailDiceNode: null,
   lastUrlWrite: 0,
+  view: null,
   camera: null,
   manualCamera: false,
   frameKey: null,
@@ -153,6 +155,7 @@ const state = {
   speed: 600,
   selectedId: null,
   drawer: null,
+  drawerInset: 0,
   manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
   hoverName: null,  // the hovered person's name label, drawn after the plates
@@ -203,8 +206,33 @@ const state = {
   lastInputAt: 0,
   lastPointerAt: 0,
 };
+function setCameraMenu(open, { focusToggle = false } = {}) {
+  const controls = $("camera-controls");
+  const toggle = $("camera-toggle");
+  if ((controls.getAttribute("data-open") !== null) !== open) {
+    if (open) controls.setAttribute("data-open", "");
+    else controls.removeAttribute("data-open");
+  }
+  const expanded = String(open);
+  if (toggle.getAttribute("aria-expanded") !== expanded) toggle.setAttribute("aria-expanded", expanded);
+  if (focusToggle) toggle.focus();
+}
+
+function dismissCameraHelp() {
+  const help = $("camera-help");
+  if (help.getAttribute("data-dismissed") === null) help.setAttribute("data-dismissed", "");
+}
+
+function updateView() {
+  const view = viewMode({ kiosk: state.kiosk, phone: mobile.matches });
+  if (state.view !== view && !state.manualCamera) state.frameKey = null;
+  state.view = view;
+  document.documentElement.dataset.view = view;
+  if (view !== "mobile") setCameraMenu(false);
+}
+updateView();
 arrangeHall();
-mobile.addEventListener?.("change", arrangeHall);
+mobile.addEventListener?.("change", () => { updateView(); arrangeHall(); });
 // Kiosk hides the scrubber panel, so its clock lives in the bar.
 if (state.kiosk) $("mode-badge").after($("clock"));
 if ($("info-open")) $("info-open").hidden = state.kiosk;
@@ -212,6 +240,51 @@ if (state.kiosk) {
   if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
   $("hall-explorer").open = true;
 }
+// Move the existing live regions with their containers; keep their original insertion points.
+function setupKioskColumns() {
+  const media = matchMedia("(min-aspect-ratio: 3/2)");
+  const info = document.createElement("aside");
+  info.id = "kiosk-info";
+  info.setAttribute("aria-label", "Event information");
+  const codes = document.createElement("aside");
+  codes.id = "kiosk-codes";
+  codes.setAttribute("aria-label", "Event QR codes");
+  const moved = [$("event-name").parentElement, $("mode-badge").parentElement, $("fundraising-strip"), $("status")]
+    .map(node => ({ node, parent: node.parentElement, next: node.nextSibling }));
+  if (!state.archive) {
+    for (const plaque of WALL_PLAQUES) {
+      if (!plaque.url) continue;
+      const card = document.createElement("div");
+      card.className = "kiosk-code";
+      const mat = document.createElement("div");
+      mat.className = "kiosk-code-mat";
+      const image = document.createElement("img");
+      image.src = new URL(plaque.qr, import.meta.url).href;
+      image.alt = plaque.label;
+      mat.append(image);
+      const label = document.createElement("p");
+      label.className = "kiosk-code-label";
+      label.textContent = plaque.label;
+      const url = document.createElement("p");
+      url.className = "kiosk-code-url";
+      url.textContent = shortUrl(plaque.url);
+      card.append(mat, label, url);
+      codes.append(card);
+    }
+  }
+  document.body.append(info, codes);
+  function arrangeKiosk() {
+    info.hidden = !media.matches;
+    codes.hidden = !media.matches || !codes.children.length;
+    for (const { node, parent, next } of moved) {
+      if (media.matches) info.append(node);
+      else parent.insertBefore(node, next);
+    }
+  }
+  arrangeKiosk();
+  media.addEventListener("change", arrangeKiosk);
+}
+if (state.kiosk) setupKioskColumns();
 // The footer's kiosk link keeps the page's other query flags (sample, now, at) so it opens the same view as a kiosk.
 {
   const link = $("kiosk-link");
@@ -294,9 +367,38 @@ function buildLayout() {
   return { ...createRoomLayout(state.data.tables, state.data.room_layout), scale: SCALE };
 }
 
-function viewport() {
+function canvasViewport() {
   const rect = canvas.getBoundingClientRect();
   return { width: rect.width || 960, height: rect.height || 480 };
+}
+
+// All camera callers, including memory, share the uncovered CSS-pixel viewport.
+function viewport() {
+  return insetViewport(canvasViewport(), state.drawerInset);
+}
+
+let drawerTransition = { target: 0, from: 0, start: 0 };
+function updateDrawerInset(now) {
+  const target = state.view === "desktop" && state.drawer !== null ? $("hall-sidebar").offsetWidth : 0;
+  if (target !== drawerTransition.target) drawerTransition = { target, from: state.drawerInset, start: now };
+  if (reducedMotion.matches || state.view !== "desktop") {
+    state.drawerInset = target;
+  } else if (state.drawerInset !== target) {
+    const progress = Math.min(1, Math.max(0, (now - drawerTransition.start) / 220));
+    if (progress === 1) state.drawerInset = target;
+    else {
+      // CSS ease-out is cubic-bezier(0, 0, .58, 1). Invert its x component for elapsed time.
+      let low = 0, high = 1;
+      for (let i = 0; i < 20; i++) {
+        const t = (low + high) / 2;
+        if (1.74 * t * t - .74 * t * t * t < progress) low = t;
+        else high = t;
+      }
+      const t = (low + high) / 2;
+      const eased = progress === 0 ? 0 : 3 * t * t - 2 * t * t * t;
+      state.drawerInset = drawerTransition.from + (target - drawerTransition.from) * eased;
+    }
+  }
 }
 
 function hallBounds() {
@@ -310,42 +412,62 @@ function frameTables(indices, manual = false) {
   hideTooltip();
 }
 
+function mobileTableIndex() {
+  let selected = state.data.tables.findIndex((table) => table.id === state.selectedId);
+  // Release an automatic selection when the schedule moves on; explicit selections stay pinned.
+  if (!state.manualSelection && selected >= 0) {
+    const relevant = relevantTableIndices(state.data.tables, state.time);
+    if (relevant.length && !relevant.includes(selected)) selected = -1;
+  }
+  return mobileTarget(state.data.tables, state.time, selected);
+}
+
+function frameMobile(manual = false) {
+  const index = mobileTableIndex();
+  state.camera = fitBounds(tableBounds(state.layout, index < 0 ? [] : [index]), viewport(), hallBounds(), 16);
+  state.manualCamera = manual;
+  hideTooltip();
+  return index;
+}
+
 function updateCamera(announcer) {
   const size = viewport();
+  const profile = VIEW_PROFILES[state.view];
   if (state.camera && state.viewport && (size.width !== state.viewport.width || size.height !== state.viewport.height)) {
     const center = screenToWorld(state.camera, { x: state.viewport.width / 2, y: state.viewport.height / 2 });
     state.camera = constrainCamera({ ...state.camera, x: size.width / 2 - center.x * state.camera.zoom, y: size.height / 2 - center.y * state.camera.zoom }, size, hallBounds());
     if (!state.manualCamera) state.frameKey = null;
   }
   state.viewport = size;
-  // The gathering seats people at every table, so frame the whole grid rather than the slot-0 tables.
+  if (state.manualCamera) {
+    state.camera = constrainCamera(state.camera, size, hallBounds());
+    return;
+  }
   const indices = upcoming() ? state.data.tables.map((_, index) => index) : relevantTableIndices(state.data.tables, state.time);
+  const target = profile.frame === "table" ? mobileTableIndex() : -1;
   const showStage = state.speech?.event.kind === "donation" || state.stageQueue.length > 0 || announcer != null || infoRunning();
-  // With no game in play (before doors, a replay's opening minutes, a gap between games) the view shows the whole room.
   const wholeRoom = upcoming() || !state.data.tables.some((table) => state.time >= table.start && state.time < table.end);
-  const key = wholeRoom ? "room" : indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
-  if (!state.manualCamera && state.kiosk) {
-    // The projector shows the whole room: the idle reset returns to this frame, never to a close-up that
-    // cuts off the stage or the lounge. Framing by relevant tables stays a live-page behaviour.
-    if (state.frameKey !== "kiosk" || !state.camera) {
-      state.camera = fitBounds(hallBounds(), size, hallBounds(), 0);
-      state.frameKey = "kiosk";
-      hideTooltip();
+  const key = profile.frame === "table" ? "m:" + (state.data.tables[target]?.id ?? "door")
+    : profile.frame === "overview" ? "kiosk"
+    : wholeRoom ? "room" : indices.map((index) => state.data.tables[index].id).join("|") + (showStage ? "|stage" : "");
+  const selectedId = profile.frame === "table" ? state.data.tables[target]?.id ?? null
+    : indices.length === 1 ? state.data.tables[indices[0]].id : null;
+  if (state.frameKey === key && state.camera) {
+    // Kiosk keeps following selection changes even though its overview frame is constant.
+    if (profile.frame === "overview" && !state.manualSelection && state.selectedId !== selectedId) {
+      state.selectedId = selectedId;
+      renderDetail();
     }
-    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
-  } else if (!state.manualCamera && wholeRoom && (state.frameKey !== key || !state.camera)) {
-    state.camera = fitBounds(hallBounds(), size, hallBounds(), 0);
-    state.frameKey = key;
-    hideTooltip();
-    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
-    renderDetail();
-  } else if (!state.manualCamera && (state.frameKey !== key || !state.camera)) {
+    return;
+  }
+  if (profile.frame === "table") {
+    frameMobile();
+  } else if (profile.frame === "overview" || wholeRoom) {
+    state.camera = overviewFrame(size, hallBounds(), profile.overviewCrop);
+  } else {
     frameTables(indices);
-    // The banner (when hosted) widens the frame as before. The plaques join it only where the whole room is
-    // the point: before doors, and on the projector in every mode; a live or replay view keeps zooming to
-    // the relevant tables. Archives hang no plaques.
-    const framePlaques = !state.archive && (upcoming() || state.kiosk);
-    const fixtures = wallFixtures(state.layout, { banner: !!state.data.event.host_name, plaques: framePlaques ? 2 : 0 });
+    // Relevant-table frames retain banner and stage widening; whole-room frames already include the plaques.
+    const fixtures = wallFixtures(state.layout, { banner: !!state.data.event.host_name, plaques: 0 });
     const hung = [fixtures.banner, ...fixtures.plaques].filter(Boolean);
     if (hung.length) {
       const tables = tableBounds(state.layout, indices);
@@ -361,11 +483,52 @@ function updateCamera(announcer) {
       state.camera = fitBounds({ x, y, width: Math.max(tables.x + tables.width, stage.x + stage.w) - x,
         height: Math.max(tables.y + tables.height, state.layout.height - 1) - y }, size, hallBounds());
     }
-    state.frameKey = key;
-    if (!state.manualSelection) state.selectedId = indices.length === 1 ? state.data.tables[indices[0]].id : null;
-    renderDetail();
   }
+  state.frameKey = key;
+  hideTooltip();
+  if (!state.manualSelection) state.selectedId = selectedId;
+  renderDetail();
   state.camera = constrainCamera(state.camera, size, hallBounds());
+}
+
+const CAMERA_MEMORY_KEY = "longtable.camera.v1";
+let cameraMemoryRead = false;
+let cameraMemoryPending = null;
+let cameraMemoryWritten = null;
+let cameraMemoryChangedAt = 0;
+function cameraScope() {
+  return state.archive ? `archive:${state.data.event.id}`
+    : state.sample ? `sample:${new URLSearchParams(location.search).get("sample")}` : `live:${state.data.event.id}`;
+}
+function restoreCameraMemory() {
+  if (cameraMemoryRead) return;
+  cameraMemoryRead = true;
+  if (!VIEW_PROFILES[state.view].memory) return;
+  try {
+    const camera = decodeCameraMemory(localStorage.getItem(CAMERA_MEMORY_KEY), cameraScope(), Date.now(), viewport(), hallBounds());
+    if (camera) {
+      state.camera = camera;
+      state.manualCamera = true;
+      cameraMemoryWritten = { ...camera };
+    }
+  } catch { /* Camera memory is optional, including when storage itself is unavailable. */ }
+}
+function persistCameraMemory(now) {
+  if (!VIEW_PROFILES[state.view].memory || !state.manualCamera) {
+    cameraMemoryPending = null;
+    return;
+  }
+  const camera = state.camera;
+  const same = (other) => other && camera.zoom === other.zoom && camera.x === other.x && camera.y === other.y;
+  if (!same(cameraMemoryPending)) {
+    cameraMemoryPending = { ...camera };
+    cameraMemoryChangedAt = now;
+  }
+  if (same(cameraMemoryWritten) || now - cameraMemoryChangedAt < 500) return;
+  try {
+    localStorage.setItem(CAMERA_MEMORY_KEY, encodeCameraMemory(camera, state.viewport, cameraScope(), Date.now()));
+  } catch { /* A failed write must never interrupt rendering. */ }
+  cameraMemoryWritten = { ...camera };
 }
 
 function renderActions() {
@@ -903,6 +1066,54 @@ function placeMusicPanel() {
   if (panel.style.top !== styleTop) panel.style.top = styleTop;
 }
 
+function drawSurround() {
+  const hall = hallBounds(), unit = TILE * SCALE;
+  const size = canvasViewport();
+  const visibleStart = screenToWorld(state.camera, { x: 0, y: 0 });
+  const visibleEnd = screenToWorld(state.camera, { x: size.width, y: size.height });
+  const left = hall.x, top = hall.y, right = left + hall.width, bottom = top + hall.height;
+  const outerLeft = left - SURROUND_TILES, outerTop = top - SURROUND_TILES;
+  const outerRight = right + SURROUND_TILES, outerBottom = bottom + SURROUND_TILES;
+  // Disjoint bands exclude the hall; clip each to the visible world before generating any bricks.
+  const bands = [
+    [outerLeft, outerTop, left, outerBottom], [right, outerTop, outerRight, outerBottom],
+    [left, outerTop, right, top], [left, bottom, right, outerBottom],
+  ].map(([x1, y1, x2, y2]) => [Math.max(x1, visibleStart.x), Math.max(y1, visibleStart.y),
+    Math.min(x2, visibleEnd.x), Math.min(y2, visibleEnd.y)])
+    .filter(([x1, y1, x2, y2]) => x2 > x1 && y2 > y1);
+  if (!bands.length) return;
+  ctx.save();
+  ctx.beginPath();
+  for (const [x1, y1, x2, y2] of bands) ctx.rect(x1 * unit, y1 * unit, (x2 - x1) * unit, (y2 - y1) * unit);
+  ctx.clip();
+  ctx.fillStyle = "#1a211e";
+  ctx.strokeStyle = "#232c28";
+  ctx.lineWidth = 1;
+  for (const [x1, y1, x2, y2] of bands) {
+    ctx.fillRect(x1 * unit, y1 * unit, (x2 - x1) * unit, (y2 - y1) * unit);
+    for (let y = Math.floor(y1); y < y2; y++) {
+      const offset = y % 2 ? -2 : 0;
+      const start = offset + Math.floor((x1 - offset) / 4) * 4;
+      for (let x = start; x < x2; x += 4) ctx.strokeRect(x * unit, y * unit, 4 * unit, unit);
+    }
+  }
+  const fade = (fromX, fromY, toX, toY, x1, y1, x2, y2) => {
+    x1 = Math.max(x1, visibleStart.x); y1 = Math.max(y1, visibleStart.y);
+    x2 = Math.min(x2, visibleEnd.x); y2 = Math.min(y2, visibleEnd.y);
+    if (x2 <= x1 || y2 <= y1) return;
+    const gradient = ctx.createLinearGradient(fromX * unit, fromY * unit, toX * unit, toY * unit);
+    gradient.addColorStop(0, "#100f1500");
+    gradient.addColorStop(1, "#100f15");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x1 * unit, y1 * unit, (x2 - x1) * unit, (y2 - y1) * unit);
+  };
+  fade(left - 2, 0, outerLeft, 0, outerLeft, outerTop, left, outerBottom);
+  fade(right + 2, 0, outerRight, 0, right, outerTop, outerRight, outerBottom);
+  fade(0, top - 2, 0, outerTop, outerLeft, outerTop, outerRight, top);
+  fade(0, bottom + 2, 0, outerBottom, outerLeft, bottom, outerRight, outerBottom);
+  ctx.restore();
+}
+
 function drawRoom() {
   const layout = state.layout;
   const unit = TILE * SCALE;
@@ -1428,16 +1639,19 @@ function render(now, active) {
     state.ambience = hallAmbience(state.data, ambienceSlot, state.layout, reducedMotion.matches);
   }
   updateFoodScene(now);
+  updateDrawerInset(now);
   updateCamera(announcer);
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
-  const width = Math.round(state.viewport.width * dpr);
-  const height = Math.round(state.viewport.height * dpr);
+  const fullSize = canvasViewport();
+  const width = Math.round(fullSize.width * dpr);
+  const height = Math.round(fullSize.height * dpr);
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, width, height);
   const scale = dpr * state.camera.zoom / (TILE * SCALE);
   ctx.setTransform(scale, 0, 0, scale, state.camera.x * dpr, state.camera.y * dpr);
+  drawSurround();
   ctx.imageSmoothingEnabled = false;
   drawRoom();
   drawTables();
@@ -1543,7 +1757,9 @@ function closeDrawer() {
   const restoreFocus = $("hall-sidebar").contains(document.activeElement);
   if (view === "detail") selectTable(null);
   else setDrawer(null);
-  if (restoreFocus) (view === "detail" ? canvas : $("activity-toggle")).focus();
+  const activityReturn = state.view === "mobile" && $("camera-controls").getAttribute("data-open") === null
+    ? $("camera-toggle") : $("activity-toggle");
+  if (restoreFocus) (view === "detail" ? canvas : activityReturn).focus();
 }
 
 function drawerKeydown(event) {
@@ -1685,16 +1901,18 @@ function updateHeader(active) {
   const note = !ctx ? " · Hall graphics unavailable; use the table list." : state.assetsFailed ? " · Sprite art unavailable; simplified graphics are in use." : "";
   const statusClass = !ctx || state.assetsFailed ? "stale" : "";
   if (state.staleMessage) return;
+  const hostName = state.data.event.host_name?.trim();
+  const hostPrefix = state.view === "mobile" && hostName ? `Hosted by ${hostName} · ` : "";
   if (beforeDoors()) {
     // The sign-up window: who has gathered, what has space, and the invitation (a link outside sample/archive views).
     const games = count ? ` · ${available} ${available === 1 ? "game" : "games"} with signup space` : "";
     const lead = gathered === 0 ? "Nobody has arrived yet" : `${gathered} gathered so far`;
     const invite = state.sample || state.archive ? null : { text: "Sign up on Discord", href: DISCORD_INVITE };
-    setStatus(`${lead}${games}${note} · ${invite ? "" : "Sign up on Discord"}`, statusClass, invite);
+    setStatus(`${hostPrefix}${lead}${games}${note} · ${invite ? "" : "Sign up on Discord"}`, statusClass, invite);
     return;
   }
   const base = state.archive ? `${count} ${count === 1 ? "game" : "games"} in the saved schedule · Figures follow planned and recorded attendance` : beforeEvent ? `${available} ${available === 1 ? "game" : "games"} with signup space · Event starts ${formatSlot(0, true)}` : `${count} ${count === 1 ? "game" : "games"} on the schedule · Figures follow planned and recorded attendance`;
-  setStatus(base + note, statusClass);
+  setStatus(hostPrefix + base + note, statusClass);
 }
 
 function clearSpeech() {
@@ -1872,9 +2090,11 @@ function installTimeline(data, initial = false) {
   $("start-label").textContent = formatSlot(0, true);
   $("end-label").textContent = formatSlot(data.event.slots, true);
   state.layout = buildLayout();
+  restoreCameraMemory();
   state.loungeGeometry = null;
-  // The desktop view follows the room's shape, back wall included (styles.css); phones and the kiosk ignore it.
+  // Desktop aspect and kiosk column width both include the back wall.
   canvas.style.setProperty("--hall-aspect", `${state.layout.width} / ${state.layout.height - state.layout.backWall.y}`);
+  document.documentElement.style.setProperty("--hall-ratio", state.layout.width / (state.layout.height - state.layout.backWall.y));
   state.frameKey = null;
   renderActions();
   state.adminEvents = indexAdminEvents(data);
@@ -2090,6 +2310,7 @@ canvas.addEventListener("pointermove", (event) => {
     const dx = next.center.x - gesture.center.x, dy = next.center.y - gesture.center.y;
     if (pointers.size > 1 || suppressClick || Math.hypot(dx, dy) > 5) {
       suppressClick = true;
+      dismissCameraHelp();
       if (next.distance && gesture.distance) zoomCamera(next.distance / gesture.distance, gesture.center);
       moveCamera(dx, dy);
       gesture = next;
@@ -2154,6 +2375,7 @@ canvas.addEventListener("wheel", (event) => {
     scrollY: globalThis.scrollY || 0, previous: lastWheel?.intent, sincePrevious: at - (lastWheel?.at ?? -Infinity) });
   lastWheel = { intent, at };
   if (intent === "scroll") return;
+  dismissCameraHelp();
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport().height : 1;
   zoomCamera(Math.exp(-clamp(event.deltaY * unit, -300, 300) * .002), pointerPoint(event));
@@ -2167,17 +2389,43 @@ function recenter() {
 $("zoom-in").addEventListener("click", () => zoomCamera(1.25));
 $("zoom-out").addEventListener("click", () => zoomCamera(.8));
 $("recenter").addEventListener("click", recenter);
-$("fit-active").addEventListener("click", () => { if (state.data) frameTables(relevantTableIndices(state.data.tables, state.time), true); });
+$("fit-active").addEventListener("click", () => {
+  if (!state.data) return;
+  if (VIEW_PROFILES[state.view].frame === "table") frameMobile(true);
+  else frameTables(relevantTableIndices(state.data.tables, state.time), true);
+});
 $("activity-toggle").addEventListener("click", () => setDrawer(state.drawer === "activity" ? null : "activity"));
+// Register after each action so any focus it moves into a panel stays there.
+for (const id of ["zoom-in", "zoom-out", "recenter", "fit-active", "activity-toggle"]) {
+  const button = $(id);
+  button.addEventListener("click", () => {
+    const wasOpen = $("camera-controls").getAttribute("data-open") !== null;
+    setCameraMenu(false, { focusToggle: wasOpen && document.activeElement === button });
+  });
+}
+$("camera-toggle").addEventListener("click", () => {
+  setCameraMenu($("camera-controls").getAttribute("data-open") === null);
+});
+document.addEventListener("pointerdown", (event) => {
+  const controls = $("camera-controls");
+  if (controls.getAttribute("data-open") === null) return;
+  if (!controls.contains(event.target)) setCameraMenu(false);
+}, { passive: true });
+$("camera-controls").addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !$("camera-controls").contains(document.activeElement)) return;
+  setCameraMenu(false, { focusToggle: true });
+  event.preventDefault();
+});
 $("drawer-close").addEventListener("click", closeDrawer);
 $("hall-sidebar").addEventListener("keydown", drawerKeydown);
 canvas.addEventListener("keydown", (event) => {
   drawerKeydown(event);
   const keys = { ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60] };
-  if (keys[event.key]) { event.preventDefault(); moveCamera(...keys[event.key]); }
+  if (keys[event.key]) { dismissCameraHelp(); event.preventDefault(); moveCamera(...keys[event.key]); }
   else if (["+", "=", "-", "Home"].includes(event.key)) {
     event.preventDefault();
-    if (event.key === "Home") recenter(); else zoomCamera(event.key === "-" ? .8 : 1.25);
+    if (event.key === "Home") recenter();
+    else { dismissCameraHelp(); zoomCamera(event.key === "-" ? .8 : 1.25); }
   }
 });
 
@@ -2263,6 +2511,7 @@ function loop(now) {
   updatePeople(realSeconds, now, active);
   settleStageSpeech(now, active);
   render(now, active);
+  persistCameraMemory(now);
   updateHeader(active);
   updateSyncStatus();
   renderActivity();
