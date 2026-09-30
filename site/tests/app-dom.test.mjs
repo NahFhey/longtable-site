@@ -2812,7 +2812,7 @@ for (const [name, options, key] of [
       for (const [index, line] of lines.entries()) {
         step();
         assert.equal(app.nodes.get("info-speech").textContent, line);
-        assert.ok(app.contextCalls.join(" ").includes(`Staff: ${line}`));
+        assert.ok(app.contextCalls.join(" ").includes(line) && !app.contextCalls.join(" ").includes("Staff:"));
         const last = index === lines.length - 1;
         assert.ok(app.contextCalls.includes(last ? "▸ click to finish" : "▸ click to continue"));
         assert.ok(!app.contextCalls.includes(last ? "▸ click to continue" : "▸ click to finish"));
@@ -2842,7 +2842,7 @@ test("info visit locks before speech across doors opening and chooses during on 
       assert.equal(app.nodes.get("mode-badge").textContent, "LIVE");
       for (const [index, line] of INFO_SPEECHES.before.entries()) {
         assert.equal(app.nodes.get("info-speech").textContent, line);
-        assert.ok(app.contextCalls.join(" ").includes(`Staff: ${line}`));
+        assert.ok(app.contextCalls.join(" ").includes(line) && !app.contextCalls.join(" ").includes("Staff:"));
         assert.ok(app.contextCalls.includes(index === INFO_SPEECHES.before.length - 1 ? "▸ click to finish" : "▸ click to continue"));
         advance();
         step();
@@ -2894,7 +2894,7 @@ test("info hit starts a real-time walk, eight click-to-continue lines at the mic
   await withInfoApp("info-visit", {}, ({ app, geometry, step, click, hit, pointEvent, walkMs, camera }) => {
     app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
     assert.equal(app.nodes.get("hall").style.cursor, "pointer");
-    assert.equal(app.nodes.get("tooltip").textContent, "Staff: click for info about Longtable");
+    assert.equal(app.nodes.get("tooltip").textContent, "Click for info about Longtable");
     click(hit);
     step(walkMs / 2);
     assert.ok(!app.contextCalls.includes("Click me for Info"));
@@ -2903,8 +2903,8 @@ test("info hit starts a real-time walk, eight click-to-continue lines at the mic
     click(hit); // Approaching ignores repeated clicks.
     step(walkMs / 2 + 1);
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
-    assert.ok(app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
-    const bubble = app.textCalls.find(c => c.text === "Staff: Hey, welcome to Longtable! Glad you stopped by.");
+    assert.ok(app.contextCalls.includes("Hey, welcome to Longtable! Glad you stopped by."));
+    const bubble = app.textCalls.find(c => c.text === "Hey, welcome to Longtable! Glad you stopped by.");
     const anchor = worldToScreen(camera(), { x: geometry.speakSpot.x, y: geometry.speakSpot.y - 2.2 });
     assert.ok(Math.abs(bubble.x - 4 + (bubble.text.length * 5 + 8) / 2 - anchor.x) < 1);
     assert.equal(INFO_SPEECHES.before.length, 8);
@@ -2912,7 +2912,7 @@ test("info hit starts a real-time walk, eight click-to-continue lines at the mic
       const hint = line === INFO_SPEECHES.before.length - 1 ? "▸ click to finish" : "▸ click to continue";
       step(60_000);
       assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[line], "a line waits for the viewer");
-      assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECHES.before[line]}`), `line ${line + 1} bubble text`);
+      assert.ok(app.contextCalls.join(" ").includes(INFO_SPEECHES.before[line]) && !app.contextCalls.join(" ").includes("Staff:"), `line ${line + 1} bubble text`);
       const hintCall = app.textCalls.find(c => c.text === hint);
       assert.ok(hintCall, `line ${line} shows "${hint}"`);
       app.nodes.get("hall").listeners.get("pointermove")({ pointerId: 8, clientX: hintCall.x + 1, clientY: hintCall.y + 1 });
@@ -2939,7 +2939,7 @@ test("the keyboard starts the welcome and clicking the speaking staff skips each
       step();
       assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[line]);
     }
-    assert.ok(app.contextCalls.join(" ").includes(`Staff: ${INFO_SPEECHES.before[7]}`));
+    assert.ok(app.contextCalls.join(" ").includes(INFO_SPEECHES.before[7]) && !app.contextCalls.join(" ").includes("Staff:"));
     app.nodes.get("info-open").listeners.get("click")();
     step(walkMs + 1);
     assert.ok(app.contextCalls.includes("Click me for Info"));
@@ -2951,7 +2951,7 @@ test("reduced motion speaks on the first frame and returns without walking", asy
     click(hit);
     assert.equal(app.nodes.get("info-speech").textContent, INFO_SPEECHES.before[0]);
     step();
-    assert.ok(app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
+    assert.ok(app.contextCalls.includes("Hey, welcome to Longtable! Glad you stopped by."));
     assert.equal(infoSprites(app, geometry.speakSpot).length, 3);
     for (let i = 0; i < INFO_SPEECHES.before.length; i++) app.nodes.get("info-open").listeners.get("click")();
     step();
@@ -2972,10 +2972,10 @@ test("a donation speech blocks info clicks and interrupts a welcome already spea
     step(100);
     assert.match(app.nodes.get("current-event").textContent, /walking to the stage microphone/);
     assert.equal(app.nodes.get("info-speech").textContent, "");
-    assert.ok(!app.contextCalls.includes("Staff: Hey, welcome to Longtable! Glad you stopped by."));
+    assert.ok(!app.contextCalls.includes("Hey, welcome to Longtable! Glad you stopped by."));
     if (!during) {
       app.nodes.get("hall").listeners.get("pointermove")(pointEvent(hit));
-      assert.equal(app.nodes.get("tooltip").textContent, "Staff: busy on stage, try again shortly");
+      assert.equal(app.nodes.get("tooltip").textContent, "Busy on stage, try again shortly");
       click(hit);
       step(1);
       assert.ok(app.contextCalls.includes("Click me for Info"));

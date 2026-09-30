@@ -1697,7 +1697,7 @@ function render(now, active) {
     else if (state.infoVisit.phase === "speaking") {
       const { x, y } = infoPosition();
       const last = state.infoVisit.line === infoSpeech().length - 1;
-      state.infoBubble = drawBubble(infoSpeech()[state.infoVisit.line], x, y - 2.2, "#fff", "Staff", last ? INFO_FINISH_HINT : INFO_CONTINUE_HINT);
+      state.infoBubble = drawBubble(infoSpeech()[state.infoVisit.line], x, y - 2.2, "#fff", "", last ? INFO_FINISH_HINT : INFO_CONTINUE_HINT);
     }
   }
   placeMusicPanel();
@@ -2333,7 +2333,7 @@ canvas.addEventListener("pointermove", (event) => {
   const tooltip = $("tooltip");
   if (!best && !onJukebox && !onInfo) { tooltip.hidden = true; return; }
   // A person walking in front of the jukebox keeps their tooltip; the jukebox tip stays visible in kiosk mode.
-  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : onJukebox ? JUKEBOX_TOOLTIP : infoStageBusy() ? "Staff: busy on stage, try again shortly" : "Staff: click for info about Longtable";
+  tooltip.textContent = best ? personTooltip(best.person, best.place, best.moving) : onJukebox ? JUKEBOX_TOOLTIP : infoStageBusy() ? "Busy on stage, try again shortly" : "Click for info about Longtable";
   tooltip.className = best ? "tooltip" : "tooltip jukebox-tip";
   const sceneRect = canvas.parentElement.getBoundingClientRect();
   tooltip.style.left = `${clamp(event.clientX - sceneRect.left + 12, 0, Math.max(0, sceneRect.width - 280))}px`;
