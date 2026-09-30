@@ -38,6 +38,13 @@ test('Dinner service starts on demand, serves six dishes and clears after the la
   assert.ok(service.cleanupStart >= service.cleanupRequested);
   near(service.cleanupEnd, service.cleanupStart + SET_OUT_SECONDS);
   assert.equal(state(sample, service.cleanupEnd).foodCount, 0);
+  // Staff walk to the kitchen empty-handed; a dish appears only once set-out begins.
+  for (let t = service.start; t < service.setOutStart; t += 1) {
+    const walking = state(sample, t);
+    assert.match(walking.action, /heading to the kitchen/);
+    assert.equal(walking.staff.load, null, `load at ${t}`);
+    assert.equal(walking.staff.carrying, null, `carrying at ${t}`);
+  }
   assert.equal(kitchenServices(sample, layout), kitchenServices(sample, layout));
   t.diagnostic(JSON.stringify(service));
 });

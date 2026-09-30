@@ -1,6 +1,6 @@
 import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=804de706146e";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=b95b61e41cd4";
 import { VIEW_PROFILES, atMinZoom, constrainCamera, decodeCameraMemory, encodeCameraMemory, fitBounds, insetViewport, mobileTarget, overviewFrame, panCamera, relevantTableIndices, screenToWorld, tableBounds, viewMode, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=d94bb0d105dc";
 import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=e5ce603f951c";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
@@ -53,7 +53,7 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=e4a4ef86821a";
+} from "./model.mjs?v=562e199f9c15";
 
 const TILE = 16;
 const SCALE = 2;
@@ -1320,7 +1320,7 @@ function drawStaff(staff, station = "caretaker") {
     ctx.fillRect(x - 7, y - 11, 14, 14);
     ctx.fillStyle = "#23232d"; ctx.fillRect(x - 6, y + 3, 5, 7); ctx.fillRect(x + 1, y + 3, 5, 7);
   }
-  if (staff.load && staff.load !== "food" && staff.load !== "rug") {
+  if (staff.load && staff.load !== "rug") {
     ctx.fillStyle = staff.load === "map" ? "#d8c99f" : "#bd955c";
     ctx.fillRect(x + 7, y - 8, staff.load === "table" ? 22 : 10, staff.load === "chairs" ? 15 : 7);
   }
@@ -1616,8 +1616,7 @@ function caretakerForFrame() {
   const dx = prev ? staff.x - prev.x : 0, dy = prev ? staff.y - prev.y : 0;
   staff = { ...staff, moving: Math.hypot(dx, dy) > .002,
     facing: Math.abs(dx) > .002 ? Math.sign(dx) : prev?.facing ?? 1,
-    carrying: staff.carrying != null ? foodCorner.DISHES[staff.carrying]
-      : staff.load === "food" ? foodCorner.DISHES[0] : null };
+    carrying: staff.carrying != null ? foodCorner.DISHES[staff.carrying] : null };
   state.staffPrevious = staff;
   return staff;
 }

@@ -731,14 +731,14 @@ function buildKitchenSchedule(layout, { visits, intervals, horizon, tour, openin
       if (!returnPath) {
         const state = tourState(tour, tourClock);
         if (state.remaining && distance(position, state.position) < 1e-7) {
-          walk([position, state.end], CARETAKER_TILES_PER_SECOND, 'Staff are heading to the kitchen.', { service, load: 'food' });
+          walk([position, state.end], CARETAKER_TILES_PER_SECOND, 'Staff are heading to the kitchen.', { service });
           tourClock += state.remaining;
         }
         if (practice) service.tourDeparture = now;
         const leave = routePoint(layout, position);
         // Return to the segment end, where the paused tour will resume.
         returnPath = [position, ...corridorPath(layout, leave, kitchenDoor), pickup];
-        walk(returnPath, SERVICE_SPEED, 'Staff are heading to the kitchen.', { service, load: 'food' });
+        walk(returnPath, SERVICE_SPEED, 'Staff are heading to the kitchen.', { service });
       }
       service.walkIn = now - start;
       service.setOutStart = now;
