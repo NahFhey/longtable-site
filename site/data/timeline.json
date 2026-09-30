@@ -192,6 +192,14 @@
    "actor": "p8",
    "table": null,
    "person": null
+  },
+  {
+   "id": "c604ddfcce7946569bbc8f15602f99ef",
+   "at": "2026-09-30T01:55:56.485604Z",
+   "action": "set_presence",
+   "actor": "p9",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -204,7 +212,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-09-28T16:59:48.421254Z",
+ "generated_at": "2026-09-30T01:55:59.442005Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -385,6 +393,25 @@
     "planned": [
      0,
      48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "p9",
+   "name": "Rasmuth",
+   "dm": true,
+   "hidden": false,
+   "variant": 3655901222,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     16
     ],
     "actual": {
      "here": null,
