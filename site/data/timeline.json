@@ -264,6 +264,14 @@
    "actor": "p13",
    "table": null,
    "person": null
+  },
+  {
+   "id": "85312194853c4f53a55f06f69606b236",
+   "at": "2026-10-02T02:21:30.257788Z",
+   "action": "join",
+   "actor": "p13",
+   "table": "t5",
+   "person": null
   }
  ],
  "visitors": {
@@ -276,7 +284,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-02T02:21:16.808001Z",
+ "generated_at": "2026-10-02T02:21:45.246561Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -661,7 +669,16 @@
    "end": 47,
    "dm": "p11",
    "created_at": "2026-10-01T21:12:51.653919-05:00",
-   "signups": [],
+   "signups": [
+    {
+     "person": "p13",
+     "planned": [
+      1,
+      25
+     ],
+     "actual": null
+    }
+   ],
    "pad": 4
   }
  ],
