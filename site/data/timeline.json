@@ -224,6 +224,14 @@
    "actor": "p10",
    "table": "t4",
    "person": null
+  },
+  {
+   "id": "153fc90faa514486b445af0a84f638ce",
+   "at": "2026-10-02T02:09:26.889882Z",
+   "action": "set_presence",
+   "actor": "p11",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -236,7 +244,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-01T10:43:41.752784Z",
+ "generated_at": "2026-10-02T02:09:29.677288Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -449,6 +457,25 @@
    "dm": true,
    "hidden": false,
    "variant": 2727828721,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "p11",
+   "name": "Sylus-4",
+   "dm": true,
+   "hidden": false,
+   "variant": 3499475277,
    "appearance": null,
    "movements": [],
    "presence": {
