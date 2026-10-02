@@ -280,6 +280,14 @@
    "actor": "p14",
    "table": null,
    "person": null
+  },
+  {
+   "id": "0634522e753842238ed2f59ec5b66738",
+   "at": "2026-10-02T07:57:54.333603Z",
+   "action": "join",
+   "actor": "p14",
+   "table": "t3",
+   "person": null
   }
  ],
  "visitors": {
@@ -292,7 +300,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-02T07:57:22.119124Z",
+ "generated_at": "2026-10-02T07:58:02.729178Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -577,10 +585,10 @@
   },
   {
    "id": "p14",
-   "name": null,
+   "name": "payrongamesttv",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 590563248,
    "appearance": null,
    "movements": [],
    "presence": {
@@ -668,7 +676,16 @@
    "end": 16,
    "dm": "p9",
    "created_at": "2026-09-29T21:17:43.814886-05:00",
-   "signups": [],
+   "signups": [
+    {
+     "person": "p14",
+     "planned": [
+      0,
+      16
+     ],
+     "actual": null
+    }
+   ],
    "pad": 2
   },
   {
