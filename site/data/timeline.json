@@ -232,6 +232,14 @@
    "actor": "p11",
    "table": null,
    "person": null
+  },
+  {
+   "id": "55974f322eaf438098b075fdc9525e09",
+   "at": "2026-10-02T02:12:51.653919Z",
+   "action": "create_table",
+   "actor": "p11",
+   "table": "t5",
+   "person": null
   }
  ],
  "visitors": {
@@ -244,7 +252,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-02T02:09:29.677288Z",
+ "generated_at": "2026-10-02T02:13:06.793173Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -579,6 +587,20 @@
    "created_at": "2026-09-29T22:15:18.244275-05:00",
    "signups": [],
    "pad": 3
+  },
+  {
+   "id": "t5",
+   "name": "Tyranny of Dragons",
+   "system": "D&D 5e",
+   "pitch": "A cult dedicated to Chromatic Dragons attacks a city, and the party must both recover lost treasures and discover the Cult’s true motives, putting a stop to the madness.",
+   "seats": 6,
+   "walk_ins": false,
+   "start": 1,
+   "end": 47,
+   "dm": "p11",
+   "created_at": "2026-10-01T21:12:51.653919-05:00",
+   "signups": [],
+   "pad": 4
   }
  ],
  "events": []
