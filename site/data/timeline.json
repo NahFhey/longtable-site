@@ -240,6 +240,14 @@
    "actor": "p11",
    "table": "t5",
    "person": null
+  },
+  {
+   "id": "2d87231b90bf404e8dab61e4ff52abe2",
+   "at": "2026-10-02T02:19:45.335989Z",
+   "action": "set_presence",
+   "actor": "p12",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -252,7 +260,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-02T02:13:06.793173Z",
+ "generated_at": "2026-10-02T02:19:48.047133Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -484,6 +492,25 @@
    "dm": true,
    "hidden": false,
    "variant": 3499475277,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "p12",
+   "name": null,
+   "dm": false,
+   "hidden": true,
+   "variant": null,
    "appearance": null,
    "movements": [],
    "presence": {
