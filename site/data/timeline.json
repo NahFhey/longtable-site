@@ -304,6 +304,14 @@
    "actor": "p15",
    "table": null,
    "person": null
+  },
+  {
+   "id": "73b4ab70b09f4708b335d3f6bfa13fd4",
+   "at": "2026-10-03T19:50:13.062510Z",
+   "action": "create_table",
+   "actor": "p15",
+   "table": "t6",
+   "person": null
   }
  ],
  "visitors": {
@@ -316,7 +324,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-03T19:02:25.176119Z",
+ "generated_at": "2026-10-03T19:50:32.233119Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -620,15 +628,15 @@
   },
   {
    "id": "p15",
-   "name": null,
-   "dm": false,
-   "hidden": true,
-   "variant": null,
+   "name": "Michael",
+   "dm": true,
+   "hidden": false,
+   "variant": 2383118561,
    "appearance": null,
    "movements": [],
    "presence": {
     "planned": [
-     20,
+     16,
      44
     ],
     "actual": {
@@ -759,6 +767,20 @@
     }
    ],
    "pad": 4
+  },
+  {
+   "id": "t6",
+   "name": "\"Other\" Game Systems",
+   "system": "Delta Green, Alien, Power Rangers, Fallout, etc.",
+   "pitch": "This table will honor the often overlooked \"other\" game systems. Whether investigating the macabre as Agents or fighting against Zordon as Rangers - we will explore a variety of games.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 16,
+   "end": 41,
+   "dm": "p15",
+   "created_at": "2026-10-03T14:50:13.062510-05:00",
+   "signups": [],
+   "pad": 5
   }
  ],
  "events": []
