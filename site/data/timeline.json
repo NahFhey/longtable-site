@@ -360,6 +360,14 @@
    "actor": "p16",
    "table": "t8",
    "person": null
+  },
+  {
+   "id": "6d0303e9add6470e9b7ed0c9f8995b8d",
+   "at": "2026-10-04T19:20:56.495341Z",
+   "action": "edit_table",
+   "actor": "p16",
+   "table": "t8",
+   "person": null
   }
  ],
  "visitors": {
@@ -372,7 +380,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-04T18:39:54.839745Z",
+ "generated_at": "2026-10-04T19:21:16.488521Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -851,9 +859,9 @@
   },
   {
    "id": "t8",
-   "name": "TIme to Harvest",
+   "name": "Time to Harvest",
    "system": "Call of Cthulhu 7th ed.",
-   "pitch": "Mid length adventure for new players.",
+   "pitch": "In 1929, a student died during an expedition in the Vermont Hills. One year later, the Miskatonic University sent another team on the same expedition.",
    "seats": 5,
    "walk_ins": true,
    "start": 4,
