@@ -344,6 +344,14 @@
    "actor": "p16",
    "table": "t7",
    "person": null
+  },
+  {
+   "id": "96b26d2eaaf04843bdf263c0785c8c38",
+   "at": "2026-10-04T18:34:42.367897Z",
+   "action": "end_table",
+   "actor": "p16",
+   "table": "t7",
+   "person": null
   }
  ],
  "visitors": {
@@ -356,7 +364,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-04T17:24:04.821972Z",
+ "generated_at": "2026-10-04T18:35:01.575042Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -832,20 +840,6 @@
    "created_at": "2026-10-03T14:50:13.062510-05:00",
    "signups": [],
    "pad": 5
-  },
-  {
-   "id": "t7",
-   "name": "Mansion of Mystery",
-   "system": "Call of Cthulhu 7th ed.",
-   "pitch": "Join in a crew to uncover the secrets of a winding and seemingly endless manor",
-   "seats": 6,
-   "walk_ins": true,
-   "start": 4,
-   "end": 28,
-   "dm": "p16",
-   "created_at": "2026-10-04T12:23:41.754956-05:00",
-   "signups": [],
-   "pad": 6
   }
  ],
  "events": []
