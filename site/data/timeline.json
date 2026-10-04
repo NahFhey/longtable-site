@@ -352,6 +352,14 @@
    "actor": "p16",
    "table": "t7",
    "person": null
+  },
+  {
+   "id": "c5d205fbad3b46bfa474dd588b2ba1c5",
+   "at": "2026-10-04T18:39:34.750963Z",
+   "action": "create_table",
+   "actor": "p16",
+   "table": "t8",
+   "person": null
   }
  ],
  "visitors": {
@@ -364,7 +372,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-04T18:35:01.575042Z",
+ "generated_at": "2026-10-04T18:39:54.839745Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -840,6 +848,20 @@
    "created_at": "2026-10-03T14:50:13.062510-05:00",
    "signups": [],
    "pad": 5
+  },
+  {
+   "id": "t8",
+   "name": "TIme to Harvest",
+   "system": "Call of Cthulhu 7th ed.",
+   "pitch": "Mid length adventure for new players.",
+   "seats": 5,
+   "walk_ins": true,
+   "start": 4,
+   "end": 28,
+   "dm": "p16",
+   "created_at": "2026-10-04T13:39:34.750963-05:00",
+   "signups": [],
+   "pad": 6
   }
  ],
  "events": []
