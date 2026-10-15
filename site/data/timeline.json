@@ -396,7 +396,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-15T19:36:51.183790Z",
+ "generated_at": "2026-10-15T19:37:16.976447Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -757,10 +757,10 @@
   },
   {
    "id": "p18",
-   "name": null,
+   "name": "tallglassofbruce",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 3215796878,
    "appearance": null,
    "movements": [],
    "presence": {
