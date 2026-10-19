@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Private recovery copies inherit this workflow but do not publish a site.
+    if: github.repository == 'NahFhey/longtable-site'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
