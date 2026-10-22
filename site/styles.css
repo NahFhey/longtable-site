@@ -459,13 +459,16 @@ html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
 .scene-toggle { display: flex; gap: .25rem; order: 7; }
 .raid-preview-open {
   position: absolute; z-index: 3; transform: translate(-50%, -50%);
-  display: grid; justify-items: center; min-width: 44px; min-height: 44px;
+  display: grid; justify-items: center; width: max-content; min-width: 44px; min-height: 44px;
   padding: 4px 8px; border: 2px solid var(--gold); border-radius: 0;
   background: var(--panel); color: var(--gold); font: 700 13px/18px ui-monospace, monospace;
 }
-.raid-preview-label { color: var(--ink); font-size: 11px; font-weight: 400; white-space: nowrap; }
-.raid-preview-arrow { animation: raid-preview-bob 1.2s steps(2, end) infinite; }
-@keyframes raid-preview-bob { 50% { transform: translateY(3px); } }
+.raid-preview-label { color: var(--ink); font-size: 11px; font-weight: 400; max-width: 160px; white-space: normal; text-align: center; }
+.raid-preview-arrow { display: inline-block; transform: rotate(var(--raid-preview-angle, 0deg)); animation: raid-preview-bob 1.2s steps(2, end) infinite; }
+@keyframes raid-preview-bob {
+  from, to { transform: rotate(var(--raid-preview-angle, 0deg)); }
+  50% { transform: rotate(var(--raid-preview-angle, 0deg)) translateY(3px); }
+}
 .raid-preview {
   position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
   padding: 12px; background: color-mix(in srgb, var(--panel) 85%, transparent);

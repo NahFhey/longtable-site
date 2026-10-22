@@ -16,6 +16,44 @@ export function previewLabel(status, windowStart, now, { timeZone, locale } = {}
   return `Opens ${format({ weekday: "short", month: "short", day: "numeric" })}, ${format({ hour: "numeric", minute: "2-digit" })}`;
 }
 
+/** Canvas-local box centre and glyph rotation, independent of the DOM. */
+export function previewPlacement({ point, canvas: { w, h }, box, avoid = null, inset = 8,
+  glyphOffset = { x: 0, y: 0 } }) {
+  const bw = box?.w || 0, bh = box?.h || 0;
+  const cx = w / 2, cy = h / 2;
+  const dx = point.x - cx, dy = point.y - cy;
+  const pinned = point.x < inset || point.x > w - inset || point.y < inset || point.y > h - inset;
+  // The first axis reached by the centre-to-curtain segment determines Q's edge.
+  const tx = dx === 0 ? Infinity : Math.max(0, cx - inset) / Math.abs(dx);
+  const ty = dy === 0 ? Infinity : Math.max(0, cy - inset) / Math.abs(dy);
+  const t = pinned ? Math.min(1, tx, ty) : 1;
+  // Collapse an axis to the canvas centre when the box cannot fit inside R.
+  const minX = Math.min(cx, inset + bw / 2), maxX = Math.max(cx, w - inset - bw / 2);
+  const minY = Math.min(cy, inset + bh / 2), maxY = Math.max(cy, h - inset - bh / 2);
+  let x = Math.max(minX, Math.min(maxX, cx + dx * t));
+  let y = Math.max(minY, Math.min(maxY, cy + dy * t));
+
+  if (pinned && avoid && bw <= w - 2 * inset && bh <= h - 2 * inset) {
+    const left = avoid.x - 8, right = avoid.x + avoid.w + 8;
+    const top = avoid.y - 8, bottom = avoid.y + avoid.h + 8;
+    if (x + bw / 2 > left && x - bw / 2 < right && y + bh / 2 > top && y - bh / 2 < bottom) {
+      const candidates = [];
+      // Equality means an exact corner: consider both axes, shortest move first.
+      if (tx <= ty) candidates.push({ x, y: top - bh / 2 }, { x, y: bottom + bh / 2 });
+      if (ty <= tx) candidates.push({ x: left - bw / 2, y }, { x: right + bw / 2, y });
+      let best = null, distance = Infinity;
+      for (const candidate of candidates) {
+        if (candidate.x < minX || candidate.x > maxX || candidate.y < minY || candidate.y > maxY) continue;
+        const move = Math.abs(candidate.x - x) + Math.abs(candidate.y - y);
+        if (move < distance) { best = candidate; distance = move; }
+      }
+      if (best) { x = best.x; y = best.y; }
+    }
+  }
+  const angle = pinned ? Math.atan2(point.y - y - glyphOffset.y, point.x - x - glyphOffset.x) * 180 / Math.PI - 90 : 0;
+  return { x, y, angle: angle <= -180 ? angle + 360 : angle, pinned };
+}
+
 export function setupRaidPreview({ canvas, music, getState, sample = false }, doc = document) {
   const button = doc.getElementById("raid-preview-open");
   const overlay = doc.getElementById("raid-preview");
@@ -23,6 +61,7 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
   const closeButton = doc.getElementById("raid-preview-close");
   const mute = doc.getElementById("raid-preview-mute");
   const label = button?.querySelector(".raid-preview-label");
+  const arrow = button?.querySelector(".raid-preview-arrow");
   const status = doc.getElementById("raid-preview-status");
   if (!button || !overlay || !video || !closeButton || !mute || !label) return null;
   const audio = music?.audio;
@@ -95,10 +134,26 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     const point = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + opening.h / 2 });
     const rect = canvas.getBoundingClientRect();
     const parent = button.parentElement.getBoundingClientRect();
-    // Follow a panned curtain off screen rather than leaving a detached button at the edge.
-    button.hidden = point.x < 0 || point.y < 0 || point.x > rect.width || point.y > rect.height;
-    button.style.left = `${Math.round(rect.left - parent.left + point.x)}px`;
-    button.style.top = `${Math.round(rect.top - parent.top + point.y)}px`;
+    const box = { w: button.offsetWidth || 0, h: button.offsetHeight || 0 };
+    const glyphOffset = [arrow?.offsetLeft, arrow?.offsetTop, arrow?.offsetWidth, arrow?.offsetHeight,
+      button.offsetWidth, button.offsetHeight].every(Number.isFinite)
+      ? { x: arrow.offsetLeft + arrow.offsetWidth / 2 - box.w / 2,
+        y: arrow.offsetTop + arrow.offsetHeight / 2 - box.h / 2 } : { x: 0, y: 0 };
+    const controls = doc.getElementById("camera-controls");
+    const controlsRect = controls && !controls.hidden ? controls.getBoundingClientRect() : null;
+    const avoid = controlsRect?.width && controlsRect?.height
+      ? { x: controlsRect.left - rect.left, y: controlsRect.top - rect.top,
+        w: controlsRect.width, h: controlsRect.height } : null;
+    const { x, y, angle, pinned } = previewPlacement({ point, canvas: { w: rect.width, h: rect.height },
+      box, avoid, glyphOffset });
+    button.style.left = `${Math.round(rect.left - parent.left + x)}px`;
+    button.style.top = `${Math.round(rect.top - parent.top + y)}px`;
+    if (arrow) {
+      if (arrow.style.setProperty) arrow.style.setProperty("--raid-preview-angle", `${angle}deg`);
+      else arrow.style["--raid-preview-angle"] = `${angle}deg`;
+    }
+    if (pinned) button.setAttribute("data-pinned", "true");
+    else button.removeAttribute?.("data-pinned");
     const { event, raid } = state.data;
     const raidStatus = state.raid?.status;
     const start = raid?.window ? Date.parse(event.start) + raid.window.start * event.slot_minutes * 60000 : NaN;

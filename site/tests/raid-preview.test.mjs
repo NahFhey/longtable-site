@@ -263,7 +263,8 @@ test("the per-frame update follows two camera transforms and canvas offsets: (55
   assert.deepEqual([button.style.left, button.style.top], ["784px", "354px"]);
   f.state.camera.x = -2000;
   f.preview.update();
-  assert.equal(button.hidden, true, "an off-screen curtain leaves no detached arrow");
+  assert.equal(button.hidden, false, "an off-screen curtain keeps the preview visible");
+  assert.equal(button.getAttribute("data-pinned"), "true");
   assert.match(app, /updateCamera\(announcer\);\s+raidPreview\?\.update\(\);\s+if \(!ctx\) return;/,
     "the update uses the current camera before either scene can return");
   assert.match(app, /sample: new URLSearchParams\(location.search\)\.get\("sample"\) === "raid"/);
@@ -328,4 +329,82 @@ test("CSS guarantees 44×44 targets, a square token-colour frame, phone width an
   assert.match(frame, /width: min\(960px, 100%,/);
   assert.match(css, /@media \(max-width: 650px\) \{ \.raid-preview \{ padding-inline: 0; \} \}/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.raid-preview-arrow \{ animation: none; \} \}/);
+});
+
+function placementFixture({ cameraControls = null } = {}) {
+  const f = fixture();
+  const button = f.$("raid-preview-open");
+  const arrow = button.querySelector(".raid-preview-arrow");
+  button.offsetWidth = 80;
+  button.offsetHeight = 40;
+  button.removeAttribute = name => button.attributes.delete(name);
+  Object.assign(arrow, { offsetLeft: 30, offsetTop: 10, offsetWidth: 20, offsetHeight: 20 });
+  const controls = cameraControls ? new Node(f.doc) : null;
+  if (controls) {
+    controls.rect = cameraControls;
+    const getElementById = f.doc.getElementById;
+    f.doc.getElementById = id => id === "camera-controls" ? controls : getElementById(id);
+  }
+  // Stage anchor is (33.25,11). Zoom=1 makes these camera offsets easy to check.
+  const pointAt = (x, y) => { f.state.camera = { x: x - 33.25, y: y - 11, zoom: 1 }; f.preview.update(); };
+  return { ...f, button, arrow, controls, pointAt };
+}
+
+test("panning back from a pin removes data-pinned and resets the arrow to 0deg", () => {
+  const f = placementFixture();
+  f.pointAt(1200, 240);
+  assert.equal(f.button.hidden, false);
+  assert.equal(f.button.getAttribute("data-pinned"), "true");
+  assert.equal(f.arrow.style["--raid-preview-angle"], "-90deg", "plain style objects use the fallback assignment");
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["927px", "280px"],
+    "right centre=960-8-40=912, plus parent offset (15,40)");
+  f.pointAt(500, 200);
+  assert.equal(f.button.hidden, false);
+  assert.equal(f.button.getAttribute("data-pinned"), null);
+  assert.equal(f.arrow.style["--raid-preview-angle"], "0deg");
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["515px", "240px"]);
+});
+
+test("update measures the glyph offsets and writes rotation with CSS setProperty", () => {
+  const f = placementFixture();
+  const writes = [];
+  f.arrow.style.setProperty = (name, value) => writes.push([name, value]);
+  Object.assign(f.arrow, { offsetLeft: 40, offsetTop: 20 });
+  // Box centre=(912,240), glyph centre=(922,250), curtain=(1200,240).
+  f.pointAt(1200, 240);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][0], "--raid-preview-angle");
+  assert.ok(Math.abs(parseFloat(writes[0][1]) - (-90 - Math.atan(5 / 139) * 180 / Math.PI)) < 1e-9);
+  delete f.arrow.offsetTop;
+  f.pointAt(1200, 240);
+  assert.deepEqual(writes[1], ["--raid-preview-angle", "-90deg"], "missing glyph metrics fall back to its box centre");
+});
+
+test("update rereads camera controls and skips hidden or zero-size controls", () => {
+  // Canvas=(35,100), parent=(20,60). Controls local=(8,280,44,192).
+  const f = placementFixture({ cameraControls: { left: 43, top: 380, width: 44, height: 192 } });
+  let reads = 0;
+  f.controls.getBoundingClientRect = () => { reads++; return f.controls.rect; };
+  // P=(-200,410), Q=(8,358): controls expanded top=272 gives centre y=252.
+  f.pointAt(-200, 410);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "292px"]);
+  assert.equal(reads, 1);
+  f.controls.rect.top = 330; // Expanded menu grows upward by 50px: local top=230, centre y=202.
+  f.controls.rect.height = 242;
+  f.pointAt(-200, 410);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "242px"]);
+  assert.equal(reads, 2);
+  f.controls.hidden = true;
+  f.pointAt(-200, 410);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "398px"]);
+  assert.equal(reads, 2, "hidden controls do not need measuring");
+  f.controls.hidden = false;
+  f.controls.rect.width = 0;
+  f.pointAt(-200, 410);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "398px"]);
+  f.controls.rect.width = 44;
+  f.controls.rect.height = 0;
+  f.pointAt(-200, 410);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "398px"]);
+  assert.equal(reads, 4);
 });
