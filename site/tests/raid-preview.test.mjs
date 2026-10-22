@@ -141,7 +141,8 @@ test("video has preload none and no source request before click; clicking opens 
   assert.equal(video.getAttribute("controls"), null);
   assert.equal(video.getAttribute("loop"), null);
   assert.equal(video.getAttribute("autoplay"), null);
-  assert.match(video.getAttribute("poster"), /assets\/raid\/preview-poster\.png$/);
+  // No poster: a still would show the spider mech before the trailer reveals it (Devin, 2026-10-22).
+  assert.equal(video.getAttribute("poster"), null);
   f.open();
   assert.equal(f.$("raid-preview").hidden, false);
   assert.equal(f.$("raid-preview-open").getAttribute("aria-expanded"), "true");
