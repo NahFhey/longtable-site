@@ -1,0 +1,3567 @@
+{
+ "schema": 8,
+ "phase": "live",
+ "generated_at": "2026-11-08T14:00:00Z",
+ "event": {
+  "name": "Longtable raid sample",
+  "start": "2026-11-07T10:00:00-05:00",
+  "tz": "America/New_York",
+  "slot_minutes": 30,
+  "slots": 48
+ },
+ "room_layout": {
+  "version": 1,
+  "pad_capacity": 20,
+  "overflow_capacity": 120
+ },
+ "visitors": {
+  "open": true,
+  "people": []
+ },
+ "people": [
+  {
+   "id": "u_dm1",
+   "name": "DM 1",
+   "dm": true,
+   "hidden": false,
+   "variant": 5,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player1_1",
+   "name": "Player 1-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 6,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player1_2",
+   "name": "Player 1-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 7,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player1_3",
+   "name": "Player 1-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 8,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player1_4",
+   "name": "Player 1-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 9,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.1,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm2",
+   "name": "DM 2",
+   "dm": true,
+   "hidden": false,
+   "variant": 10,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player2_1",
+   "name": "Player 2-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 11,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player2_2",
+   "name": "Player 2-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 12,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player2_3",
+   "name": "Player 2-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 13,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player2_4",
+   "name": "Player 2-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 14,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.2,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm3",
+   "name": "DM 3",
+   "dm": true,
+   "hidden": false,
+   "variant": 15,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.30000000000000004,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player3_1",
+   "name": "Player 3-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 16,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.30000000000000004,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player3_2",
+   "name": "Player 3-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 17,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.30000000000000004,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player3_3",
+   "name": "Player 3-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 18,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.30000000000000004,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player3_4",
+   "name": "Player 3-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 19,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.30000000000000004,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm4",
+   "name": "DM 4",
+   "dm": true,
+   "hidden": false,
+   "variant": 20,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player4_1",
+   "name": "Player 4-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 21,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player4_2",
+   "name": "Player 4-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 22,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player4_3",
+   "name": "Player 4-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 23,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player4_4",
+   "name": "Player 4-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 24,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.4,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm5",
+   "name": "DM 5",
+   "dm": true,
+   "hidden": false,
+   "variant": 25,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player5_1",
+   "name": "Player 5-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 26,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player5_2",
+   "name": "Player 5-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 27,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player5_3",
+   "name": "Player 5-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 28,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player5_4",
+   "name": "Player 5-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 29,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.5,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm6",
+   "name": "DM 6",
+   "dm": true,
+   "hidden": false,
+   "variant": 30,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.6000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player6_1",
+   "name": "Player 6-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 31,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.6000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player6_2",
+   "name": "Player 6-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 32,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.6000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player6_3",
+   "name": "Player 6-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 33,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.6000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player6_4",
+   "name": "Player 6-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 34,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.6000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm7",
+   "name": "DM 7",
+   "dm": true,
+   "hidden": false,
+   "variant": 35,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.7000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player7_1",
+   "name": "Player 7-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 36,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.7000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player7_2",
+   "name": "Player 7-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 37,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.7000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player7_3",
+   "name": "Player 7-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 38,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.7000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player7_4",
+   "name": "Player 7-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 39,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.7000000000000001,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm8",
+   "name": "DM 8",
+   "dm": true,
+   "hidden": false,
+   "variant": 40,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player8_1",
+   "name": "Player 8-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 41,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player8_2",
+   "name": "Player 8-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 42,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player8_3",
+   "name": "Player 8-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 43,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player8_4",
+   "name": "Player 8-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 44,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.8,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm9",
+   "name": "DM 9",
+   "dm": true,
+   "hidden": false,
+   "variant": 45,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.9,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player9_1",
+   "name": "Player 9-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 46,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.9,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player9_2",
+   "name": "Player 9-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 47,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.9,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player9_3",
+   "name": "Player 9-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 48,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.9,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player9_4",
+   "name": "Player 9-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 49,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 0.9,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_dm10",
+   "name": "DM 10",
+   "dm": true,
+   "hidden": false,
+   "variant": 50,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.0,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player10_1",
+   "name": "Player 10-1",
+   "dm": false,
+   "hidden": false,
+   "variant": 51,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.0,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player10_2",
+   "name": "Player 10-2",
+   "dm": false,
+   "hidden": false,
+   "variant": 52,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.0,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player10_3",
+   "name": "Player 10-3",
+   "dm": false,
+   "hidden": false,
+   "variant": 53,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.0,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "u_player10_4",
+   "name": "Player 10-4",
+   "dm": false,
+   "hidden": false,
+   "variant": 54,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     48
+    ],
+    "actual": {
+     "here": 1.0,
+     "leaving": null
+    }
+   }
+  }
+ ],
+ "tables": [
+  {
+   "id": "day1",
+   "name": "Table 1: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm1",
+   "pad": 0,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player1_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t1",
+   "name": "Table 1: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm1",
+   "pad": 1,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player1_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player1_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day2",
+   "name": "Table 2: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm2",
+   "pad": 2,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player2_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t2",
+   "name": "Table 2: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm2",
+   "pad": 3,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player2_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player2_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day3",
+   "name": "Table 3: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm3",
+   "pad": 4,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player3_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t3",
+   "name": "Table 3: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm3",
+   "pad": 5,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player3_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player3_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day4",
+   "name": "Table 4: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm4",
+   "pad": 6,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player4_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t4",
+   "name": "Table 4: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm4",
+   "pad": 7,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player4_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player4_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day5",
+   "name": "Table 5: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm5",
+   "pad": 8,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player5_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t5",
+   "name": "Table 5: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm5",
+   "pad": 9,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player5_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player5_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day6",
+   "name": "Table 6: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm6",
+   "pad": 10,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player6_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t6",
+   "name": "Table 6: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm6",
+   "pad": 11,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player6_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player6_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day7",
+   "name": "Table 7: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm7",
+   "pad": 12,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player7_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t7",
+   "name": "Table 7: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm7",
+   "pad": 13,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player7_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player7_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day8",
+   "name": "Table 8: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm8",
+   "pad": 14,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player8_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t8",
+   "name": "Table 8: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm8",
+   "pad": 15,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player8_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player8_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "day9",
+   "name": "Table 9: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 40,
+   "dm": "u_dm9",
+   "pad": 16,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player9_1",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_2",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_3",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_4",
+     "planned": [
+      0,
+      40
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t9",
+   "name": "Table 9: Dawn finale",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 40,
+   "end": 48,
+   "dm": "u_dm9",
+   "pad": 17,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player9_1",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_2",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_3",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player9_4",
+     "planned": [
+      40,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  },
+  {
+   "id": "t10",
+   "name": "Table 10: Long adventure",
+   "system": "D&D 5e",
+   "pitch": "A charity adventure; pregenerated characters available.",
+   "seats": 4,
+   "walk_ins": true,
+   "start": 0,
+   "end": 48,
+   "dm": "u_dm10",
+   "pad": 18,
+   "created_at": "2026-10-21T18:00:00-04:00",
+   "signups": [
+    {
+     "person": "u_player10_1",
+     "planned": [
+      0,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player10_2",
+     "planned": [
+      0,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player10_3",
+     "planned": [
+      0,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "u_player10_4",
+     "planned": [
+      0,
+      48
+     ],
+     "actual": null
+    }
+   ]
+  }
+ ],
+ "events": [],
+ "raid": {
+  "id": "spider-mech",
+  "name": "Spider-Mech",
+  "window": {
+   "start": 40,
+   "end": 48
+  },
+  "art": {
+   "boss_phase1": "spider_mech",
+   "boss_phase2": "hollow",
+   "boss_phase3": "heart_chamber",
+   "king": "spider_king"
+  },
+  "legs": [
+   {
+    "id": "L1",
+    "side": "L",
+    "name": "Venom Injector",
+    "special": {
+     "id": "venom_injector",
+     "name": "Venom Injector"
+    }
+   },
+   {
+    "id": "L2",
+    "side": "L",
+    "name": "Standard Leg L2",
+    "special": null
+   },
+   {
+    "id": "L3",
+    "side": "L",
+    "name": "Standard Leg L3",
+    "special": null
+   },
+   {
+    "id": "L4",
+    "side": "L",
+    "name": "Armored Strut",
+    "special": {
+     "id": "armored_strut",
+     "name": "Armored Strut"
+    }
+   },
+   {
+    "id": "R1",
+    "side": "R",
+    "name": "Nerve Conduit",
+    "special": {
+     "id": "nerve_conduit",
+     "name": "Nerve Conduit"
+    }
+   },
+   {
+    "id": "R2",
+    "side": "R",
+    "name": "Standard Leg R2",
+    "special": null
+   },
+   {
+    "id": "R3",
+    "side": "R",
+    "name": "Standard Leg R3",
+    "special": null
+   },
+   {
+    "id": "R4",
+    "side": "R",
+    "name": "Silk Spinner",
+    "special": {
+     "id": "silk_spinner",
+     "name": "Silk Spinner"
+    }
+   }
+  ],
+  "actions": [
+   {
+    "id": "stompquake",
+    "name": "Stompquake",
+    "timer": "lair"
+   },
+   {
+    "id": "silk_shockwave",
+    "name": "Silk Shockwave",
+    "timer": "lair"
+   },
+   {
+    "id": "chittering_chorus",
+    "name": "Chittering Chorus",
+    "timer": "lair"
+   },
+   {
+    "id": "acid_drip",
+    "name": "Acid Drip",
+    "timer": "lair"
+   },
+   {
+    "id": "chittering_storm",
+    "name": "Chittering Storm",
+    "timer": "core"
+   },
+   {
+    "id": "venomous_roar",
+    "name": "Venomous Roar",
+    "timer": "core"
+   },
+   {
+    "id": "phase_disruption",
+    "name": "Phase Disruption",
+    "timer": "core"
+   },
+   {
+    "id": "collapse_shock",
+    "name": "Collapse Shock",
+    "timer": "core"
+   }
+  ],
+  "checklist": [
+   {
+    "id": "heart_valve",
+    "kind": "room",
+    "name": "Heart Valve Chamber"
+   },
+   {
+    "id": "cocoon_forge",
+    "kind": "room",
+    "name": "Cocoon Forge"
+   },
+   {
+    "id": "nerve_nexus",
+    "kind": "room",
+    "name": "Nerve Nexus"
+   },
+   {
+    "id": "acid_reservoir",
+    "kind": "room",
+    "name": "Acid Reservoir"
+   },
+   {
+    "id": "prototype_prime",
+    "kind": "boss",
+    "name": "Prototype Prime"
+   },
+   {
+    "id": "phase_matriarch",
+    "kind": "boss",
+    "name": "Phase Matriarch"
+   },
+   {
+    "id": "acid_titan",
+    "kind": "boss",
+    "name": "Acid Titan"
+   },
+   {
+    "id": "web_prophet",
+    "kind": "boss",
+    "name": "Web Prophet"
+   },
+   {
+    "id": "heart",
+    "kind": "heart",
+    "name": "Heart Chamber found"
+   }
+  ],
+  "discharges": [
+   75,
+   50,
+   25
+  ],
+  "members": [
+   {
+    "table": "t1",
+    "leg": null
+   },
+   {
+    "table": "t2",
+    "leg": "L2"
+   },
+   {
+    "table": "t3",
+    "leg": "L3"
+   },
+   {
+    "table": "t4",
+    "leg": null
+   },
+   {
+    "table": "t5",
+    "leg": "R1"
+   },
+   {
+    "table": "t6",
+    "leg": "R2"
+   },
+   {
+    "table": "t7",
+    "leg": "R3"
+   },
+   {
+    "table": "t8",
+    "leg": "R4"
+   },
+   {
+    "table": "t9",
+    "leg": "L4"
+   }
+  ],
+  "log": [
+   {
+    "at": 40.0,
+    "kind": "open",
+    "admin": false,
+    "legs": [
+     {
+      "leg": "L1",
+      "max": 300,
+      "table": "t1"
+     },
+     {
+      "leg": "L2",
+      "max": 270,
+      "table": "t2"
+     },
+     {
+      "leg": "L3",
+      "max": 270,
+      "table": "t3"
+     },
+     {
+      "leg": "L4",
+      "max": 320,
+      "table": "t4"
+     },
+     {
+      "leg": "R1",
+      "max": 300,
+      "table": "t5"
+     },
+     {
+      "leg": "R2",
+      "max": 270,
+      "table": "t6"
+     },
+     {
+      "leg": "R3",
+      "max": 270,
+      "table": "t7"
+     },
+     {
+      "leg": "R4",
+      "max": 300,
+      "table": "t8"
+     }
+    ],
+    "members": [
+     {
+      "table": "t1",
+      "leg": "L1"
+     },
+     {
+      "table": "t2",
+      "leg": "L2"
+     },
+     {
+      "table": "t3",
+      "leg": "L3"
+     },
+     {
+      "table": "t4",
+      "leg": "L4"
+     },
+     {
+      "table": "t5",
+      "leg": "R1"
+     },
+     {
+      "table": "t6",
+      "leg": "R2"
+     },
+     {
+      "table": "t7",
+      "leg": "R3"
+     },
+     {
+      "table": "t8",
+      "leg": "R4"
+     },
+     {
+      "table": "t9",
+      "leg": null
+     }
+    ]
+   },
+   {
+    "at": 40.0,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.13333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "start"
+   },
+   {
+    "at": 40.13333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 40.13333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.266666666666666,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.2,
+    "kind": "push",
+    "admin": false,
+    "table": "t3",
+    "minutes": 1
+   },
+   {
+    "at": 40.2,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.3,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 2,
+    "cause": "push"
+   },
+   {
+    "at": 40.266666666666666,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L2",
+    "table": "t2",
+    "hp": 210
+   },
+   {
+    "at": 40.3,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 40.3,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.43333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.333333333333336,
+    "kind": "move",
+    "admin": true,
+    "table": "t4",
+    "from": "L4",
+    "to": null
+   },
+   {
+    "at": 40.36666666666667,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L2",
+    "table": "t2",
+    "hp": 230
+   },
+   {
+    "at": 40.43333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 40.43333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.56666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.46666666666667,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L1",
+    "table": "t1",
+    "hp": 90
+   },
+   {
+    "at": 40.56666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 40.56666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.6,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L1",
+    "table": "t1",
+    "hp": 0
+   },
+   {
+    "at": 40.6,
+    "kind": "leg_destroyed",
+    "admin": false,
+    "leg": "L1",
+    "table": "t1"
+   },
+   {
+    "at": 40.63333333333333,
+    "kind": "move",
+    "admin": false,
+    "table": "t1",
+    "from": "L1",
+    "to": "L4"
+   },
+   {
+    "at": 40.7,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 40.7,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.833333333333336,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.733333333333334,
+    "kind": "move",
+    "admin": true,
+    "table": "t1",
+    "from": "L4",
+    "to": null
+   },
+   {
+    "at": 40.766666666666666,
+    "kind": "move",
+    "admin": false,
+    "table": "t9",
+    "from": null,
+    "to": "L4"
+   },
+   {
+    "at": 40.833333333333336,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 40.833333333333336,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 40.96666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.96666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 40.96666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.1,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 40.96666666666667,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L2",
+    "table": "t2",
+    "hp": 50
+   },
+   {
+    "at": 41.06666666666667,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L2",
+    "table": "t2",
+    "hp": 0
+   },
+   {
+    "at": 41.06666666666667,
+    "kind": "leg_destroyed",
+    "admin": false,
+    "leg": "L2",
+    "table": "t2"
+   },
+   {
+    "at": 41.1,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 41.1,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.233333333333334,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.233333333333334,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 41.233333333333334,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.36666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.36666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 41.36666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.5,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.43333333333333,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L3",
+    "table": "t3",
+    "hp": 100
+   },
+   {
+    "at": 41.5,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 41.5,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.63333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.63333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "stompquake",
+    "timer": "lair",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 41.63333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.766666666666666,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.766666666666666,
+    "kind": "strike",
+    "admin": false,
+    "action": "acid_drip",
+    "timer": "lair",
+    "targets": [
+     "t2",
+     "t6"
+    ]
+   },
+   {
+    "at": 41.766666666666666,
+    "kind": "timer",
+    "admin": false,
+    "timer": "lair",
+    "next": 41.9,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 41.8,
+    "kind": "leg_hp",
+    "admin": false,
+    "leg": "L3",
+    "table": "t3",
+    "hp": 0
+   },
+   {
+    "at": 41.8,
+    "kind": "leg_destroyed",
+    "admin": false,
+    "leg": "L3",
+    "table": "t3"
+   },
+   {
+    "at": 41.8,
+    "kind": "phase",
+    "admin": false,
+    "phase": 2,
+    "cause": "collapse"
+   },
+   {
+    "at": 41.8,
+    "kind": "timer",
+    "admin": false,
+    "timer": null,
+    "next": null,
+    "paused": false,
+    "remaining": null,
+    "interval": 4,
+    "pushes_left": 0,
+    "cause": "stop"
+   },
+   {
+    "at": 42.0,
+    "kind": "check",
+    "admin": false,
+    "item": "cocoon_forge",
+    "table": "t7",
+    "undo": false
+   },
+   {
+    "at": 42.333333333333336,
+    "kind": "check",
+    "admin": false,
+    "item": "nerve_nexus",
+    "table": "t8",
+    "undo": false
+   },
+   {
+    "at": 42.43333333333333,
+    "kind": "check",
+    "admin": true,
+    "item": "nerve_nexus",
+    "table": null,
+    "undo": true
+   },
+   {
+    "at": 42.6,
+    "kind": "admin",
+    "admin": true,
+    "action": "coin_grant"
+   },
+   {
+    "at": 42.666666666666664,
+    "kind": "check",
+    "admin": false,
+    "item": "prototype_prime",
+    "table": "t2",
+    "undo": false
+   },
+   {
+    "at": 42.766666666666666,
+    "kind": "member",
+    "admin": true,
+    "table": "t10",
+    "leg": null,
+    "change": "add"
+   },
+   {
+    "at": 42.8,
+    "kind": "member",
+    "admin": true,
+    "table": "t10",
+    "leg": null,
+    "change": "remove"
+   },
+   {
+    "at": 43.0,
+    "kind": "check",
+    "admin": false,
+    "item": "heart",
+    "table": "t5",
+    "undo": false
+   },
+   {
+    "at": 43.0,
+    "kind": "phase",
+    "admin": false,
+    "phase": 3,
+    "cause": "heart"
+   },
+   {
+    "at": 43.0,
+    "kind": "active",
+    "admin": false,
+    "table": "t5"
+   },
+   {
+    "at": 43.0,
+    "kind": "king_max",
+    "admin": false,
+    "max": 2250,
+    "hp": 2250
+   },
+   {
+    "at": 43.0,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 43.166666666666664,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "start"
+   },
+   {
+    "at": 43.166666666666664,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 43.166666666666664,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 43.333333333333336,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 43.333333333333336,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 43.333333333333336,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 43.5,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 43.36666666666667,
+    "kind": "king_hp",
+    "admin": false,
+    "table": "t5",
+    "hp": 2000
+   },
+   {
+    "at": 43.4,
+    "kind": "timer",
+    "admin": true,
+    "timer": "core",
+    "next": null,
+    "paused": true,
+    "remaining": 3,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "pause"
+   },
+   {
+    "at": 43.46666666666667,
+    "kind": "check",
+    "admin": false,
+    "item": "heart_valve",
+    "table": "t6",
+    "undo": false
+   },
+   {
+    "at": 43.46666666666667,
+    "kind": "king_max",
+    "admin": false,
+    "max": 1912,
+    "hp": 1662
+   },
+   {
+    "at": 43.6,
+    "kind": "timer",
+    "admin": true,
+    "timer": "core",
+    "next": 43.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "resume"
+   },
+   {
+    "at": 43.7,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 43.7,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 43.86666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 43.8,
+    "kind": "king_hp",
+    "admin": false,
+    "table": "t5",
+    "hp": 1400
+   },
+   {
+    "at": 43.8,
+    "kind": "discharge",
+    "admin": false,
+    "threshold": 75,
+    "targets": [
+     "t5"
+    ]
+   },
+   {
+    "at": 43.86666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 43.86666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.03333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.03333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 44.03333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.2,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.2,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 44.2,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.36666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.36666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 44.36666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.53333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.53333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 44.53333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.56666666666666,
+    "kind": "active",
+    "admin": false,
+    "table": "t9"
+   },
+   {
+    "at": 44.7,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 44.7,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 44.86666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 44.86666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 44.86666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.03333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.0,
+    "kind": "king_hp",
+    "admin": false,
+    "table": "t9",
+    "hp": 900
+   },
+   {
+    "at": 45.0,
+    "kind": "discharge",
+    "admin": false,
+    "threshold": 50,
+    "targets": [
+     "t9"
+    ]
+   },
+   {
+    "at": 45.03333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 45.03333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.2,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.2,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 45.2,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.36666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.36666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 45.36666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.53333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.53333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 45.53333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.7,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 45.7,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 45.86666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 45.86666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 45.86666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.03333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.03333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 46.03333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.2,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.2,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 46.2,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.36666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.333333333333336,
+    "kind": "king_hp",
+    "admin": false,
+    "table": "t9",
+    "hp": 450
+   },
+   {
+    "at": 46.333333333333336,
+    "kind": "discharge",
+    "admin": false,
+    "threshold": 25,
+    "targets": [
+     "t9"
+    ]
+   },
+   {
+    "at": 46.36666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 46.36666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.53333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.53333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 46.53333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.7,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 46.7,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 46.86666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 46.86666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 46.86666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 47.03333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 47.03333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 47.03333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 47.2,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 47.2,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 47.2,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 47.36666666666667,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 47.36666666666667,
+    "kind": "strike",
+    "admin": false,
+    "action": "chittering_storm",
+    "timer": "core",
+    "targets": [
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9"
+    ]
+   },
+   {
+    "at": 47.36666666666667,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 47.53333333333333,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 47.53333333333333,
+    "kind": "strike",
+    "admin": false,
+    "action": "phase_disruption",
+    "timer": "core",
+    "targets": [
+     "t4"
+    ]
+   },
+   {
+    "at": 47.53333333333333,
+    "kind": "timer",
+    "admin": false,
+    "timer": "core",
+    "next": 47.7,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 3,
+    "cause": "strike"
+   },
+   {
+    "at": 47.55,
+    "kind": "king_hp",
+    "admin": false,
+    "table": "t9",
+    "hp": 0
+   },
+   {
+    "at": 47.55,
+    "kind": "timer",
+    "admin": false,
+    "timer": null,
+    "next": null,
+    "paused": false,
+    "remaining": null,
+    "interval": 5,
+    "pushes_left": 0,
+    "cause": "stop"
+   },
+   {
+    "at": 47.55,
+    "kind": "end",
+    "admin": false,
+    "result": "won"
+   }
+  ]
+ }
+}

@@ -1,4 +1,4 @@
-import { tileB, tileTL, nine, glow } from "./food-corner.mjs?v=1ee6e05562ff";
+import { tileB, tileTL, nine, glow } from "./food-corner.mjs?v=8840cd5f65f1";
 import { K, LOUNGE_FURNITURE, loungeGeometry } from "./lounge-layout.mjs?v=57da6155641f";
 
 const U = 32, TILE = 16, STRIDE = 17, PX = 1 / 16;

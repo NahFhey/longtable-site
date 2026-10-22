@@ -1,4 +1,4 @@
-import { FOOD_CORNER, atFood, foodGraph, foodObstacles, sameFoodPoint } from "./food-layout.mjs?v=44523bdb9315";
+import { FOOD_CORNER, atFood, foodGraph, foodObstacles, sameFoodPoint } from "./food-layout.mjs?v=2893649a76d7";
 
 const contains = (r, p) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
 

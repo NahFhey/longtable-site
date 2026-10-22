@@ -6,7 +6,7 @@ export const FOOD_CORNER = {
     { x: .05, y: 3.85, w: 1.9, h: 2.1 }, { x: 1.9, y: 4.95, w: 2.95, h: 1 },
     { x: 4.1, y: 4.05, w: 1, h: 1 }],
   serving: { x: 6, y: 1, w: 5, h: 2 },
-  rug: { x: 12, y: 0, w: 11, h: 6 },
+  rug: { x: 12, y: 0, w: 13, h: 6 },
   first: { x: 7.3, y: 3.95 }, second: { x: 11.5, y: 2.2 },
   enter: { x: 5.6, y: 6.6 }, exit: { x: 9.6, y: 6.6 },
   bin: { x: 11.4, y: 5.95 }, binStand: { x: 10.45, y: 5.65 },
@@ -18,10 +18,9 @@ export const FOOD_CORNER = {
   staffSpots: [{ x: 5.4, y: 3.4 }, { x: 7.8, y: 4.3 }, { x: 17, y: 3.1 }],
   slots: [1.6, 2.4].flatMap(y => [7, 8.5, 10].map(x => ({ x, y }))),
   plants: [{ at: [10.95, -.05], plant: [28, 9] }, { at: [16, -.05], plant: [22, 9] }],
-  dining: [13, 18].flatMap(x => [.2, 3.5].map(y => ({ x, y, w: 2, h: 2, lantern: true })))
-    .concat([.2, 3.5].map(y => ({ x: 22, y, w: 1, h: 2, lantern: false }))),
+  dining: [13, 18, 22].flatMap(x => [.2, 3.5].map(y => ({ x, y, w: 2, h: 2, lantern: true }))),
   seats: [.2, 3.5].flatMap(ty => [.55, 1.45].flatMap(dy =>
-    [[12.5, 1, 13.5], [15.5, -1, 14.5], [17.5, 1, 18.5], [20.5, -1, 19.5], [21.5, 1, 22.5]]
+    [[12.5, 1, 13.5], [15.5, -1, 14.5], [17.5, 1, 18.5], [20.5, -1, 19.5], [21.5, 1, 22.5], [24.5, -1, 23.5]]
       .map(([x, facing, plateX]) => ({ x, y: ty + dy, facing,
         plate: { x: plateX, y: ty + dy + .2 }, lane: x - facing * .35 })))),
   queue: {
@@ -124,8 +123,8 @@ export function foodGraph(layout, overflowCount = 0) {
 }
 
 export function foodGeometry(layout, index = 0, count = 1) {
-  const safe = Math.max(0, index), standing = safe >= FOOD_CORNER.seats.length;
-  const seat = standing ? { ...overflowSpot(safe - 20), facing: safe % 2 ? -1 : 1 } : FOOD_CORNER.seats[safe];
+  const seated = FOOD_CORNER.seats.length, safe = Math.max(0, index), standing = safe >= seated;
+  const seat = standing ? { ...overflowSpot(safe - seated), facing: safe % 2 ? -1 : 1 } : FOOD_CORNER.seats[safe];
   return {
     first: atFood(layout, FOOD_CORNER.first), second: atFood(layout, FOOD_CORNER.second),
     bin: atFood(layout, FOOD_CORNER.bin), binStand: atFood(layout, FOOD_CORNER.binStand),
@@ -133,9 +132,9 @@ export function foodGeometry(layout, index = 0, count = 1) {
       plate: seat.plate ? atFood(layout, seat.plate) : null },
     seats: FOOD_CORNER.seats.map(p => ({ ...p, ...atFood(layout, p), plate: atFood(layout, p.plate) })),
     queue: Object.fromEntries(Object.entries(FOOD_CORNER.queue).map(([name, points]) => [name, points.map(p => atFood(layout, p))])),
-    overflow: Array.from({ length: Math.max(0, count - 20) }, (_, i) => atFood(layout, overflowSpot(i))),
+    overflow: Array.from({ length: Math.max(0, count - seated) }, (_, i) => atFood(layout, overflowSpot(i))),
     staffSpots: FOOD_CORNER.staffSpots.map(p => atFood(layout, p)), pickup: atFood(layout, FOOD_CORNER.pickup),
-    graph: foodGraph(layout, Math.max(count - 20, safe - 19)),
+    graph: foodGraph(layout, Math.max(count - seated, safe - seated + 1)),
   };
 }
 

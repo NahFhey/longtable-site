@@ -20,7 +20,7 @@ test("food corner clearance holds across table counts and banner widths", t => {
     for (const room of [null, { version: 1, pad_capacity: Number.MAX_SAFE_INTEGER, overflow_capacity: 0 }]) {
       const layout = createRoomLayout(tables, room);
       assert.equal(layout.width, 42, "table counts add rows, not columns");
-      assert.deepEqual(layout.food, { x: 1, y: 1, w: 23, h: 6 });
+      assert.deepEqual(layout.food, { x: 1, y: 1, w: 25, h: 6 });
       const banner = wallFixtures(layout).banner;
       assert.equal(banner.w, 20.8, "shortest and longest banner produced by the room model");
       const grid = { x: layout.gridX, y: layout.gridY,

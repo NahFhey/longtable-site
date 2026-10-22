@@ -4,6 +4,11 @@ The one file the bot writes and the site reads. Frozen 2026-09-06 against
 DESIGN.md. The bot (`bot/`) is the only writer; the site (`site/`) is a read-only
 consumer. Any change to this file is a schema bump and needs both lanes.
 
+Amended 2026-10-21 to **schema 8**: optional `raid` definitions and an ordered,
+table-only fight log make the finale replayable at any selected event time.
+Deploy the schema-8 reader first; the bot continues writing schema 7 when no
+raid is scheduled. See `raid` below. Schemas 1–7 cannot carry the raid key.
+
 Amended 2026-09-06 to **schema 2**: two attendee event kinds, `shout` and
 `donation` (see `events[]` and §Shouts). Additive for the site: a schema-1
 file with no shouts is a valid schema-2 file. The site lane ships schema-2
@@ -39,7 +44,7 @@ A legacy schema-4 fake day is in `timeline.sample.json`
 ## Conventions
 
 - **Encoding.** UTF-8 JSON, one top-level object. Field names are `snake_case`.
-  Unknown fields are ignored by the site (forward compatibility); the bot never
+  Unknown fields outside `raid` are ignored by the site (forward compatibility); the bot never
   omits a required field, and writes `null` rather than leaving a key out.
 - **Time is a slot offset.** Every time in the file is a number of 30-minute
   slots since `event.start`. Slot 0 = 10:00 on event day, slot 48 = 10:00 next
@@ -57,22 +62,311 @@ A legacy schema-4 fake day is in `timeline.sample.json`
   derives nothing from an id (not the sprite, not the name). The bot chooses
   them; they need not be Discord snowflakes.
 - **Order.** `people` is unordered. `tables` is in creation order (the site
-  uses saved pads for schemas 4–7; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
+  uses saved pads for schemas 4–8; legacy schemas use array indices). `events` is in `at` order. `signups` is in signup order.
 
 ## Top level
 
 | field | type | notes |
 |---|---|---|
-| `schema` | int | `7` (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads; schema 5 recorded dice; schema 6 visitor group; schema 7 player choices). Site refuses unknown majors. |
+| `schema` | int | `7` without a raid, `8` with a raid (schema 2 added shouts; schema 3 appearance; schema 4 room layout and pads; schema 5 recorded dice; schema 6 visitor group; schema 7 player choices; schema 8 raid). Site refuses unknown majors. |
 | `phase` | `"live"` \| `"final"` | `final` is the +14-day publish: names trimmed to first name + initial, bot retired. Site shows a "final record" note. |
 | `generated_at` | string | ISO 8601 UTC instant the bot wrote the file. Shown as "last updated". |
 | `event` | object | window config, below. |
-| `room_layout` | object | Required in schemas 4–7. Version and capacities fixed for this event, below. |
+| `room_layout` | object | Required in schemas 4–8. Version and capacities fixed for this event, below. |
 | `people` | array | everyone who has ever signed up, created a table, or set presence. |
 | `visitors` | object | Schema 6: `open` boolean and `people` person-ID array; no copied names or Discord IDs. |
 | `tables` | array | current tables. Deleted tables are gone, not tombstoned. |
 | `events` | array | admin `/event` history plus attendee shouts and approved donations. |
+| `raid` | object or null | Optional in schema 8 only; see the raid log contract below. |
 | `practice` | object | Optional pre-doors live-feed positions, speech and timed move history; see below. |
+
+## `raid` (schema 8)
+
+Schema 8 permits `raid` to be absent or `null` (no raid). Schemas 1–7 must not
+carry the key, even with a null value. **The bot keeps emitting schema 7 when
+no raid is scheduled and emits schema 8 only when a raid exists.** Deploy the
+schema-8 reader first.
+
+Unlike the older forward-compatible objects, every raid object and log kind has
+exactly its documented keys: unknown or missing fields are errors. This prevents
+accidental publication of private fields. No person ids may appear anywhere in
+`raid` (including strings equal to a `people[].id`), and there are no coin balance,
+grant amount, actor or free-text report fields. Pushes credit only a table.
+Art is the one extensible string-to-string map; its keys are logical asset roles.
+All ids and names must be nonblank strings. All numeric values are finite; integer
+HP and maxima are bounded by JavaScript's safe-integer maximum (2^53 − 1).
+
+| field | type | meaning |
+|---|---|---|
+| `id`, `name` | string | Stable raid definition id and display name. |
+| `window` | `{start, end}` | Initial scheduled integer slots, `0 <= start < end <= event.slots`. Half-open `[start,end)`. Once opened, start is fixed; runtime end edits are logged below. Before opening, scheduling edits may replace this planned window, like table schedules. |
+| `art` | `{key: string}` | Logical asset ids, e.g. `boss_phase1`, `boss_phase2`, `boss_phase3`, `king`. Does not imply an asset is available. Empty map is allowed for fallbacks. |
+| `legs` | array | 1–8 unique `{id, side, name, special}` definitions. `side` is `L` or `R`; `special` is null or `{id, name}`, with a unique special id. Runtime maxima are deliberately absent here. |
+| `actions` | array | Unique `{id, timer, name}` definitions; `timer` is `lair` or `core`. Resolved action targets are in each strike, not a random seed. |
+| `checklist` | array | Unique `{id, kind, name}` definitions; `kind` is `room`, `boss`, or `heart`, with exactly one Heart. This raid defines nine items: four rooms, four bosses and the Heart. |
+| `discharges` | integer array | Nonempty, strictly decreasing percentages in 1–99; this raid uses `[75,50,25]`. Percentages refer to the King's current maximum. |
+| `members` | array | Current/final snapshot of `{table, leg}`. Table resolves to `tables[].id`; leg resolves to `legs[].id` or is null (reserve). Tables are unique and non-null legs hold at most one member. Destroyed legs may retain their party until it moves. This snapshot is not the replay's initial roster. |
+| `log` | array | Ordered history, described below. May be empty while scheduled. |
+
+Definitions and the initial schedule are static. All fight state is a fold of
+`log` entries with `at <= t`: phase, assignments, maxima/HP, destroyed status,
+timer, checks, active party, discharges, window edits and end result. The fold
+starts unopened with no HP/timer/active party/checks. Before `open`, `members`
+is only a preview of the planned roster. **Do not seed replay from the final
+snapshot.** `open.members` supplies the complete initial roster, including
+reserves that might later be removed. Subsequent `move`/`member` entries update it.
+
+Every entry includes these fields, in addition to its kind-specific table:
+
+| field | type | meaning |
+|---|---|---|
+| `at` | number | Fractional event slot in `[0,event.slots]`, never a wall-clock timestamp. |
+| `kind` | string | One of the kinds below. |
+| `admin` | boolean | True for entries caused by organizer controls; false for automatic and table actions. All resulting entries of an organizer action carry true. No organizer person id is published. |
+
+Entries must already be in nondecreasing `at` order. **Equal times preserve array
+insertion order; readers must not reorder them by kind.** State is the result
+after all eligible entries, including all entries at exactly `t`. At most one
+`open` and one `end` are allowed. Only `admin` entries may precede `open` or follow
+`end`. Admin markers alone do not change HP or timers. The engine writes each
+resulting state change explicitly, even at the same time.
+
+### `open`
+
+| field | type | meaning |
+|---|---|---|
+| `legs` | array of `{leg,max,table}` | Exactly one initialization per defined leg. Positive integer `max`; initial HP equals max, standing. `table` resolves or is null. |
+| `members` | array of `{table,leg}` | Complete opening roster, with the same uniqueness/reference rules as the snapshot. Leg occupants must agree with `open.legs[].table`. |
+
+`at` must equal `raid.window.start`. Starts Phase 1. It does not implicitly start
+the timer: the next equal-time entry records the resulting timer. This added
+`members` field is needed to reconstruct removed reserves without reading future
+log entries.
+
+### `phase`
+
+| field | type | meaning |
+|---|---|---|
+| `phase` | integer 1–3 | Resulting raid phase, distinct from the King's local HP bands. |
+| `cause` | `collapse` / `forced` / `heart` | Why phase changed. Forced changes carry `admin:true`. |
+
+Opening already means Phase 1. Collapse writes `phase:2` then a stopped timer;
+Heart discovery writes the check, `phase:3`, active party, King max/HP and a
+started Core timer. Those are separate entries in that order. A phase entry never
+resets HP or infers a timer transition.
+
+### `leg_hp`
+
+| field | type | meaning |
+|---|---|---|
+| `leg` | leg id | Leg whose HP was reported. |
+| `table` | table id or null | Reporting member; always null for an admin HP correction, non-null otherwise. |
+| `hp` | integer | Resulting HP, `0 <= hp <= max` in force. Higher HP is a heal, not negative damage. |
+
+Zero HP is followed by `leg_destroyed` after confirmation. Leaderboard damage is
+only the positive drop credited to a non-null table; a heal adds no damage.
+
+### `leg_max`
+
+| field | type | meaning |
+|---|---|---|
+| `leg` | leg id | Leg being overridden. |
+| `max` | positive integer | New maximum, effective immediately. |
+| `hp` | integer | Full resulting HP, bounded by the new maximum. |
+
+Requires `admin:true`. This is an override, not table damage.
+
+### `leg_destroyed`
+
+| field | type | meaning |
+|---|---|---|
+| `leg` | leg id | Marks the leg destroyed. Its latest HP must already be zero. |
+| `table` | table id or null | Credited member, or null for an organizer destruction. Null requires `admin:true`. |
+
+Assignment remains until a move/removal. The engine counts destroyed legs and
+records the resulting phase/timer entries if collapse is triggered.
+
+### `leg_revived`
+
+| field | type | meaning |
+|---|---|---|
+| `leg` | leg id | Clears destroyed status. |
+| `hp` | integer | Resulting HP within the current maximum. |
+
+Requires `admin:true`. Does not restore an old assignment or rewind phase.
+
+### `move`
+
+| field | type | meaning |
+|---|---|---|
+| `table` | table id | Current member moving. |
+| `from` | leg id or null | Must match its assignment in the preceding fold state. |
+| `to` | leg id or null | New assignment; non-null destination must be unoccupied by another party. |
+
+Covers destroyed-leg moves, reserve takes and organizer moves. Maxima and HP are
+unchanged. A null destination means reserve.
+
+### `member`
+
+| field | type | meaning |
+|---|---|---|
+| `table` | table id | Existing table being assigned/unassigned after opening. |
+| `leg` | leg id or null | Assignment being added, or the preceding assignment being removed. |
+| `change` | `add` / `remove` | Add requires a new member and unoccupied destination; removal must match the preceding member/leg. |
+
+Requires `admin:true`. A removed table may remain in earlier log entries. The
+complete assignment fold must equal the current `raid.members` snapshot.
+
+### `strike`
+
+| field | type | meaning |
+|---|---|---|
+| `action` | action id | Chosen action, resolves to `actions[].id`. |
+| `timer` | `lair` / `core` | Must agree with that action's definition. |
+| `targets` | table-id array | Unique current members receiving full text; resolved at strike time. For an all-target action, contains every running member. For a random action, contains the chosen tables. |
+
+Targets may be empty if nobody is running. Readers display the logged choice;
+they never reroll it. The engine follows each strike with a full timer entry.
+
+### `timer`
+
+| field | type | meaning |
+|---|---|---|
+| `timer` | `lair` / `core` / null | One visible clock, or stopped. |
+| `next` | number or null | Absolute fractional slot of next strike, at least `at` (it may fall after `event.slots` in the last cycle of a raid that ends with the event); null when paused/stopped. |
+| `paused` | boolean | True freezes remaining minutes; false otherwise. |
+| `remaining` | number or null | Frozen minutes in `[0,interval]` while paused; null otherwise. |
+| `interval` | number | Full cycle length in minutes, at least 1; retained even when stopped. |
+| `pushes_left` | number | Nonnegative minutes of push allowance remaining this cycle, not a personal coin balance. |
+| `cause` | enum | `start`, `strike`, `push`, `pause`, `resume`, `interval`, `stop`. |
+
+Every visible change writes the **full resulting state**. A stopped timer has
+`timer:null, next:null, paused:false, remaining:null, cause:"stop"`. A running
+timer has non-null `next` and null `remaining`; a paused timer has null `next`
+and numeric `remaining`. Pausing/resuming is an organizer action. Intervals do
+not imply deadlines; an interval edit records the actual resulting deadline.
+The Nerve Conduit normally changes the next cycle only. Pushes cannot exceed the
+cycle's configured allowance or raise remaining time above the full interval;
+the engine enforces these definition-dependent limits.
+
+**Worked timer example:** with `slot_minutes:30`, a timer entry at `at:40`
+with `next:40.13333333333333, interval:4` shows
+`max(0, (next-t)*slot_minutes)` minutes: at `t:40.1`, about **1 minute**.
+A push at `40.1` is followed by a timer entry with `next:40.16666666666667`;
+at `t:40.12`, this shows **1.4 minutes**. A pause entry at `40.12` records
+`next:null, paused:true, remaining:1.4`; at `40.2` it still shows **1.4**.
+A resume at `40.3` records `paused:false, remaining:null,
+next:40.34666666666666`; at `40.32`, about **0.8 minutes** remain. Select the
+latest timer entry with `at <= t` (array order breaks ties). A stopped/missing
+timer renders none. Display seconds may be rounded by the UI; never derive a
+strike from rounding, pushes, phase entries, or wall-clock receipt time.
+
+### `push`
+
+| field | type | meaning |
+|---|---|---|
+| `table` | table id | Member credited for the spend, never the person. |
+| `minutes` | number | Minutes purchased, at least 1; normally exactly 1. |
+
+Adds to the table's coins-spent total (one coin per minute), with no public
+balance. The following timer entry records the actual new deadline/allowance.
+
+### `check`
+
+| field | type | meaning |
+|---|---|---|
+| `item` | checklist id | Resolvable checklist item. |
+| `table` | table id or null | Credited member; null only for an organizer action. |
+| `undo` | boolean | False sets cleared; true clears it and requires `admin:true`. |
+
+Checks are assignments to cleared state, not toggles; an undo removes the prior
+room credit. Checks can continue in Phase 3. A Heart Valve effect is recorded as
+a separate `king_max` entry; Prototype Prime grants publish no amounts or people.
+
+### `active`
+
+| field | type | meaning |
+|---|---|---|
+| `table` | table id | Resulting active member party at Heart discovery, hand-off or organizer selection. |
+
+Hand-offs never reset King HP.
+
+### `king_max`
+
+| field | type | meaning |
+|---|---|---|
+| `max` | positive integer | Resulting King maximum at Heart discovery, Heart Valve or organizer override. |
+| `hp` | integer | Full resulting HP within this new maximum. |
+
+The first entry initializes the King. The engine computes 250 × running members
+at Heart discovery, including reserves; this value is then fixed until a logged
+override or Valve. Valve sets `floor(old_max * .85)` and reduces current HP by
+the same point difference, never below 1. This is not table damage.
+
+### `king_hp`
+
+| field | type | meaning |
+|---|---|---|
+| `table` | table id | Reporting member (the active party; an organizer correction retains that table and sets `admin:true`). |
+| `hp` | integer | Resulting HP within the most recent King maximum. |
+
+Requires a preceding `king_max`. Only positive drops while the reporting table
+is active count as its King damage; admin corrections are not damage credit.
+
+### `discharge`
+
+| field | type | meaning |
+|---|---|---|
+| `threshold` | integer | One of `raid.discharges`, percent of the current maximum. |
+| `targets` | table-id array | Unique current member recipients of full text, normally the active party. |
+
+The engine emits each crossed threshold once, descending when several are
+crossed together, following the HP/max entry that triggered them. The fold records
+the fired set; it never recalculates past strikes after the maximum changes.
+
+### `admin`
+
+| field | type | meaning |
+|---|---|---|
+| `action` | nonblank string | Machine action identifier, e.g. `coin_grant` or `window`; no personal data or grant amount. |
+| `window` | `{start,end}`, conditional | Required exactly when `action:"window"`; resulting integer window, same bounds as the header and the same start. Replaces the effective window from this entry onward. |
+
+Requires `admin:true`. For runtime window edits the header remains the original
+schedule, allowing replay before the edit. To move opening time before opening,
+replace the planned header; once opened, start cannot change. Other organizer
+controls use their corresponding log kind, not an extra anonymous action marker.
+
+### `end`
+
+| field | type | meaning |
+|---|---|---|
+| `result` | `won` / `unfinished` | Final outcome. An early organizer end sets `admin:true`. |
+
+Freeze final leaderboard state. The engine writes a stopped timer immediately
+before ending. Only subsequent `admin` markers are legal. The full deterministic
+example is `timeline.raid.sample.json`, generated by `gen_raid_sample.py`.
+
+### Raid validation invariants
+
+Both validators enforce exact shapes/types, nonblank strings, reference resolution
+in all nested fields, duplicate-free leg/action/checklist/special ids, 1–8 legs,
+one Heart, descending thresholds, and snapshot/open roster uniqueness. They enforce
+slot/window bounds, sorted log order, the single opening at the original start,
+one ending, and no fight entries before opening/after ending. Every current-member
+reference and target resolves in the assignment fold; removals, moves and openings
+must match their preceding roster. Opening initializes every leg once; all later
+HP uses the maximum currently in force; destruction requires zero HP; King HP
+requires prior initialization. Organizer-only kinds (`leg_max`, `leg_revived`,
+`member`, `admin`), forced phase changes, pauses/resumes and undos require
+`admin:true`. Timer cause/state consistency, nullability, numeric bounds
+and action/timer consistency are validated. The final roster equals `members`.
+No known person id may be embedded as a string anywhere in the raid.
+
+The validators check the published contract, not combat policy: they do not infer
+running eligibility from a final table snapshot, recompute random target counts,
+collapse, phase progression, active-party permissions, effect rounding, coin
+allowances or discharge triggers. Those belong to the later engine. Separate
+entries preserve the actual results without fabricating intermediate events.
 
 ## `practice` (optional live-feed overlay)
 
@@ -212,7 +506,7 @@ Invalid or rate-limited rolls leave both movement and dice history unchanged.
 | `dm` | bool | holds the DM role at publish time. Rendered with the distinct DM look. |
 | `hidden` | bool | `/hide` was ever used. Honoured forever. `true` ⇒ `name`, `variant`, and `appearance` are `null`; site draws the generic unnamed sprite and no nametag, and never shows the id. |
 | `variant` | int \| null | unsigned 32-bit FNV-1a hash of the Discord user id string, computed once by the bot. Site maps it to a sprite (`variant % palette_size`), so the art can change without the file changing. `null` iff `hidden`. |
-| `appearance` | object \| null | Required in schemas 3–7. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
+| `appearance` | object \| null | Required in schemas 3–8. `null` uses the existing variant-based appearance. Otherwise exactly four integer indices: `skin` 0–3, `shirt` 0–14, `hair` 0–15, `hat` 0–3, mapped by `site/characters.mjs`. The hat is rendered only when `dm` is true. Always `null` when hidden. |
 | `presence.planned` | `[int, int]` \| null | event presence `[arrive, leave)`. `null` if the person never set it (e.g. a DM who only created a table — see DESIGN open item: creating a table leans toward auto-setting presence to cover it). |
 | `presence.actual.here` | number \| null | slot of `/here`, fractional. |
 | `presence.actual.leaving` | number \| null | slot of `/leaving`, fractional. |
@@ -241,9 +535,9 @@ latest of each and the site takes the effective range as given.
 | `walk_ins` | bool | walk-ins-welcome flag. Display only; does not change seat accounting. |
 | `start`, `end` | int | `[start, end)` slots, `end > start`. One DM's own tables never overlap; different DMs' tables may. |
 | `dm` | string | `people[].id` of the DM. Always present in `people`. |
-| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schemas 4–7. |
+| `created_at` | string | ISO 8601 with offset. Informational; `pad` is authoritative for grid position in schemas 4–8. |
 | `signups` | array | seated players, ≤ `seats` entries. The DM is not in this list. |
-| `pad` | int | Required in schemas 4–7. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
+| `pad` | int | Required in schemas 4–8. Unique zero-based location, `0 <= pad < room_layout.pad_capacity`. Independent of ID, array order, and table window. |
 
 ### `tables[].signups[]`
 
@@ -331,6 +625,7 @@ its rolls under the existing final-snapshot retention model.
 6. All slot values lie in `[0, slots]`; planned ones are integers.
 7. `hidden` ⇒ `name == null && variant == null`; `!hidden` ⇒ both non-null.
 8. The file is written atomically and committed whole; the site never sees a partial file.
+9. Schema-8 raids obey the full Raid validation invariants above; schemas 1–7 omit `raid`.
 
 ## What the site does with it
 
@@ -364,7 +659,7 @@ its rolls under the existing final-snapshot retention model.
 
 ## Archive package (Milestone E)
 
-New timelines use schema 7; older frozen packages retain their original schema. A separate archive envelope (`archive.json`, format
+New timelines use schema 7 without a raid, schema 8 with a raid; older frozen packages retain their original schema. A separate archive envelope (`archive.json`, format
 1) records `event_id`, `preserved_at`, `fidelity: "final-schedule"`,
 `presentation_version: 1`, renderer SHA-256, timeline schema, and `room_layout`.
 It lives beside `index.html` and `timeline.json` at `events/<event-id>/`. Event

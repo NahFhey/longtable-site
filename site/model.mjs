@@ -2,8 +2,8 @@ import { loungeGeometry, seatLounge } from "./lounge-layout.mjs?v=57da6155641f";
 import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
 import { stageGeometry, stagePath } from "./stage.mjs";
 import { CHOICE_COUNTS } from "./characters.mjs";
-import { FOOD_CORNER, atFood, foodSetOut, foodClearAt, SET_OUT_SECONDS, kitchenPath } from "./food-layout.mjs?v=44523bdb9315";
-export { foodGeometry } from "./food-layout.mjs?v=44523bdb9315";
+import { FOOD_CORNER, atFood, foodSetOut, foodClearAt, SET_OUT_SECONDS, kitchenPath } from "./food-layout.mjs?v=2893649a76d7";
+export { foodGeometry } from "./food-layout.mjs?v=2893649a76d7";
 
 const ADMIN_KINDS = new Set(["break", "meal", "announce", "spotlight"]);
 const SPEECH_KINDS = new Set(["shout", "donation"]);
@@ -55,7 +55,7 @@ function array(value, label) {
 }
 
 function required(source, key, label) {
-  if (!Object.prototype.hasOwnProperty.call(source, key)) fail(`${label}.${key} is required.`);
+  if (!Object.prototype.hasOwnProperty.call(source, key)) fail(`${label}.${key} is required (unsupported schema shape).`);
   return source[key];
 }
 
@@ -114,11 +114,229 @@ function range(value, label, slots, { nullable = false, fractional = false, endp
   return [from, to];
 }
 
+/** Strict raid contract. Keep rules in sync with state.py:validate_raid. */
+function validateRaid(raid, slots, tableIds, personIds) {
+  const bad = (path, message) => fail(`${path}: ${message}`);
+  const exact = (value, path, fields, optional = []) => {
+    object(value, path);
+    for (const key of fields) required(value, key, path);
+    for (const key of Object.keys(value)) if (![...fields, ...optional].includes(key)) bad(`${path}.${key}`, "unknown field");
+    return value;
+  };
+  const text = (value, path) => {
+    string(value, path, { min: 1 });
+    if (!value.trim()) bad(path, "must be a nonempty string");
+    return value;
+  };
+  const num = (value, path, min = 0, max = Number.MAX_SAFE_INTEGER, integer = false) =>
+    number(value, path, { min, max, integer });
+  const noPeople = (value, path) => {
+    if (typeof value === "string" && personIds.has(value)) bad(path, "person ids are forbidden in raid");
+    if (Array.isArray(value)) value.forEach((child, i) => noPeople(child, `${path}[${i}]`));
+    else if (value && typeof value === "object") for (const [key, child] of Object.entries(value)) { noPeople(key, `${path} key`); noPeople(child, `${path}.${key}`); }
+  };
+  noPeople(raid, "raid");
+  exact(raid, "raid", ["id", "name", "window", "art", "legs", "actions", "checklist", "discharges", "members", "log"]);
+  for (const key of ["id", "name"]) text(raid[key], `raid.${key}`);
+  const window = (value, path) => {
+    exact(value, path, ["start", "end"]);
+    for (const key of ["start", "end"]) num(value[key], `${path}.${key}`, 0, slots, true);
+    if (value.start >= value.end) bad(path, "start must precede end");
+  };
+  window(raid.window, "raid.window");
+  object(raid.art, "raid.art");
+  for (const [key, value] of Object.entries(raid.art)) { text(key, "raid.art key"); text(value, `raid.art.${key}`); }
+  const definitions = (key, fields) => {
+    const result = new Map();
+    array(raid[key], `raid.${key}`).forEach((row, i) => {
+      const path = `raid.${key}[${i}]`;
+      exact(row, path, fields);
+      for (const field of ["id", "name"]) text(row[field], `${path}.${field}`);
+      if (result.has(row.id)) bad(`${path}.id`, "duplicate id");
+      result.set(row.id, row);
+    });
+    return result;
+  };
+  const legs = definitions("legs", ["id", "side", "name", "special"]);
+  if (legs.size < 1 || legs.size > 8) bad("raid.legs", "must contain 1 to 8 legs");
+  const specialIds = new Set();
+  [...legs.values()].forEach((leg, i) => {
+    const path = `raid.legs[${i}]`;
+    if (!["L", "R"].includes(leg.side)) bad(`${path}.side`, "must be L or R");
+    if (leg.special !== null) {
+      exact(leg.special, `${path}.special`, ["id", "name"]);
+      for (const key of ["id", "name"]) text(leg.special[key], `${path}.special.${key}`);
+      if (specialIds.has(leg.special.id)) bad(`${path}.special.id`, "duplicate id");
+      specialIds.add(leg.special.id);
+    }
+  });
+  const actions = definitions("actions", ["id", "name", "timer"]);
+  [...actions.values()].forEach((action, i) => {
+    if (!["lair", "core"].includes(action.timer)) bad(`raid.actions[${i}].timer`, "must be lair or core");
+  });
+  const checklist = definitions("checklist", ["id", "kind", "name"]);
+  if ([...checklist.values()].filter(item => item.kind === "heart").length !== 1) bad("raid.checklist", "must contain exactly one heart");
+  [...checklist.values()].forEach((item, i) => {
+    if (!["room", "boss", "heart"].includes(item.kind)) bad(`raid.checklist[${i}].kind`, "must be room, boss or heart");
+  });
+  let previous = 100;
+  const thresholds = array(raid.discharges, "raid.discharges");
+  if (!thresholds.length) bad("raid.discharges", "must not be empty");
+  thresholds.forEach((value, i) => {
+    num(value, `raid.discharges[${i}]`, 1, 99, true);
+    if (value >= previous) bad("raid.discharges", "must be strictly descending");
+    previous = value;
+  });
+  const ref = (value, ids, path, nullable = false) => {
+    if (nullable && value === null) return;
+    text(value, path);
+    if (!ids.has(value)) bad(path, "unknown reference");
+  };
+  const members = (rows, path) => {
+    const result = new Map(), occupied = new Set();
+    array(rows, path).forEach((member, i) => {
+      const p = `${path}[${i}]`;
+      exact(member, p, ["table", "leg"]);
+      ref(member.table, tableIds, `${p}.table`);
+      ref(member.leg, legs, `${p}.leg`, true);
+      if (result.has(member.table) || (member.leg !== null && occupied.has(member.leg))) bad(p, "duplicate member or occupied leg");
+      result.set(member.table, member.leg); occupied.add(member.leg);
+    });
+    return result;
+  };
+  const snapshot = members(raid.members, "raid.members");
+  const fields = {
+    open: ["legs", "members"], phase: ["phase", "cause"], leg_hp: ["leg", "table", "hp"], leg_max: ["leg", "max", "hp"],
+    leg_destroyed: ["leg", "table"], leg_revived: ["leg", "hp"], move: ["table", "from", "to"], member: ["table", "leg", "change"],
+    strike: ["action", "timer", "targets"], timer: ["timer", "next", "paused", "remaining", "interval", "pushes_left", "cause"],
+    push: ["table", "minutes"], check: ["item", "table", "undo"], active: ["table"], king_max: ["max", "hp"], king_hp: ["table", "hp"],
+    discharge: ["threshold", "targets"], admin: ["action"], end: ["result"],
+  };
+  let roster = new Map(), opened = false, ended = false, lastAt = -1, kingMax = null;
+  const maxima = new Map(), hp = new Map();
+  array(raid.log, "raid.log").forEach((entry, i) => {
+    const p = `raid.log[${i}]`;
+    if (!entry || typeof entry.kind !== "string" || !Object.hasOwn(fields, entry.kind)) bad(`${p}.kind`, "unknown log kind");
+    const kind = entry.kind;
+    exact(entry, p, ["at", "kind", "admin", ...fields[kind]], kind === "admin" ? ["window"] : []);
+    num(entry.at, `${p}.at`, 0, slots);
+    if (entry.at < lastAt) bad(`${p}.at`, "log must be in at order");
+    lastAt = entry.at;
+    bool(entry.admin, `${p}.admin`);
+    if (ended && kind !== "admin") bad(p, "only admin entries may follow end");
+    if (!opened && !["open", "admin"].includes(kind)) bad(p, "requires open");
+    for (const key of ["leg", "from", "to"]) if (Object.hasOwn(entry, key)) ref(entry[key], legs, `${p}.${key}`, ["member", "move"].includes(kind));
+    if (Object.hasOwn(entry, "table")) {
+      const nullable = ["leg_hp", "leg_destroyed", "check"].includes(kind) && entry.admin;
+      ref(entry.table, tableIds, `${p}.table`, nullable);
+      if (entry.table !== null && kind !== "member" && !roster.has(entry.table)) bad(`${p}.table`, "must be a current member");
+      if (kind === "leg_hp" && entry.admin && entry.table !== null) bad(`${p}.table`, "admin leg HP must use null table");
+    }
+    if (Object.hasOwn(entry, "targets")) {
+      const seen = new Set();
+      array(entry.targets, `${p}.targets`).forEach((target, j) => {
+        ref(target, tableIds, `${p}.targets[${j}]`);
+        if (seen.has(target) || !roster.has(target)) bad(`${p}.targets`, "duplicate target or nonmember");
+        seen.add(target);
+      });
+    }
+    if (kind === "open") {
+      if (opened || entry.at !== raid.window.start) bad(p, "open must occur once at window.start");
+      opened = true;
+      roster = members(entry.members, `${p}.members`);
+      array(entry.legs, `${p}.legs`).forEach((initial, j) => {
+        const q = `${p}.legs[${j}]`;
+        exact(initial, q, ["leg", "max", "table"]);
+        ref(initial.leg, legs, `${q}.leg`); ref(initial.table, tableIds, `${q}.table`, true);
+        num(initial.max, `${q}.max`, 1, Number.MAX_SAFE_INTEGER, true);
+        if (maxima.has(initial.leg)) bad(`${q}.leg`, "duplicate initial leg");
+        const assigned = [...roster].find(([, leg]) => leg === initial.leg)?.[0] ?? null;
+        if (assigned !== initial.table) bad(`${q}.table`, "does not match opening members");
+        maxima.set(initial.leg, initial.max); hp.set(initial.leg, initial.max);
+      });
+      if (maxima.size !== legs.size) bad(`${p}.legs`, "must initialize every leg");
+    } else if (["leg_max", "king_max"].includes(kind)) {
+      if (!entry.admin && kind === "leg_max") bad(`${p}.admin`, "override requires admin");
+      num(entry.max, `${p}.max`, 1, Number.MAX_SAFE_INTEGER, true);
+      if (kind === "leg_max") maxima.set(entry.leg, entry.max); else kingMax = entry.max;
+    }
+    if (["leg_hp", "leg_max", "leg_revived", "king_hp", "king_max"].includes(kind)) {
+      const limit = kind.startsWith("king") ? kingMax : maxima.get(entry.leg);
+      if (limit == null) bad(`${p}.hp`, "maximum not initialized");
+      num(entry.hp, `${p}.hp`, 0, limit, true);
+      if (!kind.startsWith("king")) hp.set(entry.leg, entry.hp);
+    }
+    if (["leg_max", "leg_revived", "member", "admin"].includes(kind) && !entry.admin) bad(`${p}.admin`, "organizer entry requires admin true");
+    if (kind === "leg_destroyed" && hp.get(entry.leg) !== 0) bad(`${p}.leg`, "destruction requires HP zero");
+    if (kind === "move") {
+      if (roster.get(entry.table) !== entry.from) bad(`${p}.from`, "does not match assignment");
+      if (entry.to !== null && [...roster].some(([table, leg]) => leg === entry.to && table !== entry.table)) bad(`${p}.to`, "leg already occupied");
+      roster.set(entry.table, entry.to);
+    }
+    if (kind === "member") {
+      if (entry.change === "add") {
+        if (roster.has(entry.table) || (entry.leg !== null && [...roster.values()].includes(entry.leg))) bad(p, "member already exists or leg occupied");
+        roster.set(entry.table, entry.leg);
+      } else if (entry.change === "remove") {
+        if (!roster.has(entry.table) || roster.get(entry.table) !== entry.leg) bad(p, "removal must match current member");
+        roster.delete(entry.table);
+      } else bad(`${p}.change`, "must be add or remove");
+    }
+    if (kind === "phase") {
+      num(entry.phase, `${p}.phase`, 1, 3, true);
+      if (!["collapse", "forced", "heart"].includes(entry.cause)) bad(`${p}.cause`, "unknown phase cause");
+      if (entry.cause === "forced" && !entry.admin) bad(`${p}.admin`, "forced phase requires admin true");
+    }
+    if (kind === "strike") {
+      ref(entry.action, actions, `${p}.action`);
+      if (entry.timer !== actions.get(entry.action).timer) bad(`${p}.timer`, "must match action timer");
+    }
+    if (kind === "push") num(entry.minutes, `${p}.minutes`, 1);
+    if (kind === "check") {
+      ref(entry.item, checklist, `${p}.item`);
+      bool(entry.undo, `${p}.undo`);
+      if (entry.undo && !entry.admin) bad(`${p}.undo`, "undo requires admin true");
+    }
+    if (kind === "discharge" && !thresholds.includes(entry.threshold)) bad(`${p}.threshold`, "unknown threshold");
+    if (kind === "timer") {
+      if (!["lair", "core", null].includes(entry.timer)) bad(`${p}.timer`, "unknown timer");
+      bool(entry.paused, `${p}.paused`);
+      num(entry.interval, `${p}.interval`, 1); num(entry.pushes_left, `${p}.pushes_left`);
+      if (!["start", "strike", "push", "pause", "resume", "interval", "stop"].includes(entry.cause)) bad(`${p}.cause`, "unknown timer cause");
+      if (["pause", "resume"].includes(entry.cause) && !entry.admin) bad(`${p}.admin`, "pause/resume requires admin true");
+      if ((entry.cause === "stop") !== (entry.timer === null) || (entry.cause === "pause" && !entry.paused) || (entry.cause === "resume" && entry.paused)) bad(`${p}.cause`, "inconsistent timer cause/state");
+      if (entry.timer === null) {
+        if (entry.next !== null || entry.remaining !== null || entry.paused || entry.cause !== "stop") bad(p, "stopped timer needs null next/remaining, false paused and stop cause");
+      } else if (entry.paused) {
+        if (entry.next !== null) bad(`${p}.next`, "paused timer needs null next");
+        num(entry.remaining, `${p}.remaining`, 0, entry.interval);
+      } else {
+        num(entry.next, `${p}.next`, entry.at);
+        if (entry.remaining !== null) bad(`${p}.remaining`, "running timer needs null remaining");
+      }
+    }
+    if (kind === "admin") {
+      text(entry.action, `${p}.action`);
+      if ((entry.action === "window") !== Object.hasOwn(entry, "window")) bad(`${p}.window`, "required exactly for action window");
+      if (Object.hasOwn(entry, "window")) {
+        window(entry.window, `${p}.window`);
+        if (entry.window.start !== raid.window.start) bad(`${p}.window.start`, "must preserve original start");
+      }
+    }
+    if (kind === "end") {
+      if (!["won", "unfinished"].includes(entry.result)) bad(`${p}.result`, "must be won or unfinished");
+      ended = true;
+    }
+  });
+  if (opened && (roster.size !== snapshot.size || [...roster].some(([table, leg]) => !snapshot.has(table) || snapshot.get(table) !== leg))) bad("raid.members", "snapshot does not match assignment log");
+  return structuredClone(raid);
+}
+
 /** Validate and clone only contract fields. Unknown fields are deliberately dropped. */
 export function validateTimeline(input) {
   const root = object(input, "timeline");
   const schema = number(required(root, "schema", "timeline"), "timeline.schema", { integer: true });
-  if (![1, 2, 3, 4, 5, 6, 7].includes(schema)) fail("This timeline uses an unsupported schema version.");
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(schema)) fail("This timeline uses an unsupported schema version.");
   const phase = string(required(root, "phase", "timeline"), "timeline.phase");
   if (phase !== "live" && phase !== "final") fail("timeline.phase is malformed.");
   const generated_at = dateString(required(root, "generated_at", "timeline"), "timeline.generated_at", "zero-offset");
@@ -355,7 +573,10 @@ export function validateTimeline(input) {
       }).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     }
   }
-  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity, practice };
+  if (Object.hasOwn(root, "raid") && schema !== 8) fail("raid: requires schema 8 (even when null)");
+  const raid = root.raid == null ? root.raid : validateRaid(root.raid, event.slots, tableIds, new Set(personById.keys()));
+  return { schema, visitors, phase, generated_at, event, people, tables, events, room_layout, activity, practice,
+    ...(Object.hasOwn(root, "raid") ? { raid } : {}) };
 }
 
 export function slotToMs(timeline, slot) {
@@ -1201,7 +1422,7 @@ export function createRoomLayout(tables, room = null) {
   layout.height = layout.tableGridBottom + overflowHeight + 8;
   layout.backWall = { x: 0, y: -6, w: layout.width, h: 6 };
   layout.stage = { x: layout.width - 7, y: 1, w: 6, h: layout.height - 2 };
-  layout.food = { x: 1, y: 1, w: 23, h: 6 };
+  layout.food = { x: 1, y: 1, w: 25, h: 6 };
   layout.lounge = { x: 1, y: layout.height - 8, w: layout.width - 9, h: 7 };
   layout.door = { x: 0, y: layout.gridY + 1 };
   layout.doorPosition = { x: 1.2, y: layout.door.y + 0.5 };
@@ -1266,13 +1487,13 @@ function findInfoStaffPost(layout) {
 }
 
 /**
- * The jukebox stands on the floor with its back to the back wall, two tiles right of the host banner's end
+ * The jukebox stands on the floor with its back to the back wall, 3.5 tiles right of the host banner's end
  * (the food area fills the wall's left end), so it moves with the banner and never sits under it or the plaques.
  * Its top overlaps the wall's lowest brick row like furniture pushed against a wall.
  */
 export function jukeboxBounds(layout) {
   const { banner } = wallFixtures(layout);
-  return { x: banner.x + banner.w + 2, y: -1.2, w: 2, h: 3 };
+  return { x: banner.x + banner.w + 3.5, y: -1.2, w: 2, h: 3 };
 }
 
 /** The music sign hangs on the wall directly above the jukebox, one tile wider on each side. */

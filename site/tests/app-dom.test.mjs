@@ -84,7 +84,7 @@ const lineOf = (node, className) => node.children.find((child) => child.classNam
 const cardLines = (tables) => tables.children[0].children.map((article) => [lineOf(article, "table-phase"), lineOf(article, "dice-result")]);
 
 function installDom(dataSequence, search = "?sample=1", options = {}) {
-  const ids = ["camera-toggle", "drawer-close", "activity-toggle", "info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
+  const ids = ["scene-toggle", "scene-hall", "scene-raid", "raid-overlay", "camera-toggle", "drawer-close", "activity-toggle", "info-open", "info-speech", "hall-sidebar", "attendees", "attendees-heading", "activity-panel", "activity-note", "activity-log", "activity-empty", "activity-more", "backup-feed", "live-feed", "sync-controls", "sync-status", "refresh-now", "event-name", "record-note", "mode-badge", "clock", "scene-event", "current-event", "play", "return-now", "speed", "status", "hall", "canvas-description", "tooltip", "timeline-track", "scrubber-bars", "now-tick", "scrubber", "start-label", "now-marker", "end-label", "detail", "tables", "updated", "hall-explorer", "event-actions", "zoom-in", "zoom-out", "recenter", "fit-active", "hall-content", "hall-layout", "table-list", "fundraising-strip", "thermometer", "thermometer-fill", "fundraising-total", "kiosk-link", "camera-controls", "camera-help", "timeline-controls"];
   const nodes = new Map(ids.map((id) => [id, new FakeNode(id === "hall" ? "canvas" : "div")]));
   const body = new FakeNode("body");
   // Derive header and timeline ancestry from the shipped markup so placement tests catch HTML regressions.
@@ -95,6 +95,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
       if (closing) { stack.pop(); continue; }
       const id = attributes.match(/\bid="([^"]+)"/)?.[1];
       const node = nodes.get(id) ?? new FakeNode(tag);
+      for (const [, name, value] of attributes.matchAll(/([\w-]+)="([^"]*)"/g)) node.setAttribute(name, value);
       (stack.at(-1) ?? body).append(node);
       if (!["input", "br", "img"].includes(tag)) stack.push(node);
     }
@@ -103,6 +104,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   nodes.get("hall-content").append(nodes.get("status"), nodes.get("hall-explorer"), nodes.get("table-list"));
   const originalParents = new Map(["status", "current-event", "fundraising-total", "event-name", "mode-badge", "fundraising-strip"].map(id => [id, nodes.get(id).parentElement]));
   nodes.get("fundraising-strip").hidden = true;
+  nodes.get("now-tick").hidden = true;
   nodes.get("canvas-description").textContent = options.canvasDescription ?? "";
   nodes.get("hall-sidebar").offsetWidth = options.drawerWidth ?? 0;
   nodes.get("hall-sidebar").append(nodes.get("drawer-close"), nodes.get("detail"), nodes.get("activity-panel"));
@@ -134,6 +136,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     restore() { if (scopes.length > 1) scopes.pop(); canvasCalls.push({ op: "restore" }); },
     beginPath() { path = []; },
     rect(...args) { path.push(["rect", ...args]); },
+    ellipse(...args) { canvasCalls.push({ op: "ellipse", args }); },
     moveTo(...args) { path.push(["moveTo", ...args]); },
     lineTo(...args) { path.push(["lineTo", ...args]); },
     clip() { canvasCalls.push({ op: "clip", path: structuredClone(path) }); },
@@ -1241,20 +1244,69 @@ test('all attendees appear once with DM precedence and privacy preserved without
   data.visitors = { open: true, people: [visitor.id, dm.id, player.id, guest.id] };
   const app = await runApp([data], 'visitors-no-canvas', { noContext: true });
   const attendees = app.nodes.get('attendees');
-  assert.equal(attendees.children.length, data.people.length);
+  const rows = attendees.children.flatMap(column => column.children[1].children);
+  assert.equal(rows.length, data.people.length);
   assert.equal(app.nodes.get('attendees-heading').textContent, `Attendees (${data.people.length})`);
-  const sameNameRows = attendees.children.filter(row => row.children[0]?.textContent === dm.name);
+  const sameNameRows = rows.filter(row => row.children[0]?.textContent === dm.name);
   assert.equal(sameNameRows.length, 2, 'distinct people sharing a display name remain distinct');
-  assert.deepEqual(new Set(sameNameRows.map(row => row.children[1].textContent)), new Set(['DM', 'Visitor']));
-  const playerRow = attendees.children.find(row => row.children[0]?.textContent === player.name);
-  assert.equal(playerRow.children[1].textContent, 'Player');
-  const anonymousRows = attendees.children.filter(row => row.children[0]?.textContent === 'someone');
+  assert.deepEqual(new Set(sameNameRows.map(row => row.parentElement.parentElement.children[0].textContent.split(' ')[0])), new Set(['DMs', 'Visitors']));
+  const playerRow = rows.find(row => row.children[0]?.textContent === player.name);
+  assert.match(playerRow.parentElement.parentElement.children[0].textContent, /^Players /);
+  const anonymousRows = rows.filter(row => row.children[0]?.textContent === 'someone');
   assert.ok(anonymousRows.length > 0);
   assert.ok(anonymousRows.every(row => row.children.length === 1), 'anonymous attendees do not expose roles');
   assert.doesNotMatch(allText(attendees), new RegExp(visitor.id));
   assert.doesNotMatch(allText(app.nodes.get('tables')), /Visitors Table/);
   assert.match(app.nodes.get('start-label').textContent, /Nov/);
   assert.notEqual(app.nodes.get('start-label').textContent, app.nodes.get('end-label').textContent);
+});
+
+async function roleFixture() {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.schema = 6;
+  const template = data.people.find(person => !person.hidden);
+  data.people = ["dm-z", "dm-a", "player-z", "player-a", "visitor", "attendee"].map(id => ({
+    ...structuredClone(template), id, name: id, dm: id.startsWith("dm"), hidden: false,
+  }));
+  data.tables = [{ ...data.tables[0], id: "roles-table", dm: "dm-z", start: 0, end: 10,
+    signups: ["player-z", "player-a"].map(person => ({ person, planned: [0, 10], actual: null })) }];
+  data.events = [];
+  data.visitors = { open: true, people: ["dm-z", "visitor"] };
+  return data;
+}
+const attendeeColumns = app => app.nodes.get("attendees").children;
+const columnNames = column => column.children[1].children.map(row => row.children[0].textContent);
+test("attendee columns follow role order, counts, precedence and sorted unique membership, omitting empty roles", async () => {
+  const data = await roleFixture();
+  const app = await runApp([data], "role-columns");
+  assert.deepEqual(app.errors, []);
+  const columns = attendeeColumns(app);
+  assert.deepEqual(columns.map(column => column.children[0].textContent), ["DMs (2)", "Players (2)", "Visitors (1)", "Attendees (1)"]);
+  assert.deepEqual(columns.map(columnNames), [["dm-a", "dm-z"], ["player-a", "player-z"], ["visitor"], ["attendee"]]);
+  assert.equal(new Set(columns.flatMap(columnNames)).size, data.people.length);
+  for (const column of columns) {
+    assert.equal(column.children[1].tagName, "UL");
+    assert.equal(column.children[1].getAttribute("aria-labelledby"), column.children[0].id);
+  }
+  data.people = data.people.filter(person => person.id !== "visitor");
+  data.visitors.people = ["dm-z"];
+  const empty = await runApp([data], "empty-role-column");
+  assert.deepEqual(attendeeColumns(empty).map(column => column.children[0].textContent), ["DMs (2)", "Players (2)", "Attendees (1)"]);
+});
+
+test("hidden DMs and players appear only as someone under Attendees without row role labels", async () => {
+  const data = await roleFixture();
+  for (const person of data.people.filter(person => ["dm-z", "player-z"].includes(person.id))) {
+    person.hidden = true; person.name = null; person.variant = null; person.appearance = null;
+  }
+  const app = await runApp([data], "hidden-role-columns");
+  assert.deepEqual(app.errors, []);
+  const columns = attendeeColumns(app);
+  assert.deepEqual(columns.map(column => column.children[0].textContent), ["DMs (1)", "Players (1)", "Visitors (1)", "Attendees (3)"]);
+  assert.deepEqual(columns.map(columnNames), [["dm-a"], ["player-a"], ["visitor"], ["attendee", "someone", "someone"]]);
+  assert.equal(columns.at(-1).children[0].textContent, "Attendees (3)");
+  assert.ok(columns.flatMap(column => column.children[1].children).every(row => row.children.length === 1 && row.children[0].className !== "attendee-role"));
+  assert.doesNotMatch(allText(app.nodes.get("attendees")), /dm-z|player-z/);
 });
 
 function customStageFixture(sample, count = 3) {
@@ -3600,5 +3652,603 @@ test("surround draws clipped running-bond masonry and linear fades outside the h
     assert.ok(x + width <= (hall.width + 8) * 32);
     assert.ok(x + width <= 0 || x >= hall.width * 32 || y + height <= hall.y * 32 || y >= (hall.y + hall.height) * 32,
       "band excludes the hall itself");
+  }
+});
+
+
+async function histogramFixture() {
+  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  data.events = [];
+  data.tables = data.tables.slice(0, 3).map((table, index) => ({ ...table,
+    start: index * 2, end: 8 + index * 2, signups: [] }));
+  return data;
+}
+const histogramBars = app => app.nodes.get("scrubber-bars").children;
+const histogramSlots = (app, className) => histogramBars(app).flatMap((bar, slot) => bar.className.split(" ").includes(className) ? [slot] : []);
+const tableSlots = table => Array.from({ length: table.end - table.start }, (_, index) => table.start + index);
+const histogramCards = app => app.nodes.get("tables").children[0].children;
+const selectHistogramCard = (app, index) => histogramCards(app)[index].children[0].children[0].listeners.get("click")();
+const stepHistogram = app => app.frames.shift()?.(performance.now() + 30);
+
+function assertHistogramHeights(app, data) {
+  const bars = histogramBars(app);
+  assert.equal(bars.length, data.event.slots);
+  const counts = Array.from({ length: data.event.slots }, (_, slot) => data.tables.filter(table => table.start <= slot && slot < table.end).length);
+  const scale = Math.max(4, ...counts);
+  bars.forEach((bar, slot) => {
+    assert.ok(Math.abs(parseFloat(bar.style.height) - counts[slot] / scale * 100) <= .01, `slot ${slot}: ${bar.style.height}`);
+    assert.equal(bar.style.minHeight, counts[slot] ? "2px" : "0px");
+  });
+}
+
+test("histogram builds one accessible-hidden bar per slot with overlapping density heights", async () => {
+  const data = await histogramFixture();
+  // Exercise a peak above the floor, too.
+  data.tables = [...data.tables, ...data.tables.slice(0, 2).map((table, index) => ({ ...table,
+    id: `histogram-extra-${index}`, pad: 3 + index }))];
+  const app = await runApp([data], "histogram-density");
+  assert.equal(app.nodes.get("scrubber-bars").getAttribute("aria-hidden"), "true");
+  assertHistogramHeights(app, data);
+  assert.deepEqual(app.errors, []);
+});
+
+test("histogram one-table windows are quarter height and empty slots have zero height", async () => {
+  const data = await histogramFixture();
+  data.tables = [data.tables[1]];
+  const app = await runApp([data], "histogram-quarter");
+  assertHistogramHeights(app, data);
+  assert.equal(histogramBars(app)[data.tables[0].start].style.height, "25%");
+});
+
+test("histogram selection follows heading buttons and moves to the second table", async () => {
+  const data = await histogramFixture();
+  const app = await runApp([data], "histogram-selection");
+  selectHistogramCard(app, 0);
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(data.tables[0]));
+  selectHistogramCard(app, 1);
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(data.tables[1]));
+});
+
+test("histogram card hover and focus preview half-open windows with selection taking priority", async () => {
+  const data = await histogramFixture();
+  const app = await runApp([data], "histogram-card-preview");
+  selectHistogramCard(app, 0);
+  const card = histogramCards(app)[1];
+  const button = card.children[0].children[0];
+  assert.equal(typeof card.listeners.get("mouseenter"), "function");
+  const expected = tableSlots(data.tables[1]).filter(slot => !tableSlots(data.tables[0]).includes(slot));
+  card.listeners.get("mouseenter")();
+  assert.deepEqual(histogramSlots(app, "previewed"), expected);
+  card.listeners.get("mouseleave")();
+  assert.deepEqual(histogramSlots(app, "previewed"), []);
+  card.listeners.get("focusin")({ target: button });
+  assert.deepEqual(histogramSlots(app, "previewed"), expected);
+  card.listeners.get("focusout")({ relatedTarget: button });
+  assert.deepEqual(histogramSlots(app, "previewed"), expected, "focus inside a card keeps its preview");
+  card.listeners.get("focusout")({ relatedTarget: null });
+  assert.deepEqual(histogramSlots(app, "previewed"), []);
+  assert.ok(histogramBars(app).every(bar => !(bar.className.includes("selected") && bar.className.includes("previewed"))));
+  card.listeners.get("mouseenter")();
+  selectHistogramCard(app, 1);
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(data.tables[1]));
+  assert.deepEqual(histogramSlots(app, "previewed"), [], "previewing the selected table stays gold");
+});
+
+test("histogram hall pointer hover previews the table and pointerleave clears it", async () => {
+  const data = await histogramFixture();
+  const app = await runApp([data], "histogram-hall-preview", { reducedMotion: true, search: "?sample=1&at=4" });
+  selectHistogramCard(app, 0);
+  app.transforms.length = 0;
+  stepHistogram(app);
+  const layout = createRoomLayout(data.tables, data.room_layout);
+  const cell = layout.cells[1];
+  const point = worldToScreen(drawnCamera(app), { x: cell.x + 2, y: cell.y + 2 });
+  app.nodes.get("hall").listeners.get("pointermove")({ pointerId: 1, clientX: point.x, clientY: point.y });
+  assert.deepEqual(histogramSlots(app, "previewed"), tableSlots(data.tables[1]).filter(slot => slot >= data.tables[0].end));
+  app.nodes.get("hall").listeners.get("pointerleave")();
+  assert.deepEqual(histogramSlots(app, "previewed"), []);
+});
+
+test("histogram now tick appears only off follow-now in a live event and tracks thumb travel", async () => {
+  const data = await histogramFixture();
+  data.phase = "live";
+  const wall = Date.parse(data.event.start) + data.event.slot_minutes * 60000 * 6;
+  const app = await runApp([data], "histogram-now", { search: `?${nowQuery(wall)}` });
+  assert.equal(app.nodes.get("now-tick").hidden, true);
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "2" } });
+  stepHistogram(app);
+  assert.equal(app.nodes.get("now-tick").hidden, false);
+  assert.equal(app.nodes.get("return-now").hidden, false);
+  const position = app.nodes.get("now-tick").style.left.match(/^calc\(([-\d.]+)% \+ ([-\d.]+)px\)$/);
+  assert.ok(position);
+  // nowQuery installs an offset from the real wall clock, so allow milliseconds of drift.
+  assert.ok(Math.abs(Number(position[1]) - 6 / data.event.slots * 100) < .01);
+  const fraction = Number(position[1]) / 100;
+  assert.ok(Math.abs(Number(position[2]) - (5 - fraction * 10)) < 1e-6);
+  app.nodes.get("return-now").listeners.get("click")();
+  stepHistogram(app);
+  assert.equal(app.nodes.get("now-tick").hidden, true);
+  for (const [label, options] of [
+    ["sample", {}], ["replay", { archive: true, search: `?${nowQuery(wall)}&at=2` }],
+    ["before-doors", { search: `?${nowQuery(Date.parse(data.event.start) - DAY)}&at=2` }],
+  ]) {
+    const other = await runApp([data], `histogram-now-${label}`, options);
+    assert.equal(other.nodes.get("now-tick").hidden, true, label);
+  }
+});
+
+test("histogram reload rebuilds heights and preserves selection by table id", async () => {
+  const data = await histogramFixture();
+  data.phase = "live";
+  const changed = structuredClone(data);
+  changed.generated_at = new Date(Date.parse(data.generated_at) + 60000).toISOString();
+  changed.tables = [changed.tables[1], changed.tables[2]];
+  changed.tables[0].start = 14;
+  changed.tables[0].end = 18;
+  const app = await runApp([data, changed], "histogram-reload", { search: `?${nowQuery(Date.parse(data.event.start) + 6 * data.event.slot_minutes * 60000)}` });
+  selectHistogramCard(app, 1);
+  const before = histogramBars(app)[0];
+  app.nodes.get("refresh-now").listeners.get("click")();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  stepHistogram(app);
+  assert.notEqual(histogramBars(app)[0], before);
+  assertHistogramHeights(app, changed);
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(changed.tables[0]));
+});
+
+test("histogram markup and CSS preserve input, touch band, focus, tokens and important count", async () => {
+  const track = pageHtml.match(/<div id="timeline-track"[\s\S]*?<\/div>\s*<span[\s\S]*?<input id="scrubber" type="range"[^>]*>/)?.[0];
+  assert.ok(track, "the original range lives inside the timeline track");
+  assert.match(track, /min="0" max="1" step="any" value="0" disabled/);
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /:root\s*\{[^}]*--bar:\s*#55685b/);
+  assert.match(css, /@media\s*\(pointer: coarse\)\s*\{\s*#scrubber\s*\{[^}]*height:\s*44px/);
+  assert.match(css, /#scrubber:disabled::-webkit-slider-thumb[^}]*background: none/);
+  assert.match(css, /#scrubber:disabled::-moz-range-thumb[^}]*background: none/);
+  assert.match(css, /#scrubber:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus\)/);
+  // At 3230bf3 three declaration lines contain fourteen occurrences.
+  const priority = ["!", "important"].join("");
+  assert.equal(css.split("\n").filter(line => line.includes(priority)).length, 3);
+  assert.equal(css.split(priority).length - 1, 14);
+});
+
+test("histogram remains baseline-only without tables or before a failed load", async () => {
+  const data = await histogramFixture();
+  data.tables = [];
+  const empty = await runApp([data], "histogram-empty");
+  assert.equal(histogramBars(empty).length, data.event.slots);
+  assert.equal(empty.nodes.get("timeline-track").getAttribute("data-empty"), "true");
+  assert.ok(histogramBars(empty).every(bar => bar.style.height === "0%" && bar.style.minHeight === "0px"));
+  const failed = await runApp([new Error("offline")], "histogram-unloaded");
+  assert.equal(histogramBars(failed).length, 0);
+  assert.equal(failed.nodes.get("now-tick").hidden, true);
+});
+
+test("histogram pointer previews override focused cards and leaving restores focus preview", async () => {
+  const data = await histogramFixture();
+  const app = await runApp([data], "histogram-preview-priority");
+  // Clear automatic selection so the entire preview is visible.
+  selectHistogramCard(app, 0);
+  app.nodes.get("drawer-close").listeners.get("click")();
+  const cards = histogramCards(app);
+  assert.equal(typeof cards[0].listeners.get("focusin"), "function");
+  cards[0].listeners.get("focusin")({});
+  cards[2].listeners.get("mouseenter")();
+  assert.deepEqual(histogramSlots(app, "previewed"), tableSlots(data.tables[2]));
+  cards[2].listeners.get("mouseleave")();
+  assert.deepEqual(histogramSlots(app, "previewed"), tableSlots(data.tables[0]));
+  cards[0].listeners.get("focusout")({ relatedTarget: null });
+  assert.deepEqual(histogramSlots(app, "previewed"), []);
+});
+
+test("histogram clock seeks keep bar nodes and density while automatic selection updates", async () => {
+  const data = await histogramFixture();
+  const app = await runApp([data], "histogram-clock-nodes", { reducedMotion: true, mobile: true, search: "?sample=1&at=0" });
+  const before = [...histogramBars(app)];
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(data.tables[0]));
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "10" } });
+  stepHistogram(app);
+  assert.deepEqual([...histogramBars(app)], before);
+  assertHistogramHeights(app, data);
+  assert.deepEqual(histogramSlots(app, "selected"), tableSlots(data.tables[2]));
+});
+
+// Raid integration cases use the existing fake DOM; all variants still pass the public validator.
+const raidSample = async edit => {
+  const input = JSON.parse(await readFile(new URL("../data/timeline.raid.sample.json", import.meta.url), "utf8"));
+  edit?.(input);
+  const { validateTimeline } = await import("../model.mjs");
+  validateTimeline(input);
+  return input;
+};
+function raidFind(root, className) {
+  if (root.className === className) return root;
+  return root.children.map(child => raidFind(child, className)).find(Boolean);
+}
+function raidSeek(app, slot) {
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: String(slot) } });
+  app.frames.shift()?.(performance.now() + 40);
+}
+const raidScene = app => app.nodes.get("hall").getAttribute("data-scene");
+
+import { shieldCells, weaponCells } from "./raid-gear-cells.mjs";
+const raidWeaponCells = new Set(weaponCells.map(String)), raidShieldCells = new Set(shieldCells.map(String));
+const raidSpriteCell = call => [call.args[0] / 17, call.args[1] / 17];
+const raidSprites = app => app.imageCalls.filter(call => call.src?.includes("roguelikeChar"));
+
+test("raid members layer gear after their bodies with the same cell, motion and facing, then return to an unarmed hall", async () => {
+  const data = await raidSample();
+  const app = await runApp([data], "raid-gear-layers", { search: "?sample=raid&at=40.5", trackSpriteTransforms: true, reducedMotion: true });
+  assert.deepEqual(app.errors, []);
+  const sprites = raidSprites(app), weapons = sprites.filter(call => raidWeaponCells.has(String(raidSpriteCell(call))));
+  assert.ok(weapons.length > 0, "raid members draw weapon atlas cells");
+  const { raidGear } = await import("../raid-gear.mjs");
+  const { characterAppearance, SPRITES } = await import("../characters.mjs");
+  const { raidRoomLayout, raidStateAt } = await import("../raid-model.mjs");
+  const { validateTimeline } = await import("../model.mjs");
+  const timeline = validateTimeline(data), layout = raidRoomLayout(raidStateAt(timeline, 40.5), timeline, 40.5, { theta: 0 });
+  assert.equal(weapons.length, layout.people.length, "one weapon per visible raid member");
+  let shieldCount = 0;
+  for (const placed of layout.people) {
+    const member = timeline.people.find(person => person.id === placed.id), appearance = characterAppearance(member), gear = raidGear(member);
+    const x = Math.round((placed.x - .5) * 32), y = Math.round((placed.y - .6) * 32);
+    const start = sprites.findIndex(call => raidSpriteCell(call)[0] <= 1 && call.logicalArgs[4] === x && call.logicalArgs[5] === y);
+    assert.ok(start >= 0, `${member.id} body`);
+    const expected = [SPRITES.shirts[appearance.shirt], SPRITES.hair[appearance.hair],
+      ...(member.dm ? [SPRITES.hats[appearance.hat]] : []), ...(gear.shield ? [gear.shield] : []), gear.weapon];
+    assert.deepEqual(sprites.slice(start + 1, start + 1 + expected.length).map(raidSpriteCell), expected, `${member.id} layer order`);
+    for (const tile of sprites.slice(start + expected.length - (gear.shield ? 1 : 0), start + expected.length + 1)) {
+      assert.deepEqual(tile.logicalArgs.slice(4), sprites[start].logicalArgs.slice(4), "gear shares the body cell");
+      assert.deepEqual(tile.motion, sprites[start].motion, "gear shares body motion and flip");
+    }
+    if (gear.shield) shieldCount++;
+  }
+  assert.equal(sprites.filter(call => raidShieldCells.has(String(raidSpriteCell(call)))).length, shieldCount);
+  assert.ok(weapons.some(call => call.motion.some(([op, x, y]) => op === "scale" && x === -1 && y === 1)), "left-facing gear is flipped");
+  app.imageCalls.length = 0; raidSeek(app, 39.5);
+  assert.equal(raidScene(app), "hall");
+  assert.ok(raidSprites(app).length > 0);
+  assert.equal(raidSprites(app).some(call => raidWeaponCells.has(String(raidSpriteCell(call))) || raidShieldCells.has(String(raidSpriteCell(call)))), false);
+});
+
+test("hidden raid members draw only silhouettes while visible members stay armed", async () => {
+  const data = await raidSample(input => {
+    for (const member of input.people.slice(0, 2)) Object.assign(member, { hidden: true, name: null, variant: null, appearance: null });
+  });
+  const app = await runApp([data], "raid-gear-hidden", { search: "?sample=raid&at=40.5", reducedMotion: true });
+  assert.deepEqual(app.errors, []);
+  const { raidRoomLayout, raidStateAt } = await import("../raid-model.mjs");
+  const { validateTimeline } = await import("../model.mjs");
+  const timeline = validateTimeline(data), layout = raidRoomLayout(raidStateAt(timeline, 40.5), timeline, 40.5, { theta: 0 });
+  const sprites = raidSprites(app), weapons = sprites.filter(call => raidWeaponCells.has(String(raidSpriteCell(call))));
+  assert.equal(weapons.length, layout.people.length - 2, "only visible members draw weapons");
+  for (const member of data.people.slice(0, 2)) {
+    const placed = layout.people.find(person => person.id === member.id);
+    assert.ok(placed, "hidden member still stands in the room");
+    const x = Math.round((placed.x - .5) * 32), y = Math.round((placed.y - .6) * 32);
+    const cells = sprites.filter(call => call.logicalArgs[4] === x && call.logicalArgs[5] === y).map(raidSpriteCell);
+    assert.deepEqual(cells, [[0, 1], [16, 7]], "silhouette layers only");
+  }
+});
+
+const curtainBeat = app => app.nodes.get("hall").getAttribute("data-raid-curtain");
+async function startRaidCurtain(label, speed = 30, kiosk = false) {
+  const data = await raidSample();
+  const app = await runApp([data], label, { search: `?sample=raid&at=39.999999${kiosk ? "&kiosk=1" : ""}`, wideKiosk: kiosk });
+  app.nodes.get("speed").listeners.get("change")({ target: { value: String(speed) } });
+  app.nodes.get("play").listeners.get("click")();
+  // Integer frame times: a fractional start made (start + 5500) - start land an ulp off 5500, so
+  // the half-faded fill drew as rgba(0, 0, 0, 0.4999999999999991) and missed the exact match.
+  const start = Math.ceil(performance.now()) + 100;
+  const step = elapsed => {
+    app.rectCalls.length = 0; app.imageCalls.length = 0;
+    app.frames.shift()?.(start + elapsed);
+  };
+  step(0);
+  assert.deepEqual(app.errors, []);
+  return { app, data, step };
+}
+
+test("raid curtain small ticks start the sequence and a seek restores hall lights and every person", async () => {
+  const { app, data, step } = await startRaidCurtain("raid-curtain-seek");
+  assert.equal(curtainBeat(app), "curtain", `slot=${app.nodes.get("scrubber").value}, mode=${app.nodes.get("mode-badge").textContent}, scene=${raidScene(app)}`);
+  // Shepherd review: the page keeps the hall layout until the raid beat (CURTAIN_RAID_MS).
+  assert.equal(raidScene(app), "hall");
+  assert.equal(app.nodes.get("raid-overlay").hidden, true);
+  const clock = raidFind(app.nodes.get("raid-overlay"), "raid-countdown");
+  const first = clock.textContent;
+  step(4500);
+  assert.equal(curtainBeat(app), "dark");
+  assert.ok(app.rectCalls.some(call => call.color === "rgba(0, 0, 0, 0.5)"));
+  assert.notEqual(clock.textContent, first, "selected event time keeps advancing under the wall-clock sequence");
+  app.nodes.get("scrubber").listeners.get("input")({ target: { value: "39.5" } });
+  step(4600);
+  assert.equal(curtainBeat(app), null);
+  assert.equal(raidScene(app), "hall");
+  assert.equal(app.nodes.get("raid-overlay").hidden, true);
+  assert.equal(app.rectCalls.some(call => /^rgba\(0, 0, 0,/.test(call.color)), false);
+  const restored = app.imageCalls.filter(call => call.src.includes("roguelikeChar")).length;
+  const fresh = await runApp([data], "raid-curtain-restored-hall", { search: "?sample=raid&at=39.5" });
+  assert.equal(restored, fresh.imageCalls.filter(call => call.src.includes("roguelikeChar")).length,
+    "interrupting the walk leaves no member sprites hidden");
+});
+
+test("raid curtain beats last six wall-clock seconds at every replay speed including kiosk", async () => {
+  for (const speed of [1, 30, 120, 600, 1800]) {
+    const { app, step } = await startRaidCurtain(`raid-curtain-speed-${speed}`, speed, speed === 600);
+    assert.equal(curtainBeat(app), "curtain");
+    for (const [elapsed, beat] of [[500, "curtain"], [2500, "walk"], [4500, "dark"], [5500, "raid"]]) {
+      step(elapsed); assert.equal(curtainBeat(app), beat, `${speed}x at ${elapsed}ms`);
+    }
+    assert.ok(app.rectCalls.some(call => call.color === "rgba(0, 0, 0, 0.5)"), "raid fades up from black");
+    step(6500);
+    assert.equal(curtainBeat(app), null);
+    assert.equal(raidScene(app), "raid");
+    assert.equal(app.rectCalls.some(call => /^rgba\(0, 0, 0,/.test(call.color)), false);
+  }
+});
+
+test("raid curtain seeks, same-scene toggles, Hall toggles and reverse exits interrupt immediately", async () => {
+  for (const interrupt of ["seek-raid", "seek-play", "toggle-raid", "toggle-hall", "reverse-exit"]) {
+    const { app, step } = await startRaidCurtain(`raid-curtain-interrupt-${interrupt}`, 1);
+    step(2500); assert.equal(curtainBeat(app), "walk");
+    if (interrupt.startsWith("seek") || interrupt === "reverse-exit") {
+      app.nodes.get("scrubber").listeners.get("input")({ target: { value: interrupt === "reverse-exit" ? "39" : "40.5" } });
+      if (interrupt === "seek-play") app.nodes.get("play").listeners.get("click")();
+    } else app.nodes.get(interrupt === "toggle-hall" ? "scene-hall" : "scene-raid").listeners.get("click")();
+    step(2600);
+    assert.equal(curtainBeat(app), null);
+    assert.equal(raidScene(app), ["toggle-hall", "reverse-exit"].includes(interrupt) ? "hall" : "raid", interrupt);
+    assert.equal(app.rectCalls.some(call => /^rgba\(0, 0, 0,/.test(call.color)), false);
+  }
+});
+
+test("raid curtain live ticks play across the start, cancel on a scene change and skip large clock jumps", async () => {
+  const data = await raidSample(input => {
+    input.phase = "live";
+    input.raid.log = input.raid.log.filter(entry => entry.kind !== "end");
+  });
+  const slotMs = data.event.slot_minutes * 60000;
+  const boundary = Date.parse(data.event.start) + data.raid.window.start * slotMs;
+  const originalNow = Date.now;
+  let wall = boundary - 100;
+  Date.now = () => wall;
+  try {
+    const app = await runApp([data], "raid-curtain-follow", { search: `?sample=raid&${nowQuery(wall)}` });
+    assert.equal(raidScene(app), "hall");
+    const start = performance.now() + 100;
+    wall = boundary + 100; app.frames.shift()?.(start);
+    assert.equal(curtainBeat(app), "curtain");
+    wall = Date.parse(data.event.start) + data.raid.window.end * slotMs;
+    app.frames.shift()?.(start + 100);
+    assert.equal(raidScene(app), "hall");
+    assert.equal(curtainBeat(app), null);
+    wall = boundary - slotMs; app.frames.shift()?.(start + 200);
+    wall = boundary + slotMs / 2; app.frames.shift()?.(start + 300);
+    assert.equal(raidScene(app), "raid");
+    assert.equal(curtainBeat(app), null, "a 1.5-slot live jump switches instantly");
+  } finally { Date.now = originalNow; }
+});
+
+test("raid sample loader and selected-time scene toggle persist only inside the live window", async () => {
+  const app = await runApp([await raidSample()], "raid-scenes", { search: "?sample=raid&at=39", reducedMotion: true });
+  assert.deepEqual(app.errors, []);
+  assert.ok(app.fetchUrls[0].endsWith("/data/timeline.raid.sample.json"));
+  assert.equal(raidScene(app), "hall"); assert.equal(app.nodes.get("scene-toggle").hidden, true);
+  assert.equal(app.nodes.get("raid-overlay").hidden, true);
+  raidSeek(app, 40);
+  assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("scene-toggle").hidden, false);
+  assert.equal(app.nodes.get("scene-raid").getAttribute("aria-pressed"), "true");
+  assert.equal(app.nodes.get("camera-controls").hidden, true);
+  app.nodes.get("scene-hall").listeners.get("click")(); raidSeek(app, 41);
+  assert.equal(raidScene(app), "hall"); assert.equal(app.nodes.get("raid-overlay").hidden, true);
+  assert.equal(app.nodes.get("scene-hall").getAttribute("aria-pressed"), "true");
+  raidSeek(app, 39); raidSeek(app, 42);
+  assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("raid-overlay").hidden, false);
+  assert.equal(app.nodes.get("scene-toggle").parentElement, app.nodes.get("mode-badge").parentElement);
+});
+
+test("kiosk follows default raid scene, hides toggle and ignores its Hall button", async () => {
+  const app = await runApp([await raidSample()], "raid-kiosk", { search: "?sample=raid&kiosk=1&at=40", wideKiosk: true, reducedMotion: true });
+  assert.deepEqual(app.errors, []);
+  assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("scene-toggle").hidden, true);
+  app.nodes.get("scene-hall").listeners.get("click")(); raidSeek(app, 41);
+  assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("raid-overlay").hidden, false);
+  raidSeek(app, 39); assert.equal(raidScene(app), "hall");
+});
+
+test("raid overlay keeps node identity as timer ticks and displays bars, phase checklist and sorted board", async () => {
+  const app = await runApp([await raidSample()], "raid-overlay", { search: "?sample=raid&at=40.01", reducedMotion: true });
+  assert.deepEqual(app.errors, []);
+  const host = app.nodes.get("raid-overlay"), bars = raidFind(host, "raid-legs"), clock = raidFind(host, "raid-countdown");
+  assert.equal(bars.children.length, 8);
+  assert.equal(raidFind(bars.children[0], "raid-hp").textContent, "300/300 HP");
+  assert.match(allText(bars.children[0]), /Venom Injector.*★/);
+  assert.equal(raidFind(host, "raid-checklist").hidden, true);
+  const boardRows = raidFind(host, "raid-board").children.find(node => node.tagName === "TABLE").children.find(node => node.tagName === "TBODY");
+  const future = boardRows.children.find(node => node.getAttribute("data-table") === "t10");
+  assert.equal(future.hidden, true, "future member is not exposed before joining");
+  raidSeek(app, 42.78); assert.equal(future.hidden, false);
+  raidSeek(app, 40.01); assert.equal(future.hidden, true);
+  assert.ok(boardRows.children.includes(future), "replay retains the same row nodes");
+  const first = clock.textContent;
+  raidSeek(app, 40.01 + 1 / 1800);
+  assert.equal(raidFind(host, "raid-countdown"), clock); assert.notEqual(clock.textContent, first);
+  assert.equal(raidFind(host, "raid-legs"), bars);
+  raidSeek(app, 42);
+  assert.equal(raidFind(host, "raid-checklist").hidden, false);
+  assert.match(raidFind(host, "raid-banner").textContent, /Table 7: Dawn finale cleared the Cocoon Forge/);
+  assert.equal(raidFind(host, "raid-timer").hidden, true);
+  raidSeek(app, 43.45); assert.match(clock.textContent, /03:00 · Paused/);
+  raidSeek(app, 47.55);
+  const board = raidFind(host, "raid-board").children.find(node => node.tagName === "TABLE");
+  const rows = board.children.find(node => node.tagName === "TBODY").children;
+  assert.deepEqual(rows.slice(0, 4).map(node => node.getAttribute("data-table")), ["t1", "t2", "t3", "t9"]);
+  assert.equal(raidFind(host, "raid-result").textContent, "Victory");
+  assert.equal(raidFind(host, "raid-result").hidden, false);
+  assert.match(allText(raidFind(host, "raid-king")), /0\/1912 HP/);
+});
+
+test("last-action banner resolves strike names and organizer entries", async () => {
+  const app = await runApp([await raidSample()], "raid-banner", { search: "?sample=raid&at=40.14", reducedMotion: true });
+  const banner = raidFind(app.nodes.get("raid-overlay"), "raid-banner");
+  assert.equal(banner.textContent, "Lair action: Acid Drip on Table 2: Dawn finale and Table 6: Dawn finale");
+  raidSeek(app, 40.34); assert.match(banner.textContent, /^Organizer: Table 4: Dawn finale moved to Reserve$/);
+  raidSeek(app, 42.6); assert.equal(banner.textContent, "Organizer: coin grant");
+});
+
+test("hall stage countdown and member labels update in cards and drawer", async () => {
+  const app = await runApp([await raidSample()], "raid-hall", { search: "?sample=raid&at=39", reducedMotion: true });
+  assert.ok(app.contextCalls.includes("Spider-Mech raid in 30:00"));
+  assert.match(allText(app.nodes.get("tables")), /Spider-Mech raid · Leg R2/);
+  assert.match(allText(app.nodes.get("tables")), /Spider-Mech raid · Reserve/);
+  const grid = app.nodes.get("tables").children[0];
+  const t6 = grid.children.find(card => card.children[0].children[0].textContent === "Table 6: Dawn finale");
+  t6.children[0].children[0].listeners.get("click")();
+  assert.match(allText(app.nodes.get("detail")), /Spider-Mech raid · Leg R2/);
+  const reserve = grid.children.find(card => card.children[0].children[0].textContent === "Table 9: Dawn finale");
+  reserve.children[0].children[0].listeners.get("click")();
+  assert.match(allText(app.nodes.get("detail")), /Spider-Mech raid · Reserve/);
+  raidSeek(app, 40.8); assert.match(allText(app.nodes.get("detail")), /Spider-Mech raid · Leg L4/);
+  for (const slot of [37.9, 40]) {
+    app.contextCalls.length = 0; raidSeek(app, slot);
+    assert.equal(app.contextCalls.some(text => text.includes("raid in")), false);
+  }
+});
+
+test("running raid people leave hall drawings while late, ended and nonmember tables stay", async () => {
+  const data = await raidSample(input => {
+    const late = input.tables.find(table => table.id === "t1"), early = input.tables.find(table => table.id === "t2");
+    late.start = 42; early.end = 44;
+    late.signups.forEach(signup => signup.planned[0] = 42);
+    early.signups.forEach(signup => signup.planned[1] = 44);
+  });
+  const app = await runApp([data], "raid-hall-people", { search: "?sample=raid&at=41", reducedMotion: true });
+  app.nodes.get("scene-hall").listeners.get("click")();
+  const drawn = () => app.imageCalls.filter(call => call.src.includes("roguelikeChar"));
+  const frameCount = slot => { app.imageCalls.length = 0; raidSeek(app, slot); return drawn().length; };
+  const before = frameCount(41), during = frameCount(42.1), after = frameCount(44.1);
+  assert.ok(before > during, "late table people are in hall before their window, then leave it");
+  assert.ok(after > during, "early table people return to hall after its window");
+  const noRaid = structuredClone(data); noRaid.raid = null;
+  const ordinary = await runApp([noRaid], "raid-nonmember-people", { search: "?sample=raid&at=42.1", reducedMotion: true });
+  assert.ok(ordinary.imageCalls.filter(call => call.src.includes("roguelikeChar")).length > during);
+  assert.ok(during > 0, "nonmembers and staff remain visible in the hall");
+});
+
+test("closing raid scene disposes boss and a no-end window returns to hall", async () => {
+  const roomSource = await readFile(new URL("../raid-room.mjs", import.meta.url), "utf8");
+  const bossPath = roomSource.match(/from "(\.\/raid-boss\.mjs[^\"]*)"/)[1];
+  const module = await import(new URL(bossPath, new URL("../raid-room.mjs", import.meta.url)));
+  let disposed = 0;
+  module.registerBossRenderer(() => ({ draw() {}, dispose() { disposed++; } }));
+  try {
+    const app = await runApp([await raidSample(input => { input.raid.log = input.raid.log.filter(entry => entry.at < 47.55); })], "raid-dispose", { search: "?sample=raid&at=40", reducedMotion: true });
+    app.nodes.get("scene-hall").listeners.get("click")(); assert.equal(disposed, 1);
+    raidSeek(app, 39); raidSeek(app, 40); assert.equal(raidScene(app), "raid");
+    raidSeek(app, 48); assert.equal(raidScene(app), "hall"); assert.equal(disposed, 2);
+    assert.equal(app.nodes.get("scene-toggle").hidden, true); assert.equal(app.nodes.get("raid-overlay").hidden, true);
+  } finally { module.registerBossRenderer(null); }
+});
+
+test("schema-7 keeps hall scene and hides all raid UI", async () => {
+  const app = await runApp([await cameraSample()], "raid-absent", { search: "?sample=1&at=2" });
+  assert.equal(raidScene(app), "hall"); assert.equal(app.nodes.get("scene-toggle").hidden, true);
+  assert.equal(app.nodes.get("raid-overlay").hidden, true);
+});
+
+test("logged early end holds unfinished result for one slot then restores hall before window close", async () => {
+  const data = await raidSample(input => {
+    input.raid.log = input.raid.log.filter(entry => entry.at < 46);
+    input.raid.log.push({ at: 46, kind: "end", admin: true, result: "unfinished" });
+  });
+  const app = await runApp([data], "raid-end-hold", { search: "?sample=raid&at=46", reducedMotion: true });
+  assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("scene-toggle").hidden, true);
+  assert.equal(raidFind(app.nodes.get("raid-overlay"), "raid-result").textContent, "The raid is over");
+  raidSeek(app, 46.999); assert.equal(raidScene(app), "raid");
+  raidSeek(app, 47); assert.equal(raidScene(app), "hall");
+  assert.equal(app.nodes.get("raid-overlay").hidden, true);
+});
+
+
+test("raid overlay names specials once, preserves distinct names, titles table names and has exact columns", async () => {
+  const app = await runApp([await raidSample(input => { input.raid.legs.find(leg => leg.id === "R1").name = "Right conduit"; })], "raid-overlay-columns", { search: "?sample=raid&at=43.45" });
+  assert.deepEqual(app.errors, []);
+  const host = app.nodes.get("raid-overlay"), bars = raidFind(host, "raid-legs");
+  const label = id => bars.children.find(bar => bar.getAttribute("data-leg") === id).children[0].textContent;
+  assert.equal(label("L1"), "L1 · Venom Injector ★");
+  assert.equal(label("L2"), "L2 · Standard Leg L2");
+  assert.equal(label("R1"), "R1 · Right conduit ★ Nerve Conduit");
+  const table = raidFind(host, "raid-board").children.find(node => node.tagName === "TABLE");
+  assert.deepEqual(table.children.find(node => node.tagName === "THEAD").children[0].children.map(node => node.textContent), ["Table", "Legs", "Leg damage", "Rooms", "King damage", "Coins spent"]);
+  const rows = table.children.find(node => node.tagName === "TBODY").children.filter(row => !row.hidden);
+  assert.equal(rows.length, 10);
+  for (const row of rows) assert.equal(row.children[0].getAttribute("title"), row.children[0].textContent);
+});
+
+test("theta URL degrees reach renderer options and the rings drawn by the room", async () => {
+  const source = await readFile(new URL("../raid-room.mjs", import.meta.url), "utf8");
+  const module = await import(new URL(source.match(/from "(\.\/raid-boss\.mjs[^\"]*)"/)[1], new URL("../raid-room.mjs", import.meta.url)));
+  const { stationsAt } = await import("../raid-3d-pose.mjs");
+  let received, expected;
+  module.registerBossRenderer(options => { received = options; return { draw() {}, stations(boss, rect) { expected = stationsAt(boss, rect, options); return expected; } }; });
+  try {
+    const app = await runApp([await raidSample()], "raid-theta", { search: "?sample=raid&at=40.017&theta=90" });
+    assert.deepEqual(app.errors, []); assert.equal(received.theta, 90); assert.equal(expected.angle, Math.PI / 2);
+    const rings = app.canvasCalls.filter(call => call.op === "ellipse");
+    assert.equal(rings.length, 8);
+    for (const leg of Object.values(expected.legs)) assert.ok(rings.some(call => call.args[0] === leg.arena[0] * 32 && call.args[1] === leg.arena[1] * 32));
+  } finally { module.registerBossRenderer(null); }
+});
+
+test("paused outline replay keeps identical front positions on two frames and malformed theta uses front", async () => {
+  const data = await raidSample();
+  const app = await runApp([data], "raid-paused-angle", { search: "?sample=raid&at=40.017&theta=bad" });
+  const rings = () => app.canvasCalls.filter(call => call.op === "ellipse").map(call => call.args);
+  const before = rings(); assert.equal(before.length, 8);
+  app.canvasCalls.length = 0; app.frames.shift()?.(performance.now() + 90_000);
+  assert.deepEqual(rings(), before); assert.equal(app.nodes.get("mode-badge").textContent, "PAUSED");
+  const front = await runApp([data], "raid-theta-zero", { search: "?sample=raid&at=40.017&theta=0" });
+  assert.deepEqual(front.canvasCalls.filter(call => call.op === "ellipse").map(call => call.args), before);
+  assert.deepEqual(app.errors, []); assert.deepEqual(front.errors, []);
+});
+
+test("render, header and detail share at most one raid state fold per selected-time frame", async () => {
+  const app = await runApp([await raidSample()], "raid-fold-count", { search: "?sample=raid&at=40.5" });
+  const { raidStateFor } = await import("../app.mjs?dom-test=raid-fold-count");
+  const initialFolds = raidStateFor.folds; assert.ok(initialFolds >= 1);
+  raidSeek(app, 40.51); assert.equal(raidStateFor.folds, initialFolds + 1);
+  const grid = app.nodes.get("tables").children[0];
+  grid.children[0].children[0].children[0].listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 100); assert.equal(raidStateFor.folds, initialFolds + 1);
+  app.nodes.get("play").listeners.get("click")();
+  app.frames.shift()?.(performance.now() + 200); assert.equal(raidStateFor.folds, initialFolds + 2);
+  assert.deepEqual(app.errors, []);
+});
+
+test("raid screen geometry reaches the canvas and overlay CSS boxes and updates on resize", async () => {
+  const originalWidth = globalThis.innerWidth, originalHeight = globalThis.innerHeight;
+  const { raidScreenLayout } = await import("../raid-model.mjs");
+  try {
+    globalThis.innerWidth = 1440; globalThis.innerHeight = 900;
+    const app = await runApp([await raidSample()], "raid-screen-boxes", { search: "?sample=raid&at=43.45" });
+    const check = () => {
+      const screen = raidScreenLayout({ width: globalThis.innerWidth, height: globalThis.innerHeight });
+      const host = app.nodes.get("raid-overlay");
+      for (const [key, node] of Object.entries({ canvas: app.nodes.get("hall"), legs: raidFind(host, "raid-legs"),
+        center: raidFind(host, "raid-center"), checklist: raidFind(host, "raid-checklist"),
+        board: raidFind(host, "raid-board"), timeline: app.nodes.get("timeline-controls") })) {
+        const box = screen[key];
+        for (const [name, value] of Object.entries({ x: box.x - screen.frame.x, y: box.y - screen.frame.y, w: box.w, h: box.h }))
+          assert.equal(node.style[`--raid-${name}`], `${value}px`, `${key} ${name}`);
+      }
+    };
+    check();
+    globalThis.innerWidth = 1280; globalThis.innerHeight = 720;
+    app.frames.shift()?.(performance.now() + 100); check();
+    assert.deepEqual(app.errors, []);
+  } finally {
+    if (originalWidth === undefined) delete globalThis.innerWidth; else globalThis.innerWidth = originalWidth;
+    if (originalHeight === undefined) delete globalThis.innerHeight; else globalThis.innerHeight = originalHeight;
   }
 });

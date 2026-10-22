@@ -251,13 +251,34 @@ test('practice continues through the eve and reduced motion keeps the same readi
   assert.ok(gatheringAmbience(changed, layout, (eve + 1) * 1000).staff);
 });
 
-test('500 practice moves over six weeks schedule in under 50 ms without changing the snapshot', t => {
-  const data = fixture(Array.from({ length: 500 }, (_, i) => move('u_lena', A + i * 6 * 7 * 86400 / 500,
-    i % 3 === 0 ? 'food' : i % 3 === 1 ? 'table' : 'lounge', i % 3 === 1 ? 't01' : null)));
-  const before = structuredClone(data), layout = room(data), start = performance.now();
-  practiceKitchenServices(data, layout);
-  const elapsed = performance.now() - start;
-  t.diagnostic(`500 moves: ${elapsed.toFixed(3)} ms`);
-  assert.ok(elapsed < 50, `${elapsed.toFixed(3)} ms`);
-  assert.deepEqual(data, before);
+// Wall-clock budgets flaked on a loaded machine (68-155 ms against 50 ms, and CPU time inflates
+// too under SMT contention), so the budget is in units of a fixed calibration workload timed in
+// the same process, interleaved, best of five. Idle, 500 moves cost ~2 units (~27 ms warm) and
+// 32 busy processes on 24 cores pushed it to ~3; 50 ms idle is ~4 units.
+const calibrate = () => {
+  const start = performance.now();
+  const list = Array.from({ length: 5000 }, (_, i) => ({ at: stamp(A + (i * 7919 % 5000) * 60) }));
+  list.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return performance.now() - start;
+};
+const practiceMoves = n => Array.from({ length: n }, (_, i) => move('u_lena', A + i * 6 * 7 * 86400 / n,
+  i % 3 === 0 ? 'food' : i % 3 === 1 ? 'table' : 'lounge', i % 3 === 1 ? 't01' : null));
+
+test('500 practice moves over six weeks schedule within 5 calibration units, scale with the move count, and leave the snapshot alone', t => {
+  const timed = n => {
+    const data = fixture(practiceMoves(n)), before = structuredClone(data), layout = room(data), start = performance.now();
+    practiceKitchenServices(data, layout);
+    const elapsed = performance.now() - start;
+    assert.deepEqual(data, before);
+    return elapsed;
+  };
+  const cold = timed(500), runs = { 500: [], 50: [], unit: [] };
+  for (let round = 0; round < 5; round++) {
+    runs[500].push(timed(500)); runs[50].push(timed(50)); runs.unit.push(calibrate());
+  }
+  const [moves500, moves50, unit] = [runs[500], runs[50], runs.unit].map(list => Math.min(...list));
+  t.diagnostic(`500 moves: ${moves500.toFixed(3)} ms warm (${cold.toFixed(3)} ms cold), 50 moves: ${moves50.toFixed(3)} ms, unit: ${unit.toFixed(3)} ms`);
+  assert.ok(moves500 < 5 * unit, `${(moves500 / unit).toFixed(2)} units`);
+  // Ten times the moves costs under 4x (idle ~1.8x): per-move work must stay near linear.
+  assert.ok(moves500 < 4 * moves50, `500/50 moves ratio ${(moves500 / moves50).toFixed(2)}`);
 });

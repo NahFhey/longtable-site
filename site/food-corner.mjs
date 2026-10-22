@@ -1,4 +1,4 @@
-import { FOOD_CORNER } from "./food-layout.mjs?v=44523bdb9315";
+import { FOOD_CORNER } from "./food-layout.mjs?v=2893649a76d7";
 
 const TILE = 16, STRIDE = 17, U = 32;
 export const DISHES = [[54,15],[56,16],[55,17],[55,13],[56,17],[56,13]];

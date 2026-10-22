@@ -1,16 +1,22 @@
-import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs";
+import { defaultRaidScene, raidHallCountdown, raidRoomLayout, createRaidStateMemo, raidTableLabel } from "./raid-model.mjs?v=e892f82c32b6";
+import { registerBossRenderer } from "./raid-boss.mjs?v=e2196281dd83";
+import { createRaidOverlay, createRaidRoom } from "./raid-room.mjs?v=20ec52437663";
+import { CURTAIN_RAID_MS, curtainFrame, shouldPlayRaidCurtain } from "./raid-curtain.mjs?v=18c4cf694a8f";
+import { stageGeometry, stagePath, stageQueuePeople, stageQueuePosition } from "./stage.mjs?v=d3a077633f77";
 import { setupHallMusic } from "./music.mjs?v=d1142140d771";
-import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=b95b61e41cd4";
+import { setupRaidPreview } from "./raid-preview.mjs?v=c93c94d30d75";
+import { createViewerClock, followNowClock, seekViewerClock, tickViewerClock, toggleViewerPlayback } from "./clock.mjs?v=6712902eec43";
 import { VIEW_PROFILES, atMinZoom, constrainCamera, decodeCameraMemory, encodeCameraMemory, fitBounds, insetViewport, mobileTarget, overviewFrame, panCamera, relevantTableIndices, screenToWorld, tableBounds, viewMode, wheelIntent, worldToScreen, zoomAt } from "./camera.mjs?v=d94bb0d105dc";
 import { DISCORD_INVITE, INFO_SPEECHES, WALL_PLAQUES, eventActions, setupFundraising, shortUrl } from "./event-config.mjs?v=e5ce603f951c";
 import { SPRITES, characterAppearance, staffAppearance } from "./characters.mjs?v=7e98c9c03b67";
-import * as foodCorner from "./food-corner.mjs?v=1ee6e05562ff";
-import { createLoungeDrawing } from "./lounge.mjs?v=6340aed8fa29";
-import { createStageDrawing } from "./stage-drawing.mjs?v=666f156be0b3";
+import { raidGear } from "./raid-gear.mjs?v=f7873beec9ce";
+import * as foodCorner from "./food-corner.mjs?v=8840cd5f65f1";
+import { createLoungeDrawing } from "./lounge.mjs?v=e7c2ebe54a4c";
+import { createStageDrawing } from "./stage-drawing.mjs?v=b8f9009935c5";
 import { loungeGeometry } from "./lounge-layout.mjs?v=57da6155641f";
 import { loungeRoute } from "./lounge-routing.mjs?v=282f30660235";
-import { cornerRoute } from "./food-routing.mjs?v=e52cc41290de";
-import { queueSpot } from "./food-layout.mjs?v=44523bdb9315";
+import { cornerRoute } from "./food-routing.mjs?v=9ab29475ba06";
+import { queueSpot } from "./food-layout.mjs?v=2893649a76d7";
 import {
   EVE_MS,
   CARETAKER_TILES_PER_SECOND,
@@ -53,7 +59,14 @@ import {
   validateTimeline,
   visibleVariant,
   wallFixtures,
-} from "./model.mjs?v=562e199f9c15";
+} from "./model.mjs?v=d234bf7c553d";
+
+export const raidStateFor = createRaidStateMemo();
+const thetaParam = new URLSearchParams(location.search).get("theta");
+const raidTheta = thetaParam !== null && thetaParam.trim() !== "" && Number.isFinite(Number(thetaParam)) ? Number(thetaParam) : undefined;
+// Stretch 1: the 3D boss loads only with ?boss3d=1, once, when the raid room first opens.
+const boss3dFlag = new URLSearchParams(location.search).get("boss3d") === "1";
+let boss3dRequested = false;
 
 const TILE = 16;
 const SCALE = 2;
@@ -139,6 +152,17 @@ const stageDrawing = createStageDrawing({ ctx: () => ctx, indoor: () => state.im
 
 const state = {
   data: null,
+  scene: "hall",
+  raid: null,
+  raidOverride: null,
+  raidDrawing: null,
+  raidOverlay: null,
+  raidPeople: new Set(),
+  raidCurtain: null,
+  raidPreviousTime: null,
+  raidCause: "seek",
+  tableRaidNodes: new Map(),
+  detailRaidNode: null,
   clock: null,
   time: 0,
   lastTime: 0,
@@ -159,6 +183,9 @@ const state = {
   manualSelection: false,   // a visitor picked (or cleared) the table; automatic framing leaves it alone
   hover: null,
   hoverName: null,  // the hovered person's name label, drawn after the plates
+  cardHoverId: null,
+  cardFocusId: null,
+  scrubberWindowKey: null,
   hoverTable: -1,   // index of the table under the mouse; it shows its name plate like the selected one
   layout: null,
   people: new Map(),
@@ -199,7 +226,7 @@ const state = {
   nowOverride: false,
   archive: document.documentElement?.dataset.source === "archive",
   sample: document.documentElement?.dataset.source !== "archive" && (
-    new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50"),
+    new URLSearchParams(location.search).get("sample") === "1" || new URLSearchParams(location.search).get("sample") === "50" || new URLSearchParams(location.search).get("sample") === "raid"),
   // `?kiosk=1` is a chrome flag for the projector: it never changes the clock mode, source, polling or data path.
   kiosk: new URLSearchParams(location.search).get("kiosk") === "1",
   wakeLock: null,
@@ -1432,7 +1459,7 @@ function drawTableLabels() {
   ctx.restore();
 }
 
-function drawPerson(runtime, now, active) {
+function drawPerson(runtime, now, active, gear = null) {
   const person = runtime.person;
   const place = runtime.place;
   let x = runtime.position.x - 0.5;
@@ -1471,6 +1498,10 @@ function drawPerson(runtime, now, active) {
     drawTile(state.images.characters, SPRITES.shirts[appearance.shirt], x, y, flip);
     drawTile(state.images.characters, SPRITES.hair[appearance.hair], x, y, flip);
     if (person.dm) drawTile(state.images.characters, SPRITES.hats[appearance.hat], x, y - 0.15, flip);
+    if (gear) {
+      if (gear.shield) drawTile(state.images.characters, gear.shield, x, y, flip);
+      drawTile(state.images.characters, gear.weapon, x, y, flip);
+    }
   }
   ctx.restore();
   if (loungeSeat) loungeDrawing.drawSeatFront(place.position.front);
@@ -1625,7 +1656,109 @@ function announcerForFrame() {
   return upcoming() ? null : stageAnnouncer(state.data, state.time, state.layout, reducedMotion.matches);
 }
 
+function endRaidCurtain() {
+  const interrupted = state.raidCurtain !== null;
+  state.raidCurtain = null;
+  canvas.removeAttribute("data-raid-curtain");
+  return interrupted;
+}
+
+function updateRaidScene(now = performance.now(), cause = state.raidCause) {
+  state.raid = raidStateFor(state.data, state.time);
+  const live = state.raid?.status === "live";
+  if (!live) state.raidOverride = null;
+  const scene = !state.kiosk && live && state.raidOverride ? state.raidOverride : defaultRaidScene(state.raid, state.time);
+  if (state.raidCurtain && (cause !== "tick" || reducedMotion.matches || scene !== state.scene
+    || state.time < state.raidPreviousTime || state.time - state.raidPreviousTime >= 1)) endRaidCurtain();
+  state.raidPeople = new Set(live ? raidRoomLayout(state.raid, state.data, state.time).people.map(person => person.id) : []);
+  if (shouldPlayRaidCurtain({ previousScene: state.scene, nextScene: scene,
+    previousTime: state.raidPreviousTime, nextTime: state.time, windowStart: state.data.raid?.window.start,
+    reducedMotion: reducedMotion.matches, cause })) {
+    const stage = state.layout.stage;
+    const geometry = { ...stageGeometry(state.layout), opening: {
+      x: stage.x + stage.w - 3.25, y: state.layout.stageFront.y - 3, w: 3, h: 6,
+    } };
+    const members = [...state.raidPeople].flatMap(id => {
+      const place = state.locations.get(id);
+      if (place?.kind !== "table") return [];
+      const seat = seatPosition(place.tableIndex, place.seat);
+      return [{ id, table: place.table.id, seat, approach: hallPathBetween(seat, geometry.foot) }];
+    });
+    state.raidCurtain = { startedAt: now, members, geometry };
+  }
+  state.raidPreviousTime = state.time;
+  state.raidCause = "tick";
+  if (scene !== state.scene) {
+    state.raidDrawing?.dispose(); state.raidDrawing = null;
+    state.scene = scene;
+    hideTooltip(); state.hoverTable = -1; state.labelBoxes = [];
+  }
+  // The page keeps the hall layout while the curtain sequence still draws the hall.
+  const shown = state.raidCurtain && now - state.raidCurtain.startedAt < CURTAIN_RAID_MS ? "hall" : scene;
+  if (canvas.getAttribute("data-scene") !== shown) {
+    $("camera-controls").hidden = shown === "raid";
+    $("camera-help").hidden = shown === "raid";
+    canvas.setAttribute("data-scene", shown);
+  }
+  const toggle = $("scene-toggle");
+  if (toggle) toggle.hidden = !live || state.kiosk;
+  for (const name of ["hall", "raid"]) $(`scene-${name}`)?.setAttribute("aria-pressed", String(scene === name));
+  const overlay = $("raid-overlay");
+  if (overlay) overlay.hidden = shown !== "raid";
+  if (scene === "raid") {
+    state.raidOverlay?.update(state.raid);
+    if (Number.isFinite(globalThis.innerWidth)) state.raidOverlay?.fitScreen({
+      width: globalThis.innerWidth, height: globalThis.innerHeight, kiosk: state.kiosk,
+      fundStrip: $("fundraising-strip").hidden ? 0 : $("fundraising-strip").getBoundingClientRect().height,
+      deskBar: document.querySelector?.(".masthead")?.getBoundingClientRect().height ?? 52.5,
+    }, { wrap: canvas.parentElement, canvas, controls: $("timeline-controls") });
+    if (boss3dFlag && !boss3dRequested) {
+      boss3dRequested = true;
+      // A boss renderer binds at creation, so rebuild the room once the module registers.
+      import(new URL("./raid-3d.mjs?v=15a3dab3bbc1", import.meta.url).href).then(module => {
+        registerBossRenderer(module.createBoss3D);
+        state.raidDrawing?.dispose(); state.raidDrawing = null;
+      }).catch(() => {});
+    }
+    state.raidDrawing ??= createRaidRoom({ ctx: () => ctx, sheet: () => state.images.rpg, indoor: () => state.images.indoor,
+      reducedMotion: reducedMotion.matches, slotMinutes: state.data.event.slot_minutes, theta: raidTheta,
+      drawPerson(person, now) {
+        const runtime = state.people.get(person.id);
+        if (runtime) drawPerson({ ...runtime, position: { x: person.x, y: person.y }, moving: false,
+          facing: person.x < 24 ? 1 : -1, place: { kind: "raid" } }, now, NO_ACTIVE, raidGear(runtime.person));
+      } });
+  }
+}
+for (const scene of ["hall", "raid"]) $(`scene-${scene}`)?.addEventListener("click", () => {
+  endRaidCurtain();
+  if (state.kiosk || state.raid?.status !== "live") return;
+  state.raidOverride = scene;
+  updateRaidScene(performance.now(), "toggle");
+});
+const raidPreview = setupRaidPreview({ canvas, music, getState: () => state,
+  sample: new URLSearchParams(location.search).get("sample") === "raid" });
+
+function drawRaidHallCountdown() {
+  const text = raidHallCountdown(state.data, state.time);
+  if (!text) return;
+  const point = worldToScreen(state.camera, { x: state.layout.stage.x + state.layout.stage.w / 2, y: state.layout.stage.y + 1 });
+  const dpr = globalThis.devicePixelRatio || 1;
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = "700 15px Georgia, serif";
+  const width = Math.min(state.viewport.width - 16, ctx.measureText(text).width + 18);
+  const x = clamp(point.x - width / 2, 8, state.viewport.width - width - 8), y = Math.max(8, point.y);
+  ctx.fillStyle = "#4a3524"; ctx.fillRect(x, y, width, 26);
+  ctx.strokeStyle = "#b89b5c"; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, width - 1, 25);
+  ctx.fillStyle = "#e9d9ae"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, x + width / 2, y + 13, width - 8); ctx.restore();
+}
+
 function render(now, active) {
+  updateRaidScene(now);
+  let curtain = state.raidCurtain && curtainFrame(now - state.raidCurtain.startedAt,
+    state.raidCurtain.members, state.raidCurtain.geometry);
+  if (curtain?.done) { endRaidCurtain(); curtain = null; }
+  if (curtain) canvas.setAttribute("data-raid-curtain", curtain.beat);
   const announcer = announcerForFrame();
   advanceInfoStaff(now, active, announcer);
   const gathering = gatheringScene();
@@ -1640,6 +1773,7 @@ function render(now, active) {
   updateFoodScene(now);
   updateDrawerInset(now);
   updateCamera(announcer);
+  raidPreview?.update();
   if (!ctx) return;
   const dpr = globalThis.devicePixelRatio || 1;
   const fullSize = canvasViewport();
@@ -1648,16 +1782,44 @@ function render(now, active) {
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, width, height);
+  if (state.scene === "raid" && (!curtain || curtain.beat === "raid")) {
+    state.raidDrawing.draw(state.raid, state.data, state.time, now, fullSize);
+    if (curtain) {
+      ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = `rgba(0, 0, 0, ${1 - curtain.raidAlpha})`;
+      ctx.fillRect(0, 0, fullSize.width, fullSize.height); ctx.restore();
+    }
+    return;
+  }
+  // Frame the entire walk, including the stage, without changing the viewer's camera.
+  const camera = state.camera;
+  try {
+    if (curtain) state.camera = overviewFrame(fullSize, hallBounds(), 0);
+    drawHall(now, active, announcer, gathering, curtain, fullSize);
+  } finally { state.camera = camera; }
+}
+
+function drawHall(now, active, announcer, gathering, curtain, fullSize) {
+  const dpr = globalThis.devicePixelRatio || 1;
   const scale = dpr * state.camera.zoom / (TILE * SCALE);
   ctx.setTransform(scale, 0, 0, scale, state.camera.x * dpr, state.camera.y * dpr);
   drawSurround();
   ctx.imageSmoothingEnabled = false;
   drawRoom();
+  if (curtain) stageDrawing.drawStageCurtain(curtain.curtain);
   drawTables();
   state.hoverName = null;
   state.foodPlates = [];
-  const drawables = [...state.people.values()].filter(person => person.visible && !person.entering)
+  const curtainIds = new Set(state.raidCurtain?.members.map(member => member.id));
+  const drawables = [...state.people.values()].filter(person => person.visible && !person.entering
+    && !state.raidPeople.has(person.person.id) && !curtainIds.has(person.person.id))
     .map(person => ({ y: !person.moving && person.place.kind === "lounge" ? person.place.position?.depth ?? person.position.y : person.position.y, draw: () => drawPerson(person, now, active) }));
+  for (const person of curtain?.people ?? []) {
+    const runtime = state.people.get(person.id);
+    if (runtime) drawables.push({ y: person.y, draw: () => drawPerson({ ...runtime,
+      position: { x: person.x, y: person.y }, moving: person.moving, facing: person.facing,
+      place: { kind: "raid-walk" } }, now, NO_ACTIVE) });
+  }
   drawables.push(...loungeDrawing.loungeDepthItems(state.layout, now, state.leisure));
   drawables.push(...foodCorner.foodDepthItems(state.layout, now, state.foodScene.count, state.clock.mode === "replay" || state.clock.mode === "follow-now"));
   const caretaker = caretakerForFrame();
@@ -1684,11 +1846,19 @@ function render(now, active) {
     ? Math.max(.85, state.ambience.lights) : state.ambience.lights;
   ctx.fillStyle = `rgba(4, 7, 20, ${(1 - lights) * .76})`;
   ctx.fillRect(0, 0, state.layout.width * TILE * SCALE, state.layout.height * TILE * SCALE);
+  ctx.save();
+  if (curtain) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = `rgba(0, 0, 0, ${curtain.dark})`;
+    ctx.fillRect(0, 0, fullSize.width, fullSize.height);
+  }
+  ctx.restore();
   if (caretaker && !caretakerInFood) drawStaff(caretaker);
   const lightSwitch = state.ambience.lightSwitch;
   ctx.fillStyle = lights > .5 ? "#fff3ac" : "#697a9d";
   ctx.fillRect((lightSwitch.x - .8) * TILE * SCALE, (lightSwitch.y - .7) * TILE * SCALE, 6, 10);
   drawTableLabels();
+  drawRaidHallCountdown();
   drawHoverName();
   drawEvents(active, now, announcer);
   state.infoBubble = null;
@@ -1713,6 +1883,7 @@ function renderDetail(focus = false) {
   panel.replaceChildren();
   state.detailPhaseNode = null;
   state.detailDiceNode = null;
+  state.detailRaidNode = null;
   const table = state.data.tables.find((candidate) => candidate.id === state.selectedId);
   if (!table) {
     append(panel, "h2", "Table details");
@@ -1725,6 +1896,7 @@ function renderDetail(focus = false) {
   append(panel, "p", view.system, "system");
   append(panel, "p", view.pitch);
   state.detailPhaseNode = append(panel, "p", phaseText(table), "table-phase");
+  if (state.data.raid) state.detailRaidNode = append(panel, "p", raidTableLabel(state.data, raidStateFor(state.data, state.time), table.id), "raid-membership");
   state.detailDiceNode = append(panel, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
   append(panel, "p", `DM ${view.dm}`);
   append(panel, "p", `${formatSlot(view.start, true)}–${formatSlot(view.end, true)} · ${view.signupCount}/${view.seats} signups${view.walkIns ? " · walk-ins welcome" : ""}`, "muted");
@@ -1767,10 +1939,50 @@ function drawerKeydown(event) {
   event.preventDefault();
 }
 
+// Pointer previews take precedence over card focus; focus remains a fallback on pointer leave.
+function updateScrubberWindows() {
+  if (!state.data) return;
+  const previewId = state.cardHoverId ?? state.data.tables[state.hoverTable]?.id ?? state.cardFocusId;
+  const key = JSON.stringify([state.selectedId, previewId]);
+  if (state.scrubberWindowKey === key) return;
+  state.scrubberWindowKey = key;
+  const selected = state.data.tables.find(table => table.id === state.selectedId);
+  const preview = state.data.tables.find(table => table.id === previewId);
+  const bars = $("scrubber-bars").children;
+  for (let slot = 0; slot < bars.length; slot += 1) {
+    bars[slot].className = selected && selected.start <= slot && slot < selected.end ? "selected"
+      : preview && preview.start <= slot && slot < preview.end ? "previewed" : "";
+  }
+}
+
+function rebuildScrubberBars() {
+  const { event, tables } = state.data;
+  $("timeline-track").setAttribute("data-empty", String(tables.length === 0));
+  const changes = new Array(event.slots + 1).fill(0);
+  for (const table of tables) { changes[table.start] += 1; changes[table.end] -= 1; }
+  let running = 0, peak = 0;
+  const counts = changes.slice(0, event.slots).map(change => {
+    running += change;
+    peak = Math.max(peak, running);
+    return running;
+  });
+  const host = $("scrubber-bars");
+  host.replaceChildren();
+  for (const count of counts) {
+    const bar = document.createElement("span");
+    bar.style.height = `${count / Math.max(peak, 4) * 100}%`;
+    bar.style.minHeight = count > 0 ? "2px" : "0px";
+    host.append(bar);
+  }
+  state.scrubberWindowKey = null;
+  updateScrubberWindows();
+}
+
 // Selecting shows the details; only a double click in the hall (or the table list) also zooms to the table.
 function selectTable(id, focus = false, zoom = false) {
   state.selectedId = id;
   state.manualSelection = true;
+  updateScrubberWindows();
   const index = state.data.tables.findIndex((table) => table.id === id);
   if (zoom && index >= 0) frameTables([index], true);
   // Reveal the heading before renderDetail tries to focus it from the table list.
@@ -1788,22 +2000,31 @@ function renderAttendees() {
   // The validated people collection has one record per person, even across roles.
   const people = [...state.data.people].sort((a, b) => displayName(a).localeCompare(displayName(b)));
   $("attendees-heading").textContent = `Attendees (${people.length})`;
+  const groups = new Map([["DMs", []], ["Players", []], ["Visitors", []], ["Attendees", []]]);
   for (const person of people) {
-    const row = append(list, "li");
-    append(row, "span", displayName(person));
-    if (person.hidden) continue;
-    const role = person.dm || dms.has(person.id) ? "DM"
-      : players.has(person.id) ? "Player"
-      : visitors.has(person.id) ? "Visitor" : "Attendee";
-    append(row, "span", role, "attendee-role");
+    // Privacy takes precedence over every role, including table ownership.
+    const role = person.hidden ? "Attendees" : person.dm || dms.has(person.id) ? "DMs"
+      : players.has(person.id) ? "Players"
+      : visitors.has(person.id) ? "Visitors" : "Attendees";
+    groups.get(role).push(person);
   }
-  if (!people.length) append(list, "li", "No attendees yet.", "muted");
+  for (const [role, members] of groups) {
+    if (!members.length) continue;
+    const column = append(list, "section", undefined, "attendee-column");
+    const heading = append(column, "h3", `${role} (${members.length})`, "attendee-role");
+    heading.id = `attendees-${role.toLowerCase()}-heading`;
+    const roster = append(column, "ul");
+    roster.setAttribute("aria-labelledby", heading.id);
+    for (const person of members) append(append(roster, "li"), "span", displayName(person));
+  }
+  if (!people.length) append(list, "p", "No attendees yet.", "muted");
 }
 
 function renderTableList() {
   const host = $("tables");
   host.replaceChildren();
   state.tablePhaseNodes.clear();
+  state.tableRaidNodes.clear();
   state.tableDiceNodes.clear();
   renderAttendees();
   if (state.data.tables.length === 0) { append(host, "p", "No tables have been posted.", "muted"); return; }
@@ -1811,6 +2032,14 @@ function renderTableList() {
   for (const table of state.data.tables) {
     const view = tableView(state.data, table);
     const article = append(grid, "article", undefined, "table-card");
+    article.addEventListener("mouseenter", () => { state.cardHoverId = table.id; updateScrubberWindows(); });
+    article.addEventListener("mouseleave", () => { if (state.cardHoverId === table.id) state.cardHoverId = null; updateScrubberWindows(); });
+    article.addEventListener("focusin", () => { state.cardFocusId = table.id; updateScrubberWindows(); });
+    article.addEventListener("focusout", (event) => {
+      if (article.contains(event.relatedTarget)) return;
+      if (state.cardFocusId === table.id) state.cardFocusId = null;
+      updateScrubberWindows();
+    });
     const heading = append(article, "h3");
     const button = append(heading, "button", view.name);
     button.type = "button";
@@ -1818,6 +2047,7 @@ function renderTableList() {
     button.addEventListener("click", () => selectTable(table.id, true, true));
     append(article, "p", `${view.system} — ${view.pitch}`);
     state.tablePhaseNodes.set(table.id, append(article, "p", phaseText(table), "table-phase"));
+    if (state.data.raid) state.tableRaidNodes.set(table.id, append(article, "p", raidTableLabel(state.data, raidStateFor(state.data, state.time), table.id), "raid-membership"));
     const diceNode = append(article, "p", diceText(state.data, diceAt(state.data, table.id, state.time)?.event), "dice-result");
     diceNode.setAttribute("aria-live", "polite");
     diceNode.setAttribute("aria-atomic", "true");
@@ -1869,6 +2099,7 @@ function updateHeader(active) {
   eventText = eventText.trim();
   if ($("current-event").textContent !== eventText) $("current-event").textContent = eventText;
   $("scrubber").value = String(state.time);
+  updateScrubberWindows();
   const following = state.clock.mode === "follow-now";
   $("play").textContent = state.clock.mode === "paused" || upcomingNow ? "Play" : "Pause";
   $("play").disabled = false;
@@ -1879,12 +2110,25 @@ function updateHeader(active) {
   // Before doors, now lies outside the scrubber's range, so the marker would mislead.
   const nowInRange = canFollow && !upcomingNow && !beforeDoors();
   $("now-marker").hidden = !nowInRange;
+  $("now-tick").hidden = !nowInRange || following;
+  if (nowInRange && !following) {
+    const slot = (wallNow() - start) / (state.data.event.slot_minutes * 60000);
+    const fraction = clamp(slot / state.data.event.slots, 0, 1);
+    $("now-tick").style.left = `calc(${fraction * 100}% + ${5 - fraction * 10}px)`;
+  }
   if (nowInRange) $("now-marker").textContent = `Now: ${formatDate(wallNow(), { hour: "numeric", minute: "2-digit" })}`;
   const badge = $("mode-badge");
   badge.textContent = upcomingNow ? "UPCOMING" : following ? (state.time >= state.data.event.slots ? "EVENT ENDED" : "LIVE") : state.clock.mode === "paused" ? "PAUSED" : "REPLAY";
   badge.className = `badge${following ? " live" : ""}`;
   if (badge.hidden !== upcomingNow) badge.hidden = upcomingNow;
   for (const table of state.data.tables) {
+    const label = raidTableLabel(state.data, state.raid, table.id);
+    const raidNode = state.tableRaidNodes.get(table.id);
+    if (raidNode) { raidNode.hidden = !label; if (raidNode.textContent !== label) raidNode.textContent = label; }
+    if (state.selectedId === table.id && state.detailRaidNode) {
+      state.detailRaidNode.hidden = !label;
+      if (state.detailRaidNode.textContent !== label) state.detailRaidNode.textContent = label;
+    }
     const text = phaseText(table);
     const result = diceText(state.data, diceAt(state.data, table.id, state.time)?.event);
     const diceNode = state.tableDiceNodes.get(table.id);
@@ -1921,11 +2165,14 @@ function clearSpeech() {
   if (state.live) state.live = { ...state.live, speechQueue: [] };
 }
 
-function setClock(clock, persistNow = true, snap = true) {
+function setClock(clock, persistNow = true, snap = true, cause = "seek") {
+  const interrupted = cause === "seek" && endRaidCurtain();
+  // A Play click before the next frame must not turn a pending seek into a tick.
+  if (cause !== "tick") state.raidCause = cause;
   state.clock = clock;
   state.time = clock.slot;
-  state.snap = snap;
-  if (snap) foodCorner.resetDishes();
+  state.snap = snap || interrupted;
+  if (state.snap) foodCorner.resetDishes();
   clearSpeech();
   persistClockSelection(performance.now(), persistNow);
 }
@@ -2012,6 +2259,7 @@ async function readTimeline(url, livePoll = false) {
 
 async function fetchTimeline() {
   if (state.archive || state.sample) {
+    if (!state.archive && new URLSearchParams(location.search).get("sample") === "raid") return readTimeline("./data/timeline.raid.sample.json");
     if (!state.archive && new URLSearchParams(location.search).get("sample") === "50") return readTimeline("./data/timeline.demo-50.json");
     return readTimeline(state.archive ? "./timeline.json" : "./data/timeline.sample.json");
   }
@@ -2062,7 +2310,14 @@ function updateSyncStatus() {
 }
 
 function installTimeline(data, initial = false) {
+  state.raidDrawing?.dispose(); state.raidDrawing = null;
   state.data = data;
+  state.raid = raidStateFor(data, state.time);
+  if ($("raid-overlay")) {
+    state.raidOverlay = data.raid ? createRaidOverlay($("raid-overlay"), data) : null;
+    $("raid-overlay").hidden = true;
+  }
+  canvas.setAttribute("data-scene", state.scene);
   if (initial && !state.sample && !state.archive) setupFundraising({
     strip: $("fundraising-strip"), total: $("fundraising-total"), fill: $("thermometer-fill"),
     thermometer: $("thermometer"),
@@ -2121,6 +2376,9 @@ function installTimeline(data, initial = false) {
     state.selectedId = null;
     if (state.drawer === "detail") setDrawer(null);
   }
+  state.cardHoverId = state.cardFocusId = null;
+  state.hoverTable = -1;
+  rebuildScrubberBars();
   renderTableList();
   renderDetail();
   if (initial) state.time = 0;
@@ -2281,19 +2539,19 @@ function gesturePosition() {
   return { center: { x: points.reduce((n, p) => n + p.x, 0) / points.length, y: points.reduce((n, p) => n + p.y, 0) / points.length }, distance: points.length > 1 ? Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) : 0 };
 }
 function moveCamera(dx, dy) {
-  if (!state.camera) return;
+  if (!state.camera || state.scene === "raid") return;
   state.camera = panCamera(state.camera, dx, dy, viewport(), hallBounds());
   state.manualCamera = true;
   hideTooltip();
 }
 function zoomCamera(factor, point = { x: viewport().width / 2, y: viewport().height / 2 }) {
-  if (!state.camera) return;
+  if (!state.camera || state.scene === "raid") return;
   state.camera = zoomAt(state.camera, point, factor, viewport(), hallBounds());
   state.manualCamera = true;
   hideTooltip();
 }
 canvas.addEventListener("pointerdown", (event) => {
-  if (!state.camera || (event.button !== undefined && event.button !== 0)) return;
+  if (state.scene === "raid" || !state.camera || (event.button !== undefined && event.button !== 0)) return;
   if (!pointers.size) suppressClick = false;
   pointers.set(event.pointerId, pointerPoint(event));
   canvas.setPointerCapture(event.pointerId);
@@ -2302,7 +2560,7 @@ canvas.addEventListener("pointerdown", (event) => {
   hideTooltip();
 });
 canvas.addEventListener("pointermove", (event) => {
-  if (!state.camera) return;
+  if (!state.camera || state.scene === "raid") return;
   if (pointers.has(event.pointerId)) {
     pointers.set(event.pointerId, pointerPoint(event));
     const next = gesturePosition();
@@ -2320,12 +2578,13 @@ canvas.addEventListener("pointermove", (event) => {
   let best = null;
   let distance = .72;
   for (const runtime of state.people.values()) {
-    if (!runtime.visible) continue;
+    if (!runtime.visible || state.raidPeople.has(runtime.person.id)) continue;
     const candidate = Math.hypot(runtime.position.x - point.x, runtime.position.y - point.y + .1);
     if (candidate < distance) { best = runtime; distance = candidate; }
   }
   state.hover = best;
   state.hoverTable = tableAt(point);
+  updateScrubberWindows();
   const onJukebox = overJukebox(point);
   const onInfo = !infoRunning() && overInfoStaff(point);
   const onSpeech = overInfoBubble(pointerPoint(event)) || (state.infoVisit?.phase === "speaking" && overInfoStaff(point));
@@ -2348,9 +2607,9 @@ function finishPointer(event) {
 canvas.addEventListener("pointerup", finishPointer);
 canvas.addEventListener("pointercancel", (event) => { suppressClick = true; finishPointer(event); });
 canvas.addEventListener("lostpointercapture", finishPointer);
-canvas.addEventListener("pointerleave", () => { hideTooltip(); state.hoverTable = -1; setCursor(""); });
+canvas.addEventListener("pointerleave", () => { hideTooltip(); state.hoverTable = -1; updateScrubberWindows(); setCursor(""); });
 canvas.addEventListener("click", (event) => {
-  if (!state.camera || suppressClick) return;
+  if (state.scene === "raid" || !state.camera || suppressClick) return;
   const point = canvasPoint(event);
   const screen = pointerPoint(event);
   if (overInfoBubble(screen)) { clickInfoStaff(); return; }
@@ -2368,7 +2627,7 @@ canvas.addEventListener("click", (event) => {
   else selectTable(table && table.id !== state.selectedId ? table.id : null);
 });
 canvas.addEventListener("wheel", (event) => {
-  if (!state.camera) return;
+  if (!state.camera || state.scene === "raid") return;
   const at = event.timeStamp ?? performance.now();
   const intent = wheelIntent({ deltaY: event.deltaY, ctrlKey: event.ctrlKey, atMinimum: atMinZoom(state.camera, viewport(), hallBounds()),
     scrollY: globalThis.scrollY || 0, previous: lastWheel?.intent, sincePrevious: at - (lastWheel?.at ?? -Infinity) });
@@ -2418,6 +2677,7 @@ $("camera-controls").addEventListener("keydown", (event) => {
 $("drawer-close").addEventListener("click", closeDrawer);
 $("hall-sidebar").addEventListener("keydown", drawerKeydown);
 canvas.addEventListener("keydown", (event) => {
+  if (state.scene === "raid") return;
   drawerKeydown(event);
   const keys = { ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60] };
   if (keys[event.key]) { dismissCameraHelp(); event.preventDefault(); moveCamera(...keys[event.key]); }
@@ -2432,7 +2692,8 @@ $("play").addEventListener("click", () => {
   if (!state.data) return;
   const next = toggleViewerPlayback(state.clock, state.data);
   // Leaving the gathering for the preview snaps, so nobody watches the hall re-seat itself.
-  setClock(next, true, next.slot !== state.clock.slot || state.clock.mode === "upcoming");
+  const jumped = next.slot !== state.clock.slot || state.clock.mode === "upcoming";
+  setClock(next, true, jumped, jumped ? "seek" : "tick");
   state.lastTime = performance.now();
 });
 $("return-now").addEventListener("click", () => {
@@ -2456,6 +2717,8 @@ globalThis.addEventListener?.("pagehide", () => {
 });
 
 reducedMotion.addEventListener?.("change", () => {
+  endRaidCurtain();
+  state.raidDrawing?.dispose(); state.raidDrawing = null;
   if (state.clock?.mode === "replay" && reducedMotion.matches) setClock(seekViewerClock(state.clock, state.data, state.time));
   state.snap = true;
 });

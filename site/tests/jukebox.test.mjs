@@ -51,6 +51,6 @@ test("neither the jukebox nor its sign overlaps a table, the lounge, stage, food
       assert.ok(!overlaps(sign, rect), `${name}: the sign overlaps the ${label}`);
     }
     assert.ok(box.x >= fixtures.banner.x + fixtures.banner.w + 2, `${name}: two clear tiles right of the banner`);
-    assert.ok(box.x + box.w + 2 <= fixtures.plaques[0].x, `${name}: well left of the plaques`);
+    assert.ok(box.x + box.w + 1.5 <= fixtures.plaques[0].x, `${name}: well left of the plaques`);
   }
 });

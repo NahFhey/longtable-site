@@ -5,6 +5,7 @@
   --panel: #1c2925;
   --panel-2: #273731;
   --line: #3b4b40;
+  --bar: #55685b;
   --gold: #dfba76;
   --raised: #d9604c;
   --fund-strip: 2.75rem;
@@ -108,7 +109,24 @@ html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 
 .timeline-head .controls label { margin-left: .25rem; }
 .timeline-head .controls button, .timeline-head .controls select { min-height: 2rem; padding: .15rem .7rem; }
 @media (pointer: coarse) { .timeline-head .controls button, .timeline-head .controls select { min-height: 44px; } }
-#scrubber { display: block; width: 100%; margin: .7rem 0; accent-color: var(--gold); }
+.timeline-track { position: relative; min-width: 0; margin: .7rem 0; }
+.scrubber-bars { position: absolute; inset-inline: 5px; top: 50%; height: 18px; transform: translateY(-50%); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; pointer-events: none; }
+.scrubber-bars::after { content: ""; position: absolute; top: 100%; width: 100%; height: 1.5px; background: var(--line); }
+.scrubber-bars > span { margin-right: 1px; background: var(--bar); }
+.scrubber-bars > span:last-child { margin-right: 0; }
+.scrubber-bars > .previewed { background: var(--focus); }
+.scrubber-bars > .selected { background: var(--gold); }
+.now-tick { position: absolute; top: 50%; width: 1px; height: 18px; transform: translate(-50%, -50%); background: var(--muted); pointer-events: none; }
+#scrubber { position: relative; display: block; appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; background: transparent; cursor: pointer; }
+#scrubber:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#scrubber::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+#scrubber::-moz-range-track, #scrubber::-moz-range-progress { height: 24px; background: transparent; }
+/* The transparent 10px thumb aligns native travel with the 5px bar insets. */
+#scrubber::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 10px; height: 24px; border: 0; border-radius: 0; background: linear-gradient(var(--ink), var(--ink)) center top / 6px 2px no-repeat, linear-gradient(to right, transparent 3px, #111d17 3px, #111d17 4px, var(--ink) 4px, var(--ink) 6px, #111d17 6px, #111d17 7px, transparent 7px); }
+#scrubber::-moz-range-thumb { width: 10px; height: 24px; border: 0; border-radius: 0; background: linear-gradient(var(--ink), var(--ink)) center top / 6px 2px no-repeat, linear-gradient(to right, transparent 3px, #111d17 3px, #111d17 4px, var(--ink) 4px, var(--ink) 6px, #111d17 6px, #111d17 7px, transparent 7px); }
+#scrubber:disabled::-webkit-slider-thumb, #timeline-track[data-empty="true"] #scrubber::-webkit-slider-thumb { background: none; }
+#scrubber:disabled::-moz-range-thumb, #timeline-track[data-empty="true"] #scrubber::-moz-range-thumb { background: none; }
+@media (pointer: coarse) { #scrubber { height: 44px; } }
 .timeline-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem 1rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
 #now-marker { color: var(--gold); }
 /* The jukebox player floats over the scene beside the drawn jukebox; app.mjs anchors it each frame while open. */
@@ -166,9 +184,11 @@ html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 
 .roster { margin: .4rem 0 0; padding-left: 1.25rem; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
 .attendees-card { margin-bottom: 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); }
 .attendees-card summary { padding: .8rem 1.1rem; color: var(--gold); font-weight: 650; }
-.attendee-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: .45rem 1.5rem; list-style: none; margin: 0; padding: .2rem 1.1rem 1rem; max-height: 16rem; overflow-y: auto; }
-.attendee-list li { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
-.attendee-role { flex-shrink: 0; color: var(--muted); font-size: .72rem; }
+.attendee-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: .45rem 1.5rem; margin: 0; padding: .2rem 1.1rem 1rem; max-height: 16rem; overflow-y: auto; }
+.attendee-column { min-width: 0; }
+.attendee-column ul { list-style: none; padding: 0; margin: .45rem 0 0; }
+.attendee-list li { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
+.attendee-role { margin: 0; font-weight: 650; color: var(--muted); font-size: .72rem; }
 .activity-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.1rem; }
 .activity-panel h2 { margin: 0 0 .4rem; font: 650 .9rem system-ui, sans-serif; }
 #activity-note, #activity-empty { margin: .4rem 0; color: var(--muted); font-size: .7rem; }
@@ -294,7 +314,7 @@ footer p { margin: .3rem 0; }
   html:not([data-kiosk]):has(#hall-content) #camera-help { grid-area: 1 / 1; align-self: end; justify-self: end; z-index: 1; margin: .5rem; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
   html:not([data-kiosk]):has(#hall-content) .jukebox-key:focus { grid-area: 1 / 1; align-self: start; justify-self: start; z-index: 1; margin: .5rem; }
   html:not([data-kiosk]):has(#hall-content) .timeline-controls { grid-row: 2; margin-top: .6rem; padding: .45rem .85rem; }
-  html:not([data-kiosk]):has(#hall-content) #scrubber { margin: .35rem 0; }
+  html[data-view="desktop"] #hall-content #timeline-track { margin: .35rem 0; }
   html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
 }
 /* View controls follow the camera mode, including phones held sideways. */
@@ -326,7 +346,7 @@ html[data-view="desktop"] #camera-controls button:not(#camera-toggle):not(#zoom-
   html[data-view="desktop"] .timeline-head > label { order: 1; white-space: nowrap; }
   html[data-view="desktop"] #clock { order: 2; }
   html[data-view="desktop"] #start-label { order: 3; white-space: nowrap; }
-  html[data-view="desktop"] #hall-content #scrubber { order: 4; flex: 1 1 auto; min-width: 8rem; margin: 0; }
+  html[data-view="desktop"] #hall-content #timeline-track { order: 4; flex: 1 1 auto; min-width: 8rem; margin: 0; }
   html[data-view="desktop"] #end-label { order: 5; white-space: nowrap; }
   html[data-view="desktop"] #now-marker { order: 6; white-space: nowrap; }
   html[data-view="desktop"] .timeline-head .controls { order: 7; margin-left: 0; }
@@ -433,4 +453,145 @@ html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
   html[data-kiosk] .kiosk-code p { margin: .5rem 0 0; overflow-wrap: anywhere; }
   html[data-kiosk] .kiosk-code-label { color: #e9d9ae; font-size: 1.2rem; }
   html[data-kiosk] .kiosk-code-url { color: var(--muted); font-size: .95rem; }
+}
+
+/* Phone panels stack below the room; desktop boxes come from raidScreenLayout. */
+.scene-toggle { display: flex; gap: .25rem; order: 7; }
+.raid-preview-open {
+  position: absolute; z-index: 3; transform: translate(-50%, -50%);
+  display: grid; justify-items: center; min-width: 44px; min-height: 44px;
+  padding: 4px 8px; border: 2px solid var(--gold); border-radius: 0;
+  background: var(--panel); color: var(--gold); font: 700 13px/18px ui-monospace, monospace;
+}
+.raid-preview-label { color: var(--ink); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.raid-preview-arrow { animation: raid-preview-bob 1.2s steps(2, end) infinite; }
+@keyframes raid-preview-bob { 50% { transform: translateY(3px); } }
+.raid-preview {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+  padding: 12px; background: color-mix(in srgb, var(--panel) 85%, transparent);
+}
+.raid-preview-frame {
+  position: relative; width: min(960px, 100%, calc((100dvh - 24px) * 16 / 9));
+  border: 2px solid var(--gold); border-radius: 0; background: var(--panel);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--panel) 80%, transparent);
+}
+#raid-preview-video { display: block; width: 100%; aspect-ratio: 16 / 9; }
+.raid-preview-controls { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; }
+.raid-preview-controls button {
+  min-width: 44px; min-height: 44px; padding: 4px 8px; border: 2px solid var(--gold); border-radius: 0;
+  background: var(--panel); color: var(--ink); font: 700 13px/18px ui-monospace, monospace;
+}
+#raid-preview-status { position: absolute; bottom: 0; margin: 0; padding: 8px; background: var(--panel); color: var(--ink); }
+#raid-preview-status:empty { display: none; }
+@media (max-width: 650px) { .raid-preview { padding-inline: 0; } }
+@media (prefers-reduced-motion: reduce) { .raid-preview-arrow { animation: none; } }
+.scene-toggle button { min-height: 2rem; padding: .15rem .6rem; }
+.scene-toggle button[aria-pressed="true"] { color: var(--ink); background: var(--live); }
+.raid-overlay { pointer-events: none; font-size: 16px; line-height: 20px; min-width: 0; }
+.raid-legs, .raid-checklist, .raid-board { background: var(--panel); border: 1px solid var(--line); border-radius: .35rem; padding: 8px; pointer-events: auto; min-width: 0; min-height: 0; }
+.raid-legs { display: grid; grid-template-rows: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.raid-leg { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 20px 20px 6px; gap: 2px 4px; align-content: center; }
+.raid-leg strong { grid-column: 1 / -1; }
+.raid-leg strong, .raid-holder { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.raid-holder { grid-row: 2; grid-column: 1; }
+.raid-hp { grid-row: 2; grid-column: 2; font-variant-numeric: tabular-nums; }
+.raid-leg[data-broken="true"] { color: var(--muted); }
+.raid-overlay progress { display: block; width: 100%; height: 6px; margin: 0; accent-color: var(--gold); }
+.raid-leg progress { grid-row: 3; grid-column: 1 / -1; }
+.raid-center { height: 248px; min-width: 0; text-align: center; align-self: start; }
+.raid-title { font-size: 20px; line-height: 24px; margin: 0 0 8px; }
+.raid-king { margin-bottom: 8px; }
+.raid-timer { display: grid; }
+.raid-countdown { font-size: 28px; line-height: 36px; font-variant-numeric: tabular-nums; color: var(--gold); }
+.raid-banner { margin: 8px 0 0; }
+.raid-result { margin: 8px 0; padding: 8px; background: var(--panel-2); color: var(--gold); font-size: 24px; line-height: 28px; border-radius: .35rem; }
+.raid-checklist h3, .raid-board h3 { margin: 0 0 6px; font-size: 18px; line-height: 24px; }
+.raid-checklist ul { margin: 0; padding: 0; list-style: none; }
+.raid-checklist li { margin: 0; }
+.raid-checklist [data-done="true"] { color: var(--gold); }
+.raid-board table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: inherit; line-height: 20px; }
+.raid-board th, .raid-board td { padding: 4px 2px; text-align: right; font-variant-numeric: tabular-nums; }
+.raid-board thead th { vertical-align: bottom; font-size: 14px; line-height: 18px; }
+.raid-board th:first-child { width: 36%; text-align: left; }
+.raid-board tbody th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.raid-membership { color: var(--gold); }
+/* fitScreen applies raidScreenLayout's measured viewport boxes. The canvas is
+   exactly the world's aspect; its header and controls occupy reserved empty bands. */
+@media (min-width: 900px) {
+  html:has(#hall[data-scene="raid"]) body { overflow: hidden; }
+  html:has(#hall[data-scene="raid"]) .scene-wrap {
+    position: fixed; z-index: 2; background: #121d19; inset: auto;
+    left: var(--raid-x); top: var(--raid-y); width: var(--raid-w); height: var(--raid-h); display: block;
+  }
+  html:has(#hall[data-scene="raid"]) #hall,
+  html:has(#hall[data-scene="raid"]) #timeline-controls,
+  .raid-overlay > * {
+    position: absolute; left: var(--raid-x); top: var(--raid-y); width: var(--raid-w); height: var(--raid-h); margin: 0;
+  }
+  html:has(#hall[data-scene="raid"]) #hall { min-height: 0; max-height: none; aspect-ratio: auto; border: 0; }
+  html:has(#hall[data-scene="raid"]) #timeline-controls { overflow: hidden; }
+  .raid-overlay { position: absolute; inset: 0; display: block; }
+  .raid-legs { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px 8px; }
+  .raid-leg { grid-template-rows: 18px 18px 4px; }
+  .raid-leg progress { height: 4px; }
+  .raid-center { padding: 8px; display: grid; grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: 28px 48px; gap: 4px 12px; text-align: left; }
+  .raid-title { grid-area: 1 / 1; margin: 0; font-size: 18px; line-height: 24px; }
+  .raid-king { grid-area: 1 / 2; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) 100px; align-items: center; gap: 8px; }
+  .raid-timer { grid-area: 2 / 1; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 28px 20px; align-items: center; }
+  .raid-countdown { font-size: 24px; line-height: 28px; }
+  .raid-pushes { grid-column: 1 / -1; }
+  .raid-banner { grid-area: 2 / 2; margin: 0; }
+  .raid-result { grid-area: 1 / 1; padding: 0; margin: 0; font-size: 24px; line-height: 28px; }
+  .raid-center:has(.raid-result:not([hidden])) .raid-title { display: none; }
+  .raid-checklist, .raid-board { overflow: auto; }
+  .raid-checklist h3, .raid-board h3 { font-size: 18px; line-height: 22px; margin-bottom: 4px; }
+  .raid-board th, .raid-board td { padding: 2px; }
+}
+@media (max-width: 899px) {
+  html:has(#hall[data-scene="raid"]) #hall-content { padding: 0; }
+  html:has(#hall[data-scene="raid"]) .hall-layout { padding: 0; }
+  html:has(#hall[data-scene="raid"]) .scene-wrap { display: block; height: auto; }
+  html:has(#hall[data-scene="raid"]) #hall { width: 100%; margin: 0; height: auto; aspect-ratio: 64 / 50; min-height: 0; max-height: none; }
+  .raid-overlay { position: static; display: grid; gap: 12px; padding: 0 12px; margin-top: 12px; }
+  .raid-center { grid-row: 1; height: 208px; }
+  .raid-legs { grid-row: 2; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, 76px); gap: 8px; }
+  .raid-leg { grid-template-rows: 40px 20px 6px; }
+  .raid-leg strong { white-space: normal; overflow-wrap: anywhere; }
+  .raid-hp, .raid-holder { font-size: 13px; }
+  .raid-checklist { grid-row: 3; height: 248px; }
+  .raid-board { grid-row: 4; min-height: 364px; }
+  .raid-board table { font-size: 14px; }
+  .raid-board thead th { font-size: 12px; line-height: 16px; }
+  .raid-board th:first-child { width: 28%; }
+}
+html[data-kiosk]:has(#hall[data-scene="raid"]) body { display: block; padding: 0; }
+html[data-kiosk]:has(#hall[data-scene="raid"]) #hall-content { width: 100vw; height: 100vh; margin: 0; padding: 0; }
+html[data-kiosk]:has(#hall[data-scene="raid"]) #hall { width: 100%; height: 100vh; }
+html[data-kiosk]:has(#hall[data-scene="raid"]) #kiosk-info,
+html[data-kiosk]:has(#hall[data-scene="raid"]) #kiosk-codes { display: none; }
+
+/* Raid-only overrides leave the hall kiosk's columns and sizing intact. */
+@media (min-width: 900px) {
+  html[data-kiosk]:has(#hall[data-scene="raid"]) .scene-wrap {
+    --raid-columns: 320px minmax(0, 1fr) 640px;
+    inset: 12px; grid-template-rows: 248px minmax(0, 1fr);
+  }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) #raid-overlay { inset: 0; }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) #hall { grid-area: 2 / 2; height: 100%; }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) .raid-board thead th { font-size: 16px; line-height: 20px; }
+}
+
+/* Narrow desktop raid frames drop the range labels so the speed control is not clipped. */
+@media (min-width: 900px) and (max-width: 1399px) {
+  html:has(#hall[data-scene="raid"]) #start-label, html:has(#hall[data-scene="raid"]) #end-label { display: none; }
+}
+
+/* Preserve the preceding kiosk rules verbatim; only this raid framing changes. */
+@media (min-width: 900px) {
+  html[data-kiosk]:has(#hall[data-scene="raid"]) .scene-wrap {
+    inset: auto; left: var(--raid-x); top: var(--raid-y); width: var(--raid-w); height: var(--raid-h); display: block;
+  }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) #hall { width: var(--raid-w); height: var(--raid-h); }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) .raid-leg { grid-template-rows: 20px 20px 6px; }
+  html[data-kiosk]:has(#hall[data-scene="raid"]) .raid-leg progress { height: 6px; }
 }

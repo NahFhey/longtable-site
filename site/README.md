@@ -90,10 +90,11 @@ when a table is picked. The **Activity** button under the map opens the log in
 the same drawer. At phone widths, **The Great Hall** stays open above the status,
 camera help, timeline, and table list; the drawer stays over the canvas.
 
-The collapsible attendee list shows every published person once; DM takes
-precedence over Player and Visitor when roles overlap. Hidden attendees remain
-`someone` without a role label. This list represents event registration, not
-current presence in the hall.
+The collapsible attendee list shows every published person once, in DMs,
+Players, Visitors and Attendees columns; empty roles are omitted. DM takes
+precedence over Player and Visitor when roles overlap. Hidden attendees are
+listed under Attendees as `someone`, so their role is never revealed. This list
+represents event registration, not current presence in the hall.
 
 Mobile replay starts paused. Selecting a card leaves its full details
 available even while the hall is collapsed. Null or throwing canvas contexts do
@@ -419,6 +420,14 @@ after the first direct canvas pan or zoom, remaining available to screen readers
 until reload. The phone status strip prefixes regular messages with “Hosted by”
 and the host name when one is supplied.
 
+The timeline histogram shows tables running per slot: bar height is the count
+divided by the event’s peak count, with a floor of 4 for that divisor. Nonzero
+bars are at least 2px tall. Gold highlights the selected table’s window; teal
+previews a table hovered in its card or the hall, or focused inside its card.
+Gold wins where the windows overlap. A muted now tick appears beside Return to
+Now while viewing another time during a live event. Touch devices get a 44px
+drag band around the same 18px bars.
+
 ### Testing deployment and later launch
 
 HTTPS was repaired on September 18 with organizer approval. Public DNS already
@@ -714,3 +723,52 @@ omit the Extra Life brand text; kiosks enlarge the total and hide the header
 actions. Wide kiosks stack the total above the thermometer in the left column
 and provide large QR cards in the right column; narrow kiosks retain the strip. Samples and archived replays do not fetch or
 show the strip.
+
+## Raid room
+
+Use `?sample=raid&at=40` for the schema-8 preview. Selected time chooses the
+raid room while the raid is live. A logged end keeps the result card visible
+for exactly one slot, `[end.at, end.at + 1)`, then returns to the hall. A window
+closing without an end returns directly to the hall. During live play the Hall/Raid
+buttons beside the mode badge select a room until you leave the live window;
+kiosk always follows the default. Table attendance and the hall's location resolver
+choose the people who move to the raid room. Everyone else remains in the hall.
+
+Small forward ticks across the raid window start play a six-second curtain sequence:
+the stage panels open, seated member parties walk through in table order, the hall
+fades to black, and the raid room fades in. It uses wall-clock time at every replay
+speed, including kiosk, while the selected time still drives the raid and overlay.
+Seeks, room toggles, jumps of at least one slot, loading inside the window and
+reduced motion switch instantly. A seek, toggle or scene change discards the drawing
+overrides; hall lights, sprites and the viewer's camera retain their ordinary state.
+The pure trigger and walk frames live in `raid-curtain.mjs`.
+
+`raidStateAt` caches a fold checkpoint every 32 log entries per immutable timeline
+snapshot. Binary search and at most 31 folds support arbitrary replay seeks.
+The leaderboard includes reserves and retains historical member contributions:
+legs destroyed (revives remove that credit), positive leg HP drops, currently
+credited checklist items, positive King HP drops reported by the active table,
+and coins spent (push minutes). Heals and maximum-HP changes earn no damage.
+Organizer HP corrections earn no damage. Sort by legs, then combined damage,
+then table name. Results freeze at the logged end or effective window close.
+
+`raid-boss.mjs` exports `registerBossRenderer(factory)` and
+`createBossRenderer({reducedMotion, slotMinutes})`. A factory may return
+`draw(ctx, boss, rect, nowMs)`, `ready`, `available`, `anchors`, and `dispose`.
+The rect is 24 × 13.5 world tiles (32 drawing pixels per tile). Boss state and
+party positions come only from selected time. Unready renderers use the outline
+for that frame; failures use it for the rest of the session. Closing the scene
+calls `dispose`. No 3D renderer or dependency is loaded. Live polling is unchanged.
+
+Ready registered renderers supply `stations()` for their selected-time carousel.
+The outline uses front-view stations, including while a renderer is unready or
+unavailable; `?theta=<degrees>` overrides the view for inspection. The pure
+`raidRoomLayout` receives the selected angle or stations. Plates sit on the outer
+sides of the rings, clear of every front-view arena.
+
+On desktop, `raidScreenLayout` sizes the canvas to the 64:50 world with a shared
+right sidebar for legs, checklist and leaderboard. A compact 96px header occupies
+the empty top band; replay controls occupy the empty bottom band. Geometry tests
+keep both clear of the boss, rings, plates and party sprites. At 720px height the
+sidebar panels may scroll. The phone keeps its canvas aspect and stacked panels;
+the kiosk keeps its hall-only info and QR columns hidden during the raid.

@@ -106,5 +106,21 @@ export function createStageDrawing({ ctx: getCtx, indoor: getIndoor, reduced: is
     for (const { y, seed } of footlights(stage)) warm(stage.x + .5, y + .05, now, seed);
   }
 
-  return { drawStageFloor, drawStageLights };
+  function drawStageCurtain({ opening: { x, y, w, h }, open }) {
+    // Snap both panel edges to the same pixel grid as the stage boards and drapes.
+    x = Math.round(x * TILE) * PX; y = Math.round(y * TILE) * PX;
+    w = Math.round(w * TILE) * PX; h = Math.round(h * TILE) * PX;
+    rect("#08090d", x, y, w, h);
+    const width = Math.round(w / 2 * (1 - open) * TILE) * PX;
+    const shades = ["#6d1b22", "#8e2630", "#a8343c", "#8e2630"];
+    for (let column = 0; column < width * TILE; column++) {
+      rect(shades[column % 4], x + column * PX, y, PX, h);
+      rect(shades[column % 4], x + w - (column + 1) * PX, y, PX, h);
+    }
+    rect("#c9a45c", x - PX, y - PX, w + 2 * PX, PX);
+    rect("#3a2618", x - PX, y, PX, h);
+    rect("#3a2618", x + w, y, PX, h);
+  }
+
+  return { drawStageFloor, drawStageLights, drawStageCurtain };
 }

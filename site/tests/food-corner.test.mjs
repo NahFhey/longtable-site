@@ -9,9 +9,9 @@ const layout = createRoomLayout([]);
 const key = p => `${p.x},${p.y}`;
 const contains = (r, p) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
 
-test("food corner has 20 unique seats and each plate lies on its own table", () => {
-  const seats = Array.from({ length: 20 }, (_, i) => foodGeometry(layout, i, 20).seat);
-  assert.equal(new Set(seats.map(key)).size, 20);
+test("food corner has 24 unique seats and each plate lies on its own table", () => {
+  const seats = Array.from({ length: 24 }, (_, i) => foodGeometry(layout, i, 24).seat);
+  assert.equal(new Set(seats.map(key)).size, 24);
   for (const seat of seats) {
     assert.equal(seat.standing, false);
     const tables = FOOD_CORNER.dining.map(r => ({ ...r, ...atFood(layout, r) }));
@@ -61,11 +61,11 @@ test("no corner route segment crosses a table, the hearth or another stool recta
   t.diagnostic(`${nodes.length} waypoints; ${pairs} ordered waypoint paths; every directed edge retargeted mid-walk`);
 });
 
-test("overflow spots are unique for 21–60 diners", () => {
-  for (let count = 21; count <= 60; count += 1) {
+test("overflow spots are unique for 25–60 diners", () => {
+  for (let count = 25; count <= 60; count += 1) {
     const seats = Array.from({ length: count }, (_, i) => foodGeometry(layout, i, count).seat);
     assert.equal(new Set(seats.map(key)).size, count);
-    for (const seat of seats.slice(20)) {
+    for (const seat of seats.slice(24)) {
       assert.equal(seat.standing, true);
       assert.equal(seat.plate, null);
       assert.ok(seat.y < layout.aisles[0], "overflow never touches the hall aisle");

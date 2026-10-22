@@ -1,0 +1,1505 @@
+[
+  {
+    "name": "schema7_raid",
+    "patches": [
+      {
+        "path": [
+          "schema"
+        ],
+        "op": "set",
+        "value": 7
+      }
+    ]
+  },
+  {
+    "name": "schema7_null_raid",
+    "patches": [
+      {
+        "path": [
+          "schema"
+        ],
+        "op": "set",
+        "value": 7
+      },
+      {
+        "path": [
+          "raid"
+        ],
+        "op": "set",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "unknown_private_field",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "person"
+        ],
+        "op": "set",
+        "value": "u_dm1"
+      }
+    ]
+  },
+  {
+    "name": "person_in_log",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "person"
+        ],
+        "op": "set",
+        "value": "u_player3_1"
+      }
+    ]
+  },
+  {
+    "name": "person_as_raid_id",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "id"
+        ],
+        "op": "set",
+        "value": "u_dm1"
+      }
+    ]
+  },
+  {
+    "name": "person_as_table",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "table"
+        ],
+        "op": "set",
+        "value": "u_dm1"
+      }
+    ]
+  },
+  {
+    "name": "coin_amount",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "amount"
+        ],
+        "op": "set",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "missing_log_field",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "minutes"
+        ],
+        "op": "delete"
+      }
+    ]
+  },
+  {
+    "name": "unknown_log_kind",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "kind"
+        ],
+        "op": "set",
+        "value": "coin"
+      }
+    ]
+  },
+  {
+    "name": "unknown_member_table",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "members",
+          0,
+          "table"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_member_leg",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "members",
+          0,
+          "leg"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_member_table",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "members",
+          1,
+          "table"
+        ],
+        "op": "set",
+        "value": "t1"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_member_leg",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "members",
+          0,
+          "leg"
+        ],
+        "op": "set",
+        "value": "L2"
+      }
+    ]
+  },
+  {
+    "name": "unknown_log_leg",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "leg"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_log_table",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "table"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_log_action",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "action"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_log_item",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          47,
+          "item"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_target",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "targets"
+        ],
+        "op": "set",
+        "value": [
+          "missing"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "duplicate_target",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "targets"
+        ],
+        "op": "set",
+        "value": [
+          "t1",
+          "t1"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nonmember_target",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "targets"
+        ],
+        "op": "set",
+        "value": [
+          "t10"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "unknown_move_from",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          9,
+          "from"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "unknown_move_to",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          9,
+          "to"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "move_source_mismatch",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          9,
+          "from"
+        ],
+        "op": "set",
+        "value": "R4"
+      }
+    ]
+  },
+  {
+    "name": "move_occupied_destination",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          9,
+          "to"
+        ],
+        "op": "set",
+        "value": "R4"
+      }
+    ]
+  },
+  {
+    "name": "opening_table_reference",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "legs",
+          0,
+          "table"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "opening_leg_reference",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "legs",
+          0,
+          "leg"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "opening_roster_reference",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "members",
+          0,
+          "table"
+        ],
+        "op": "set",
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "opening_missing_leg",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "legs"
+        ],
+        "op": "set",
+        "value": [
+          {
+            "leg": "L1",
+            "max": 300,
+            "table": "t1"
+          },
+          {
+            "leg": "L2",
+            "max": 270,
+            "table": "t2"
+          },
+          {
+            "leg": "L3",
+            "max": 320,
+            "table": "t3"
+          },
+          {
+            "leg": "L4",
+            "max": 270,
+            "table": "t4"
+          },
+          {
+            "leg": "R1",
+            "max": 300,
+            "table": "t5"
+          },
+          {
+            "leg": "R2",
+            "max": 270,
+            "table": "t6"
+          },
+          {
+            "leg": "R3",
+            "max": 300,
+            "table": "t7"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "opening_duplicate_leg",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "legs",
+          1,
+          "leg"
+        ],
+        "op": "set",
+        "value": "L1"
+      }
+    ]
+  },
+  {
+    "name": "opening_roster_mismatch",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "legs",
+          0,
+          "table"
+        ],
+        "op": "set",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "snapshot_mismatch",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "members",
+          0,
+          "leg"
+        ],
+        "op": "set",
+        "value": "L1"
+      }
+    ]
+  },
+  {
+    "name": "hp_above_max",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "hp"
+        ],
+        "op": "set",
+        "value": 9999
+      }
+    ]
+  },
+  {
+    "name": "hp_negative",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "hp"
+        ],
+        "op": "set",
+        "value": -1
+      }
+    ]
+  },
+  {
+    "name": "hp_fractional",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "hp"
+        ],
+        "op": "set",
+        "value": 1.5
+      }
+    ]
+  },
+  {
+    "name": "hp_boolean",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "hp"
+        ],
+        "op": "set",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "king_hp_above_max",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          63,
+          "hp"
+        ],
+        "op": "set",
+        "value": 9999
+      }
+    ]
+  },
+  {
+    "name": "king_without_max",
+    "patches": [
+      {
+        "op": "delete",
+        "path": [
+          "raid",
+          "log",
+          57
+        ]
+      }
+    ]
+  },
+  {
+    "name": "log_out_of_order",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "at"
+        ],
+        "op": "set",
+        "value": 39
+      }
+    ]
+  },
+  {
+    "name": "log_at_beyond_day",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          125,
+          "at"
+        ],
+        "op": "set",
+        "value": 49
+      }
+    ]
+  },
+  {
+    "name": "log_at_negative",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "at"
+        ],
+        "op": "set",
+        "value": -1
+      }
+    ]
+  },
+  {
+    "name": "duplicate_open",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1
+        ],
+        "op": "set",
+        "value": {
+          "at": 40.0,
+          "kind": "open",
+          "admin": false,
+          "legs": [
+            {
+              "leg": "L1",
+              "max": 300,
+              "table": "t1"
+            },
+            {
+              "leg": "L2",
+              "max": 270,
+              "table": "t2"
+            },
+            {
+              "leg": "L3",
+              "max": 320,
+              "table": "t3"
+            },
+            {
+              "leg": "L4",
+              "max": 270,
+              "table": "t4"
+            },
+            {
+              "leg": "R1",
+              "max": 300,
+              "table": "t5"
+            },
+            {
+              "leg": "R2",
+              "max": 270,
+              "table": "t6"
+            },
+            {
+              "leg": "R3",
+              "max": 300,
+              "table": "t7"
+            },
+            {
+              "leg": "R4",
+              "max": 270,
+              "table": "t8"
+            }
+          ],
+          "members": [
+            {
+              "table": "t1",
+              "leg": "L1"
+            },
+            {
+              "table": "t2",
+              "leg": "L2"
+            },
+            {
+              "table": "t3",
+              "leg": "L3"
+            },
+            {
+              "table": "t4",
+              "leg": "L4"
+            },
+            {
+              "table": "t5",
+              "leg": "R1"
+            },
+            {
+              "table": "t6",
+              "leg": "R2"
+            },
+            {
+              "table": "t7",
+              "leg": "R3"
+            },
+            {
+              "table": "t8",
+              "leg": "R4"
+            },
+            {
+              "table": "t9",
+              "leg": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "duplicate_end",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log"
+        ],
+        "op": "append",
+        "value": {
+          "at": 47.55,
+          "kind": "end",
+          "admin": false,
+          "result": "won"
+        }
+      }
+    ]
+  },
+  {
+    "name": "entry_after_end",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log"
+        ],
+        "op": "append",
+        "value": {
+          "at": 48,
+          "kind": "active",
+          "admin": false,
+          "table": "t1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "open_wrong_time",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0,
+          "at"
+        ],
+        "op": "set",
+        "value": 39.9
+      }
+    ]
+  },
+  {
+    "name": "entry_before_open",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          0
+        ],
+        "op": "set",
+        "value": {
+          "at": 40,
+          "kind": "active",
+          "admin": false,
+          "table": "t1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "destruction_without_zero_hp",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          17,
+          "leg"
+        ],
+        "op": "set",
+        "value": "R1"
+      }
+    ]
+  },
+  {
+    "name": "window_fractional",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "window",
+          "start"
+        ],
+        "op": "set",
+        "value": 40.5
+      }
+    ]
+  },
+  {
+    "name": "window_empty",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "window",
+          "end"
+        ],
+        "op": "set",
+        "value": 40
+      }
+    ]
+  },
+  {
+    "name": "window_out_of_bounds",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "window",
+          "end"
+        ],
+        "op": "set",
+        "value": 49
+      }
+    ]
+  },
+  {
+    "name": "unknown_side",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "legs",
+          0,
+          "side"
+        ],
+        "op": "set",
+        "value": "X"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_leg_id",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "legs",
+          1,
+          "id"
+        ],
+        "op": "set",
+        "value": "L1"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_special_id",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "legs",
+          3,
+          "special",
+          "id"
+        ],
+        "op": "set",
+        "value": "venom_injector"
+      }
+    ]
+  },
+  {
+    "name": "unknown_special_field",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "legs",
+          0,
+          "special",
+          "person"
+        ],
+        "op": "set",
+        "value": "private"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_action_id",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "actions",
+          1,
+          "id"
+        ],
+        "op": "set",
+        "value": "stompquake"
+      }
+    ]
+  },
+  {
+    "name": "invalid_action_timer",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "actions",
+          0,
+          "timer"
+        ],
+        "op": "set",
+        "value": "clock"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_checklist_id",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "checklist",
+          1,
+          "id"
+        ],
+        "op": "set",
+        "value": "heart_valve"
+      }
+    ]
+  },
+  {
+    "name": "missing_heart",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "checklist",
+          8,
+          "kind"
+        ],
+        "op": "set",
+        "value": "room"
+      }
+    ]
+  },
+  {
+    "name": "unknown_checklist_kind",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "checklist",
+          0,
+          "kind"
+        ],
+        "op": "set",
+        "value": "feature"
+      }
+    ]
+  },
+  {
+    "name": "thresholds_unsorted",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "discharges"
+        ],
+        "op": "set",
+        "value": [
+          50,
+          75,
+          25
+        ]
+      }
+    ]
+  },
+  {
+    "name": "thresholds_duplicate",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "discharges"
+        ],
+        "op": "set",
+        "value": [
+          75,
+          75,
+          25
+        ]
+      }
+    ]
+  },
+  {
+    "name": "unknown_discharge_threshold",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          71,
+          "threshold"
+        ],
+        "op": "set",
+        "value": 60
+      }
+    ]
+  },
+  {
+    "name": "strike_timer_mismatch",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          2,
+          "timer"
+        ],
+        "op": "set",
+        "value": "core"
+      }
+    ]
+  },
+  {
+    "name": "admin_not_boolean",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "admin"
+        ],
+        "op": "set",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "admin_kind_without_flag",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "admin"
+        ],
+        "op": "set",
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "member_kind_without_flag",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          52,
+          "admin"
+        ],
+        "op": "set",
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "nonadmin_null_reporter",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "table"
+        ],
+        "op": "set",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "admin_leg_hp_with_table",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          6,
+          "admin"
+        ],
+        "op": "set",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "undo_without_admin",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          49,
+          "admin"
+        ],
+        "op": "set",
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "timer_unknown_name",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "timer"
+        ],
+        "op": "set",
+        "value": "clock"
+      }
+    ]
+  },
+  {
+    "name": "timer_negative_interval",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "interval"
+        ],
+        "op": "set",
+        "value": -1
+      }
+    ]
+  },
+  {
+    "name": "timer_negative_pushes",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "pushes_left"
+        ],
+        "op": "set",
+        "value": -1
+      }
+    ]
+  },
+  {
+    "name": "timer_running_remaining",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "remaining"
+        ],
+        "op": "set",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "timer_paused_deadline",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "paused"
+        ],
+        "op": "set",
+        "value": true
+      },
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "remaining"
+        ],
+        "op": "set",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "timer_missing_deadline",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "next"
+        ],
+        "op": "set",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "timer_deadline_in_past",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "next"
+        ],
+        "op": "set",
+        "value": 39
+      }
+    ]
+  },
+  {
+    "name": "timer_unknown_cause",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "cause"
+        ],
+        "op": "set",
+        "value": "warp"
+      }
+    ]
+  },
+  {
+    "name": "stopped_timer_has_deadline",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          1,
+          "timer"
+        ],
+        "op": "set",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "push_zero",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          4,
+          "minutes"
+        ],
+        "op": "set",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "invalid_phase",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          45,
+          "phase"
+        ],
+        "op": "set",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "name": "invalid_phase_cause",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          45,
+          "cause"
+        ],
+        "op": "set",
+        "value": "magic"
+      }
+    ]
+  },
+  {
+    "name": "invalid_end_result",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          125,
+          "result"
+        ],
+        "op": "set",
+        "value": "lost"
+      }
+    ]
+  },
+  {
+    "name": "window_edit_missing_payload",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "action"
+        ],
+        "op": "set",
+        "value": "window"
+      }
+    ]
+  },
+  {
+    "name": "window_payload_other_action",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "window"
+        ],
+        "op": "set",
+        "value": {
+          "start": 40,
+          "end": 47
+        }
+      }
+    ]
+  },
+  {
+    "name": "window_edit_changes_start",
+    "patches": [
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "action"
+        ],
+        "op": "set",
+        "value": "window"
+      },
+      {
+        "path": [
+          "raid",
+          "log",
+          50,
+          "window"
+        ],
+        "op": "set",
+        "value": {
+          "start": 39,
+          "end": 48
+        }
+      }
+    ]
+  },
+  {
+    "name": "person_in_art_key",
+    "patches": [
+      {
+        "op": "set",
+        "path": [
+          "raid",
+          "art",
+          "u_dm1"
+        ],
+        "value": "asset"
+      }
+    ]
+  },
+  {
+    "name": "forced_phase_without_admin",
+    "patches": [
+      {
+        "op": "set",
+        "path": [
+          "raid",
+          "log",
+          45,
+          "cause"
+        ],
+        "value": "forced"
+      }
+    ]
+  },
+  {
+    "name": "pause_without_admin",
+    "patches": [
+      {
+        "op": "set",
+        "path": [
+          "raid",
+          "log",
+          64,
+          "admin"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "resume_without_admin",
+    "patches": [
+      {
+        "op": "set",
+        "path": [
+          "raid",
+          "log",
+          67,
+          "admin"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "running_timer_stop_cause",
+    "patches": [
+      {
+        "op": "set",
+        "path": [
+          "raid",
+          "log",
+          1,
+          "cause"
+        ],
+        "value": "stop"
+      }
+    ]
+  }
+]
