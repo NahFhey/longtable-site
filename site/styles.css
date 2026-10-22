@@ -460,11 +460,41 @@ html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
 .raid-preview-open {
   position: absolute; z-index: 3; transform: translate(-50%, -50%);
   display: grid; justify-items: center; width: max-content; min-width: 44px; min-height: 44px;
-  padding: 4px 8px; border: 2px solid var(--gold); border-radius: 0;
-  background: var(--panel); color: var(--gold); font: 700 13px/18px ui-monospace, monospace;
+  gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer;
+  filter: drop-shadow(0 3px 0 rgb(0 0 0 / .35));
 }
-.raid-preview-label { color: var(--ink); font-size: 11px; font-weight: 400; max-width: 160px; white-space: normal; text-align: center; }
-.raid-preview-arrow { display: inline-block; transform: rotate(var(--raid-preview-angle, 0deg)); animation: raid-preview-bob 1.2s steps(2, end) infinite; }
+.raid-preview-open:hover { filter: drop-shadow(0 3px 0 rgb(0 0 0 / .35)) brightness(1.12); }
+.raid-preview-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.raid-preview-board {
+  position: relative; display: grid; justify-items: center; gap: 1px;
+  padding: 13px 16px 12px; border: 2px solid #b89b5c; outline: 2px solid #4a3524;
+  background: linear-gradient(#8a2629, #6d1c20); color: #f6dc93;
+}
+.raid-preview-board::before, .raid-preview-board::after {
+  content: ""; position: absolute; left: 4px; right: 4px; height: 6px;
+  background: radial-gradient(circle, #fff3c4 0 1.5px, #e0b25a 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x;
+  animation: raid-preview-bulbs .8s steps(2, end) infinite;
+}
+.raid-preview-board::before { top: 3px; }
+.raid-preview-board::after { bottom: 3px; animation-direction: reverse; }
+@keyframes raid-preview-bulbs { to { background-position-x: 8px; } }
+.raid-preview-head {
+  font: 700 15px/19px Georgia, "Times New Roman", serif; letter-spacing: .14em;
+  text-shadow: 0 0 6px rgb(255 214 130 / .55);
+}
+.raid-preview-label {
+  max-width: 190px; white-space: normal; text-align: center; text-wrap: balance;
+  color: #e9d9ae; font: 600 10px/13px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+}
+.raid-preview-arrow {
+  display: inline-block; margin-top: -4px; color: #b89b5c; font: 12px/12px system-ui, sans-serif;
+  transform: rotate(var(--raid-preview-angle, 0deg)); animation: raid-preview-bob 1.2s steps(2, end) infinite;
+}
+.raid-preview-open[data-flip] .raid-preview-arrow { order: -1; margin-top: 0; margin-bottom: -4px; }
+.raid-preview-open[data-pinned] .raid-preview-arrow {
+  margin: 0; color: #e0b25a; font-size: 22px; line-height: 22px;
+  text-shadow: 1px 1px 0 #4a3524, -1px -1px 0 #4a3524, 1px -1px 0 #4a3524, -1px 1px 0 #4a3524;
+}
 @keyframes raid-preview-bob {
   from, to { transform: rotate(var(--raid-preview-angle, 0deg)); }
   50% { transform: rotate(var(--raid-preview-angle, 0deg)) translateY(3px); }
@@ -488,6 +518,7 @@ html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
 #raid-preview-status:empty { display: none; }
 @media (max-width: 650px) { .raid-preview { padding-inline: 0; } }
 @media (prefers-reduced-motion: reduce) { .raid-preview-arrow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .raid-preview-board::before, .raid-preview-board::after { animation: none; } }
 .scene-toggle button { min-height: 2rem; padding: .15rem .6rem; }
 .scene-toggle button[aria-pressed="true"] { color: var(--ink); background: var(--live); }
 .raid-overlay { pointer-events: none; font-size: 16px; line-height: 20px; min-width: 0; }

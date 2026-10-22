@@ -60,10 +60,15 @@ class Node {
   fire(name, event = {}) { for (const handler of this.handlers.get(name) ?? []) handler(event); }
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  removeAttribute(name) { this.attributes.delete(name); }
   get src() { return this.getAttribute("src"); }
   set src(value) { this.setAttribute("src", value); this.requests.push(value); }
   querySelector(selector) {
-    return this.children.find(child => child.getAttribute("class") === selector.slice(1));
+    for (const child of this.children) {
+      if (child.getAttribute("class") === selector.slice(1)) return child;
+      const match = child.querySelector(selector);
+      if (match) return match;
+    }
   }
   focus() { this.doc.activeElement = this; }
   load() { this.loads++; this.currentTime = 0; }
@@ -253,14 +258,15 @@ test("an untouched jukebox remains unloaded, and playback rejection leaves a clo
   assert.equal(f.music.audio.plays, 0);
 });
 
-test("the per-frame update follows two camera transforms and canvas offsets: (557,236), (784,354)", () => {
+// The sign hangs above the curtain: tipAbove is 2 tiles above the centre (box h 0 here), so y drops 2 × zoom.
+test("the per-frame update follows two camera transforms and canvas offsets: (557,204), (784,306)", () => {
   const f = fixture();
   const button = f.$("raid-preview-open");
   assert.equal(button.hidden, false);
-  assert.deepEqual([button.style.left, button.style.top], ["557px", "236px"]);
+  assert.deepEqual([button.style.left, button.style.top], ["557px", "204px"]);
   f.state.camera = { x: -29, y: 50, zoom: 24 };
   f.preview.update();
-  assert.deepEqual([button.style.left, button.style.top], ["784px", "354px"]);
+  assert.deepEqual([button.style.left, button.style.top], ["784px", "306px"]);
   f.state.camera.x = -2000;
   f.preview.update();
   assert.equal(button.hidden, false, "an off-screen curtain keeps the preview visible");
@@ -322,7 +328,10 @@ test("CSS guarantees 44×44 targets, a square token-colour frame, phone width an
   const button = css.match(/\.raid-preview-open\s*\{([^}]+)\}/)[1];
   assert.match(button, /min-width: 44px/);
   assert.match(button, /min-height: 44px/);
-  assert.match(button, /ui-monospace, monospace/);
+  const board = css.match(/\.raid-preview-board\s*\{([^}]+)\}/)[1];
+  assert.match(board, /linear-gradient\(#8a2629, #6d1c20\)/);
+  assert.match(css, /\.raid-preview-head\s*\{[^}]*font: 700 15px\/19px Georgia, "Times New Roman", serif/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.raid-preview-board::before, \.raid-preview-board::after \{ animation: none; \} \}/);
   const frame = css.match(/\.raid-preview-frame\s*\{([^}]+)\}/)[1];
   assert.match(frame, /border: 2px solid var\(--gold\)/);
   assert.match(frame, /border-radius: 0/);
@@ -362,7 +371,8 @@ test("panning back from a pin removes data-pinned and resets the arrow to 0deg",
   assert.equal(f.button.hidden, false);
   assert.equal(f.button.getAttribute("data-pinned"), null);
   assert.equal(f.arrow.style["--raid-preview-angle"], "0deg");
-  assert.deepEqual([f.button.style.left, f.button.style.top], ["515px", "240px"]);
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["515px", "218px"],
+    "tipAbove y=200-2=198, box bottom on it: 198-20, plus parent offset 40");
 });
 
 test("update measures the glyph offsets and writes rotation with CSS setProperty", () => {
@@ -407,4 +417,45 @@ test("update rereads camera controls and skips hidden or zero-size controls", ()
   f.pointAt(-200, 410);
   assert.deepEqual([f.button.style.left, f.button.style.top], ["63px", "398px"]);
   assert.equal(reads, 4);
+});
+
+test("the shipped button has a marquee board with heading and label, followed by its pointer", () => {
+  const f = fixture();
+  const button = f.$("raid-preview-open");
+  const board = button.querySelector(".raid-preview-board");
+  const head = button.querySelector(".raid-preview-head");
+  const label = button.querySelector(".raid-preview-label");
+  const arrow = button.querySelector(".raid-preview-arrow");
+  assert.deepEqual(button.children, [board, arrow]);
+  assert.deepEqual(board.children, [head, label]);
+  assert.equal(arrow.getAttribute("aria-hidden"), "true");
+  const children = html.match(/<button id="raid-preview-open"[^>]*>([\s\S]*?)<\/button>/)[1].trim();
+  assert.equal(children, '<span class="raid-preview-board"><span class="raid-preview-head">PREVIEW</span><span class="raid-preview-label"></span></span><span class="raid-preview-arrow" aria-hidden="true">▼</span>');
+});
+
+test("update flips near the canvas top, removes the flip after panning back, and clears it when pinned", () => {
+  const f = fixture();
+  const button = f.$("raid-preview-open");
+  const arrow = button.querySelector(".raid-preview-arrow");
+  button.offsetWidth = 194;
+  button.offsetHeight = 70;
+  // At 32px/tile, centre y=60 puts the upper tip at -4 and lower tip at 124.
+  f.state.camera = { x: 480 - 33.25 * 32, y: 60 - 11 * 32, zoom: 32 };
+  f.preview.update();
+  assert.equal(button.getAttribute("data-flip"), "true");
+  assert.equal(button.getAttribute("data-pinned"), null);
+  assert.equal(arrow.style["--raid-preview-angle"], "180deg");
+  assert.deepEqual([button.style.left, button.style.top], ["495px", "199px"]);
+  f.state.camera.y = 400 - 11 * 32;
+  f.preview.update();
+  assert.equal(button.getAttribute("data-flip"), null);
+  assert.equal(arrow.style["--raid-preview-angle"], "0deg");
+  assert.deepEqual([button.style.left, button.style.top], ["495px", "341px"]);
+  f.state.camera.y = 60 - 11 * 32;
+  f.preview.update();
+  assert.equal(button.getAttribute("data-flip"), "true");
+  f.state.camera.x = -2000;
+  f.preview.update();
+  assert.equal(button.getAttribute("data-flip"), null);
+  assert.equal(button.getAttribute("data-pinned"), "true");
 });

@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { previewPlacement } from "../raid-preview.mjs";
+import { readFile } from "node:fs/promises";
+import { createRoomLayout, validateTimeline } from "../model.mjs";
+import { stageGeometry } from "../stage.mjs";
+import { worldToScreen } from "../camera.mjs";
 
 const canvas = { w: 400, h: 300 }, box = { w: 80, h: 40 };
 // R = [8,392] × [8,292]; legal box centres = [48,352] × [28,272].
@@ -207,4 +211,139 @@ test("a canvas smaller than both insets never produces NaN", () => {
 test("a custom inset changes both the ray border and the box clamp", () => {
   // Inset=20 gives right border 380; half-width=40 gives centre x=340, y=150, angle=-90°.
   assert.deepEqual(place({ x: 600, y: 150 }, { inset: 20 }), { x: 340, y: 150, angle: -90, pinned: true });
+});
+
+test("an upper curtain tip meets the box bottom without flipping", () => {
+  const tipAbove = { x: 170, y: 110 };
+  const result = place({ x: 160, y: 150 }, { tipAbove, tipBelow: { x: 170, y: 190 } });
+  assert.equal(result.x, tipAbove.x);
+  assert.equal(result.y + box.h / 2, tipAbove.y);
+  assert.equal(result.angle, 0);
+  assert.equal(result.flip, false);
+  assert.equal(result.pinned, false);
+});
+
+test("insufficient space above flips the box below the lower curtain tip", () => {
+  const tipBelow = { x: 180, y: 100 };
+  const result = place({ x: 160, y: 60 }, { tipAbove: { x: 170, y: 20 }, tipBelow });
+  assert.equal(result.x, tipBelow.x);
+  assert.equal(result.y - box.h / 2, tipBelow.y);
+  assert.equal(result.angle, 180);
+  assert.equal(result.flip, true);
+  assert.equal(result.pinned, false);
+});
+
+test("when neither tip fits the upper position clamps without flipping", () => {
+  const result = place({ x: 160, y: 150 }, {
+    tipAbove: { x: 170, y: 20 }, tipBelow: { x: 170, y: 280 }
+  });
+  assert.equal(result.flip, false);
+  assert.equal(result.angle, 0);
+  assert.ok(result.y >= 8 + box.h / 2 && result.y <= canvas.h - 8 - box.h / 2);
+  assert.equal(result.y, 28);
+});
+
+test("tips clamp horizontally at both insets in above and flip modes", () => {
+  for (const [tipX, expectedX] of [[4, 48], [396, 352]]) {
+    for (const flip of [false, true]) {
+      const result = place({ x: 200, y: 150 }, {
+        tipAbove: { x: tipX, y: flip ? 20 : 110 }, tipBelow: { x: tipX, y: 190 }
+      });
+      assert.equal(result.x, expectedX);
+      assert.equal(result.flip, flip);
+      inside(result);
+    }
+  }
+});
+
+test("pinned placement ignores both tips, including glyph offsets and control avoidance", () => {
+  const options = { avoid: { x: 8, y: 130, w: 44, h: 60 }, glyphOffset: { x: 5, y: -3 } };
+  for (const point of [{ x: -200, y: 150 }, { x: 600, y: 150 }, { x: 500, y: -120 }]) {
+    const before = place(point, options);
+    const after = place(point, { ...options, tipAbove: { x: 100, y: 20 }, tipBelow: { x: 100, y: 100 } });
+    const { flip, ...rest } = after;
+    assert.equal(rest.pinned, true);
+    assert.equal(flip, false);
+    assert.deepEqual(rest, before);
+  }
+});
+
+test("upper-fit and lower-fit boundaries are inclusive; a missing lower tip clamps above", () => {
+  const point = { x: 160, y: 150 };
+  const above = place(point, { tipAbove: { x: 160, y: 48 }, tipBelow: { x: 160, y: 100 } });
+  assert.equal(above.flip, false);
+  assert.equal(above.y + box.h / 2, 48);
+  const below = place(point, { tipAbove: { x: 160, y: 47 }, tipBelow: { x: 160, y: 252 } });
+  assert.equal(below.flip, true);
+  assert.equal(below.y - box.h / 2, 252);
+  const missing = place(point, { tipAbove: { x: 160, y: 20 } });
+  assert.equal(missing.flip, false);
+  assert.equal(missing.y, 28);
+});
+
+test("default hall preview clears the microphone and speaker across desktop and phone pans", async t => {
+  const raw = JSON.parse(await readFile(new URL("../data/timeline.raid.sample.json", import.meta.url), "utf8"));
+  const timeline = validateTimeline(raw);
+  const layout = createRoomLayout(timeline.tables, timeline.room_layout);
+  const { stage, stageFront } = layout;
+  const { microphone } = stageGeometry(layout);
+  // Match update()'s opening, including its 1/16-tile snap.
+  const opening = { x: Math.round((stage.x + stage.w - 3.25) * 16) / 16,
+    y: Math.round((stageFront.y - 3) * 16) / 16, w: 3, h: 6 };
+  const centre = { x: opening.x + opening.w / 2, y: opening.y + opening.h / 2 };
+  const previewBox = { w: 194, h: 70 };
+  const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  let checked = 0, flips = 0;
+  try {
+    for (const canvas of [{ w: 1440, h: 800 }, { w: 375, h: 600 }]) {
+      let canvasChecked = 0, canvasFlips = 0;
+      for (const zoom of [.5, .75, 1, 1.5, 2, 2.5, 3]) {
+        // drawHall scales drawing pixels by camera.zoom / (TILE * SCALE), where 16 * 2 = 32.
+        const pixelsPerTile = 32 * zoom;
+        for (const screenX of [16, canvas.w / 4, canvas.w / 2, canvas.w * .75, canvas.w - 16]) {
+          // A 16px curtain centre forces the lower tip at every tested zoom.
+          for (const screenY of [16, 40, 64, canvas.h / 4, canvas.h / 2, canvas.h * .75, canvas.h - 16]) {
+            const camera = { x: screenX - centre.x * pixelsPerTile,
+              y: screenY - centre.y * pixelsPerTile, zoom: pixelsPerTile };
+            const point = worldToScreen(camera, centre);
+            const tipAbove = worldToScreen(camera, { x: centre.x, y: opening.y + 1 });
+            const tipBelow = worldToScreen(camera, { x: centre.x, y: opening.y + opening.h - 1 });
+            const result = previewPlacement({ point, canvas, box: previewBox, tipAbove, tipBelow });
+            if (result.pinned) continue;
+            checked++; canvasChecked++;
+            if (result.flip) { flips++; canvasFlips++; }
+            const button = { x: result.x - previewBox.w / 2, y: result.y - previewBox.h / 2, ...previewBox };
+            const mic = worldToScreen(camera, microphone);
+            const micScale = camera.zoom / 32;
+            const micRect = { x: mic.x - 7 * micScale, y: mic.y - 24 * micScale,
+              w: 14 * micScale, h: 33 * micScale };
+            const speaker = worldToScreen(camera, { x: stageFront.x - .5, y: stageFront.y - 1.5 });
+            const speakerRect = { ...speaker, w: camera.zoom, h: 1.5 * camera.zoom };
+            const context = `zoom=${zoom}, pan=(${camera.x},${camera.y}), canvas=${canvas.w}x${canvas.h}`;
+            assert.equal(intersects(button, micRect), false, `BLOCKED: mic overlap at ${context}`);
+            assert.equal(intersects(button, speakerRect), false, `BLOCKED: mic overlap at ${context} (speaker)`);
+          }
+        }
+      }
+      t.diagnostic(`${canvas.w}x${canvas.h}: placements=${canvasChecked}, flips=${canvasFlips}`);
+      assert.ok(canvasChecked > 50);
+      assert.ok(canvasFlips > 0);
+    }
+  } finally {
+    t.diagnostic(`mic geometry: placements=${checked}, flips=${flips}`);
+  }
+  assert.ok(checked > 50);
+  assert.ok(flips > 0);
+});
+
+test("a list of avoid rects: a right-edge pin slides up off the stage mic and ignores far controls", () => {
+  const controls = { x: 8, y: 250, w: 60, h: 40 }, mic = { x: 340, y: 145, w: 10, h: 20 };
+  const plain = place({ x: 600, y: 150 });
+  assert.deepEqual([plain.x, plain.y], [352, 150]);
+  const result = place({ x: 600, y: 150 }, { avoid: [controls, mic] });
+  assert.equal(result.pinned, true);
+  // Mic band with margin is [137,173]; up to 137-20=117 moves 33px, down to 173+20=193 moves 43px.
+  assert.deepEqual([result.x, result.y], [352, 117]);
+  clears(result, mic);
+  assert.deepEqual(place({ x: 600, y: 150 }, { avoid: [mic] }), result);
 });

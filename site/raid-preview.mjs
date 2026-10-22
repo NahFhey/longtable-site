@@ -1,4 +1,5 @@
 import { worldToScreen } from "./camera.mjs?v=d94bb0d105dc";
+import { stageGeometry } from "./stage.mjs?v=d3a077633f77";
 
 // No raid in the timeline (status null/undefined) shows the arrow as "Coming soon" (Devin, 2026-10-22).
 export function previewVisible(status, { kiosk = false, curtainPlaying = false, sample = false, archive = false } = {}) {
@@ -18,7 +19,7 @@ export function previewLabel(status, windowStart, now, { timeZone, locale } = {}
 
 /** Canvas-local box centre and glyph rotation, independent of the DOM. */
 export function previewPlacement({ point, canvas: { w, h }, box, avoid = null, inset = 8,
-  glyphOffset = { x: 0, y: 0 } }) {
+  glyphOffset = { x: 0, y: 0 }, tipAbove, tipBelow }) {
   const bw = box?.w || 0, bh = box?.h || 0;
   const cx = w / 2, cy = h / 2;
   const dx = point.x - cx, dy = point.y - cy;
@@ -32,10 +33,22 @@ export function previewPlacement({ point, canvas: { w, h }, box, avoid = null, i
   const minY = Math.min(cy, inset + bh / 2), maxY = Math.max(cy, h - inset - bh / 2);
   let x = Math.max(minX, Math.min(maxX, cx + dx * t));
   let y = Math.max(minY, Math.min(maxY, cy + dy * t));
+  let flip = false;
 
-  if (pinned && avoid && bw <= w - 2 * inset && bh <= h - 2 * inset) {
-    const left = avoid.x - 8, right = avoid.x + avoid.w + 8;
-    const top = avoid.y - 8, bottom = avoid.y + avoid.h + 8;
+  if (!pinned && tipAbove) {
+    const fitsAbove = tipAbove.y - bh >= inset;
+    flip = !fitsAbove && Boolean(tipBelow) && tipBelow.y + bh <= h - inset;
+    const tip = flip ? tipBelow : tipAbove;
+    x = Math.max(minX, Math.min(maxX, tip.x));
+    y = tip.y + (flip ? bh / 2 : -bh / 2);
+    if (!fitsAbove && !flip) y = Math.max(minY, Math.min(maxY, y));
+  }
+
+  // avoid is one rect or a list (camera controls, then the stage mic), each slid clear of in turn.
+  const avoids = pinned && bw <= w - 2 * inset && bh <= h - 2 * inset ? [avoid].flat().filter(Boolean) : [];
+  for (const rect of avoids) {
+    const left = rect.x - 8, right = rect.x + rect.w + 8;
+    const top = rect.y - 8, bottom = rect.y + rect.h + 8;
     if (x + bw / 2 > left && x - bw / 2 < right && y + bh / 2 > top && y - bh / 2 < bottom) {
       const candidates = [];
       // Equality means an exact corner: consider both axes, shortest move first.
@@ -50,8 +63,9 @@ export function previewPlacement({ point, canvas: { w, h }, box, avoid = null, i
       if (best) { x = best.x; y = best.y; }
     }
   }
-  const angle = pinned ? Math.atan2(point.y - y - glyphOffset.y, point.x - x - glyphOffset.x) * 180 / Math.PI - 90 : 0;
-  return { x, y, angle: angle <= -180 ? angle + 360 : angle, pinned };
+  const angle = pinned ? Math.atan2(point.y - y - glyphOffset.y, point.x - x - glyphOffset.x) * 180 / Math.PI - 90 : flip ? 180 : 0;
+  // Without tips the result keeps its 9a shape.
+  return { x, y, angle: angle <= -180 ? angle + 360 : angle, pinned, ...(tipAbove ? { flip } : {}) };
 }
 
 export function setupRaidPreview({ canvas, music, getState, sample = false }, doc = document) {
@@ -132,6 +146,8 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     const opening = { x: Math.round((stage.x + stage.w - 3.25) * 16) / 16,
       y: Math.round((stageFront.y - 3) * 16) / 16, w: 3, h: 6 };
     const point = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + opening.h / 2 });
+    const tipAbove = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + 1 });
+    const tipBelow = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + opening.h - 1 });
     const rect = canvas.getBoundingClientRect();
     const parent = button.parentElement.getBoundingClientRect();
     const box = { w: button.offsetWidth || 0, h: button.offsetHeight || 0 };
@@ -142,10 +158,14 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     const controls = doc.getElementById("camera-controls");
     const controlsRect = controls && !controls.hidden ? controls.getBoundingClientRect() : null;
     const avoid = controlsRect?.width && controlsRect?.height
-      ? { x: controlsRect.left - rect.left, y: controlsRect.top - rect.top,
-        w: controlsRect.width, h: controlsRect.height } : null;
-    const { x, y, angle, pinned } = previewPlacement({ point, canvas: { w: rect.width, h: rect.height },
-      box, avoid, glyphOffset });
+      ? [{ x: controlsRect.left - rect.left, y: controlsRect.top - rect.top,
+        w: controlsRect.width, h: controlsRect.height }] : [];
+    // A sign pinned at the edge can still land on an on-screen mic: −7…+7 by −24…+9 drawing px at TILE * SCALE = 32.
+    const mic = worldToScreen(state.camera, stageGeometry(state.layout).microphone);
+    const micScale = state.camera.zoom / 32;
+    avoid.push({ x: mic.x - 7 * micScale, y: mic.y - 24 * micScale, w: 14 * micScale, h: 33 * micScale });
+    const { x, y, angle, pinned, flip } = previewPlacement({ point, canvas: { w: rect.width, h: rect.height },
+      box, avoid, glyphOffset, tipAbove, tipBelow });
     button.style.left = `${Math.round(rect.left - parent.left + x)}px`;
     button.style.top = `${Math.round(rect.top - parent.top + y)}px`;
     if (arrow) {
@@ -154,6 +174,8 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     }
     if (pinned) button.setAttribute("data-pinned", "true");
     else button.removeAttribute?.("data-pinned");
+    if (flip) button.setAttribute("data-flip", "true");
+    else button.removeAttribute?.("data-flip");
     const { event, raid } = state.data;
     const raidStatus = state.raid?.status;
     const start = raid?.window ? Date.parse(event.start) + raid.window.start * event.slot_minutes * 60000 : NaN;
