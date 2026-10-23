@@ -195,6 +195,7 @@ const state = {
   snap: true,
   lastRefresh: 0,
   refreshing: false,
+  bootFailed: false,    // a live page's first load failed; the poll tick retries boot()
   lastChecked: null,
   feedDelayed: false,
   live: null,
@@ -2419,6 +2420,8 @@ $("refresh-now")?.addEventListener("click", () => { void refresh(); });
 // Cadence: 30 s during the sign-up window, 2 s from an hour before doors; nothing while the tab is hidden.
 function checkLiveUpdates() {
   if (document.hidden) return;
+  // A live page whose first load failed (a venue Wi-Fi drop, no snapshot yet) retries here: a kiosk has nobody to reload it.
+  if (state.bootFailed) { void boot(); return; }
   if (state.data?.phase === "live" && state.clock?.source === "live"
       && performance.now() - state.lastRefresh >= state.pollSeconds * 1000) void refresh();
 }
@@ -2781,8 +2784,11 @@ function loop(now) {
 }
 
 async function boot() {
+  state.bootFailed = false;
+  let fetched = false;
   try {
     const [data] = await Promise.all([fetchTimeline(), loadAssets()]);
+    fetched = true;
     installTimeline(data, true);
     state.lastChecked = Date.now();
     state.lastRefresh = performance.now();
@@ -2806,7 +2812,9 @@ async function boot() {
     requestAnimationFrame(loop);
   } catch (error) {
     const message = error?.name === "TimelineError" ? `Timeline could not be loaded: ${error.message}` : "Timeline could not be loaded. Check that the published data file is available.";
-    setStatus(message, "error");
+    // Only a failed fetch retries; archives and samples are static, and a failure after the fetch is a bug, not the network.
+    state.bootFailed = !fetched && !state.archive && !state.sample;
+    setStatus(state.bootFailed ? `${message} Retrying.` : message, "error");
     if (!ctx) return;
     const width = canvas.width;
     const height = canvas.height;

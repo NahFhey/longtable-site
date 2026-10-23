@@ -356,6 +356,37 @@ test("an unknown schema fails visibly instead of leaving a blank canvas", async 
   assert.ok(app.contextCalls.includes("The hall is unavailable."));
 });
 
+test("a live page whose first load fails retries on the poll tick and boots", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([new TypeError("Failed to fetch"), new TypeError("Failed to fetch"), sample], "boot-retry", { search: "" });
+  assert.equal(app.nodes.get("status").className, "status error");
+  assert.match(app.nodes.get("status").textContent, /could not be loaded.*Retrying\.$/);
+  assert.equal(app.frames.length, 0);
+  const tick = () => { for (const interval of app.intervals) interval(); };
+  tick();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.fetchUrls.length, 2);
+  assert.match(app.nodes.get("status").textContent, /Retrying\.$/);
+  tick();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.fetchUrls.length, 3);
+  assert.notEqual(app.nodes.get("status").className, "status error");
+  assert.equal(app.nodes.get("event-name").textContent, sample.event.name);
+  assert.equal(app.frames.length, 1);
+  // Booted pages poll through refresh(), never boot() again.
+  tick();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.frames.length, 1);
+});
+
+test("a static page whose first load fails does not retry", async () => {
+  const app = await runApp([new TypeError("Failed to fetch")], "boot-no-retry");
+  assert.equal(app.nodes.get("status").textContent, "Timeline could not be loaded. Check that the published data file is available.");
+  for (const interval of app.intervals) interval();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(app.fetchUrls.length, 1);
+});
+
 test("a bad live refresh retains the last good rendered table list", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const start = new Date(Date.now() - 30 * 60_000);
