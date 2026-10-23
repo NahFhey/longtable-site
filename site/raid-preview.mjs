@@ -17,6 +17,15 @@ export function previewLabel(status, windowStart, now, { timeZone, locale } = {}
   return `Opens ${format({ weekday: "short", month: "short", day: "numeric" })}, ${format({ hour: "numeric", minute: "2-digit" })}`;
 }
 
+/** World point the sign's arrow rests on: the stage floor beside the stairs, far below the microphone.
+ * Stage speech bubbles grow upward from the speaker, so a sign down here never covers them (Devin, 2026-10-23).
+ */
+export function previewAnchor(layout) {
+  const { stage } = layout;
+  // Level with the stairs, centred on the stage floor; the room's bottom edge would pin the sign.
+  return { x: stage.x + stage.w / 2, y: stageGeometry(layout).foot.y };
+}
+
 /** Canvas-local box centre and glyph rotation, independent of the DOM. */
 export function previewPlacement({ point, canvas: { w, h }, box, avoid = null, inset = 8,
   glyphOffset = { x: 0, y: 0 }, tipAbove, tipBelow }) {
@@ -141,13 +150,9 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
       curtainPlaying: Boolean(state.raidCurtain), sample, archive: state.archive }) && state.scene === "hall";
     button.hidden = !visible || !state.layout || !state.camera || !state.data;
     if (button.hidden) { close(); return; }
-    const { stage, stageFront } = state.layout;
-    // Same opening rect and 1/16-tile snap as drawStageCurtain; anchor at its centre.
-    const opening = { x: Math.round((stage.x + stage.w - 3.25) * 16) / 16,
-      y: Math.round((stageFront.y - 3) * 16) / 16, w: 3, h: 6 };
-    const point = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + opening.h / 2 });
-    const tipAbove = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + 1 });
-    const tipBelow = worldToScreen(state.camera, { x: opening.x + opening.w / 2, y: opening.y + opening.h - 1 });
+    // The arrow rests on the anchor; with no room above it, the sign flips below with the arrow up.
+    const point = worldToScreen(state.camera, previewAnchor(state.layout));
+    const tipAbove = point, tipBelow = point;
     const rect = canvas.getBoundingClientRect();
     const parent = button.parentElement.getBoundingClientRect();
     const box = { w: button.offsetWidth || 0, h: button.offsetHeight || 0 };

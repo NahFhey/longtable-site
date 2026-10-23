@@ -259,15 +259,15 @@ test("an untouched jukebox remains unloaded, and playback rejection leaves a clo
   assert.equal(f.music.audio.plays, 0);
 });
 
-// The sign hangs above the curtain: tipAbove is 2 tiles above the centre (box h 0 here), so y drops 2 × zoom.
-test("the per-frame update follows two camera transforms and canvas offsets: (557,204), (784,306)", () => {
+// The sign rests on the stage floor level with the stairs: anchor (32.5,19), box h 0 here, so y is the anchor's.
+test("the per-frame update follows two camera transforms and canvas offsets: (545,364), (766,446)", () => {
   const f = fixture();
   const button = f.$("raid-preview-open");
   assert.equal(button.hidden, false);
-  assert.deepEqual([button.style.left, button.style.top], ["557px", "204px"]);
-  f.state.camera = { x: -29, y: 50, zoom: 24 };
+  assert.deepEqual([button.style.left, button.style.top], ["545px", "364px"]);
+  f.state.camera = { x: -29, y: -50, zoom: 24 };
   f.preview.update();
-  assert.deepEqual([button.style.left, button.style.top], ["784px", "306px"]);
+  assert.deepEqual([button.style.left, button.style.top], ["766px", "446px"]);
   f.state.camera.x = -2000;
   f.preview.update();
   assert.equal(button.hidden, false, "an off-screen curtain keeps the preview visible");
@@ -355,8 +355,8 @@ function placementFixture({ cameraControls = null } = {}) {
     const getElementById = f.doc.getElementById;
     f.doc.getElementById = id => id === "camera-controls" ? controls : getElementById(id);
   }
-  // Stage anchor is (33.25,11). Zoom=1 makes these camera offsets easy to check.
-  const pointAt = (x, y) => { f.state.camera = { x: x - 33.25, y: y - 11, zoom: 1 }; f.preview.update(); };
+  // Stage anchor is (32.5,19). Zoom=1 makes these camera offsets easy to check.
+  const pointAt = (x, y) => { f.state.camera = { x: x - 32.5, y: y - 19, zoom: 1 }; f.preview.update(); };
   return { ...f, button, arrow, controls, pointAt };
 }
 
@@ -372,8 +372,8 @@ test("panning back from a pin removes data-pinned and resets the arrow to 0deg",
   assert.equal(f.button.hidden, false);
   assert.equal(f.button.getAttribute("data-pinned"), null);
   assert.equal(f.arrow.style["--raid-preview-angle"], "0deg");
-  assert.deepEqual([f.button.style.left, f.button.style.top], ["515px", "218px"],
-    "tipAbove y=200-2=198, box bottom on it: 198-20, plus parent offset 40");
+  assert.deepEqual([f.button.style.left, f.button.style.top], ["515px", "220px"],
+    "box bottom on the anchor: 200-20, plus parent offset 40");
 });
 
 test("update measures the glyph offsets and writes rotation with CSS setProperty", () => {
@@ -440,19 +440,19 @@ test("update flips near the canvas top, removes the flip after panning back, and
   const arrow = button.querySelector(".raid-preview-arrow");
   button.offsetWidth = 194;
   button.offsetHeight = 70;
-  // At 32px/tile, centre y=60 puts the upper tip at -4 and lower tip at 124.
-  f.state.camera = { x: 480 - 33.25 * 32, y: 60 - 11 * 32, zoom: 32 };
+  // At 32px/tile, anchor y=60 leaves no room for the 70px box above, so it hangs below: centre 60+35.
+  f.state.camera = { x: 480 - 32.5 * 32, y: 60 - 19 * 32, zoom: 32 };
   f.preview.update();
   assert.equal(button.getAttribute("data-flip"), "true");
   assert.equal(button.getAttribute("data-pinned"), null);
   assert.equal(arrow.style["--raid-preview-angle"], "180deg");
-  assert.deepEqual([button.style.left, button.style.top], ["495px", "199px"]);
-  f.state.camera.y = 400 - 11 * 32;
+  assert.deepEqual([button.style.left, button.style.top], ["495px", "135px"]);
+  f.state.camera.y = 400 - 19 * 32;
   f.preview.update();
   assert.equal(button.getAttribute("data-flip"), null);
   assert.equal(arrow.style["--raid-preview-angle"], "0deg");
-  assert.deepEqual([button.style.left, button.style.top], ["495px", "341px"]);
-  f.state.camera.y = 60 - 11 * 32;
+  assert.deepEqual([button.style.left, button.style.top], ["495px", "405px"]);
+  f.state.camera.y = 60 - 19 * 32;
   f.preview.update();
   assert.equal(button.getAttribute("data-flip"), "true");
   f.state.camera.x = -2000;

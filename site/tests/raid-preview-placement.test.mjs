@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { previewPlacement } from "../raid-preview.mjs";
+import { previewAnchor, previewPlacement } from "../raid-preview.mjs";
 import { readFile } from "node:fs/promises";
 import { createRoomLayout, validateTimeline } from "../model.mjs";
 import { stageGeometry } from "../stage.mjs";
@@ -281,16 +281,13 @@ test("upper-fit and lower-fit boundaries are inclusive; a missing lower tip clam
   assert.equal(missing.y, 28);
 });
 
-test("default hall preview clears the microphone and speaker across desktop and phone pans", async t => {
+test("default hall preview stays below stage speech and clears the microphone and speaker across pans", async t => {
   const raw = JSON.parse(await readFile(new URL("../data/timeline.raid.sample.json", import.meta.url), "utf8"));
   const timeline = validateTimeline(raw);
   const layout = createRoomLayout(timeline.tables, timeline.room_layout);
-  const { stage, stageFront } = layout;
+  const { stageFront } = layout;
   const { microphone } = stageGeometry(layout);
-  // Match update()'s opening, including its 1/16-tile snap.
-  const opening = { x: Math.round((stage.x + stage.w - 3.25) * 16) / 16,
-    y: Math.round((stageFront.y - 3) * 16) / 16, w: 3, h: 6 };
-  const centre = { x: opening.x + opening.w / 2, y: opening.y + opening.h / 2 };
+  const anchor = previewAnchor(layout);
   const previewBox = { w: 194, h: 70 };
   const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   let checked = 0, flips = 0;
@@ -301,14 +298,13 @@ test("default hall preview clears the microphone and speaker across desktop and 
         // drawHall scales drawing pixels by camera.zoom / (TILE * SCALE), where 16 * 2 = 32.
         const pixelsPerTile = 32 * zoom;
         for (const screenX of [16, canvas.w / 4, canvas.w / 2, canvas.w * .75, canvas.w - 16]) {
-          // A 16px curtain centre forces the lower tip at every tested zoom.
+          // A 16px anchor forces the flip below it at every tested zoom.
           for (const screenY of [16, 40, 64, canvas.h / 4, canvas.h / 2, canvas.h * .75, canvas.h - 16]) {
-            const camera = { x: screenX - centre.x * pixelsPerTile,
-              y: screenY - centre.y * pixelsPerTile, zoom: pixelsPerTile };
-            const point = worldToScreen(camera, centre);
-            const tipAbove = worldToScreen(camera, { x: centre.x, y: opening.y + 1 });
-            const tipBelow = worldToScreen(camera, { x: centre.x, y: opening.y + opening.h - 1 });
-            const result = previewPlacement({ point, canvas, box: previewBox, tipAbove, tipBelow });
+            const camera = { x: screenX - anchor.x * pixelsPerTile,
+              y: screenY - anchor.y * pixelsPerTile, zoom: pixelsPerTile };
+            // Match update(): the arrow rests on the anchor, above or (flipped) below.
+            const point = worldToScreen(camera, anchor);
+            const result = previewPlacement({ point, canvas, box: previewBox, tipAbove: point, tipBelow: point });
             if (result.pinned) continue;
             checked++; canvasChecked++;
             if (result.flip) { flips++; canvasFlips++; }
@@ -322,6 +318,9 @@ test("default hall preview clears the microphone and speaker across desktop and 
             const context = `zoom=${zoom}, pan=(${camera.x},${camera.y}), canvas=${canvas.w}x${canvas.h}`;
             assert.equal(intersects(button, micRect), false, `BLOCKED: mic overlap at ${context}`);
             assert.equal(intersects(button, speakerRect), false, `BLOCKED: mic overlap at ${context} (speaker)`);
+            // The lowest stage bubble (a speaker at the mic) ends 1.2 tiles above them, plus its 6px tail.
+            const bubbleBottom = worldToScreen(camera, { x: stageFront.x, y: stageFront.y - 1.2 }).y + 6;
+            assert.ok(button.y >= bubbleBottom, `BLOCKED: stage speech overlap at ${context}`);
           }
         }
       }
