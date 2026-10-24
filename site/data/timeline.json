@@ -400,6 +400,14 @@
    "actor": "p19",
    "table": null,
    "person": null
+  },
+  {
+   "id": "670c641a528b493e9a22a3df00b649e7",
+   "at": "2026-10-24T13:29:29.002371Z",
+   "action": "set_appearance",
+   "actor": "p19",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -412,7 +420,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-24T13:28:30.787471Z",
+ "generated_at": "2026-10-24T13:29:32.134298Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -796,7 +804,12 @@
    "dm": false,
    "hidden": false,
    "variant": 942555671,
-   "appearance": null,
+   "appearance": {
+    "skin": 0,
+    "shirt": 8,
+    "hair": 9,
+    "hat": 0
+   },
    "movements": [],
    "presence": {
     "planned": [
