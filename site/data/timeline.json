@@ -416,11 +416,21 @@
    "actor": "p12",
    "table": null,
    "person": null
+  },
+  {
+   "id": "68c720bb521e466c83d66e7f6ab37aba",
+   "at": "2026-10-26T23:48:34.932850Z",
+   "action": "join_visitors",
+   "actor": "p12",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
   "open": true,
-  "people": []
+  "people": [
+   "p12"
+  ]
  },
  "room_layout": {
   "version": 1,
@@ -428,7 +438,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-26T23:48:09.961793Z",
+ "generated_at": "2026-10-26T23:48:59.345011Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
