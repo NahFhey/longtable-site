@@ -462,7 +462,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-29T03:57:23.911331Z",
+ "generated_at": "2026-10-29T03:57:49.059673Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -885,10 +885,10 @@
   },
   {
    "id": "p21",
-   "name": null,
+   "name": "Peterson",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 1450200210,
    "appearance": null,
    "movements": [],
    "presence": {
