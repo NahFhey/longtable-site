@@ -424,6 +424,22 @@
    "actor": "p12",
    "table": null,
    "person": null
+  },
+  {
+   "id": "f26b45dfcecd4a6aa7f040e319acb829",
+   "at": "2026-10-29T03:56:07.778182Z",
+   "action": "edit_table",
+   "actor": "p10",
+   "table": "t4",
+   "person": null
+  },
+  {
+   "id": "8580b63b2a5441999f9fd048d567047e",
+   "at": "2026-10-29T03:56:16.346030Z",
+   "action": "set_presence",
+   "actor": "p20",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -438,7 +454,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-10-26T23:48:59.345011Z",
+ "generated_at": "2026-10-29T03:56:19.104319Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -839,6 +855,25 @@
      "leaving": null
     }
    }
+  },
+  {
+   "id": "p20",
+   "name": null,
+   "dm": false,
+   "hidden": true,
+   "variant": null,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": [
+     0,
+     28
+    ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
   }
  ],
  "tables": [
@@ -942,7 +977,7 @@
    "seats": 5,
    "walk_ins": true,
    "start": 0,
-   "end": 48,
+   "end": 28,
    "dm": "p10",
    "created_at": "2026-09-29T22:15:18.244275-05:00",
    "signups": [],
