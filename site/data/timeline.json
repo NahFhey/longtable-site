@@ -504,6 +504,14 @@
    "actor": "p23",
    "table": null,
    "person": null
+  },
+  {
+   "id": "354f78fccd924749bfbb198522375556",
+   "at": "2026-11-01T19:46:53.759129Z",
+   "action": "join",
+   "actor": "p23",
+   "table": "t2",
+   "person": null
   }
  ],
  "visitors": {
@@ -519,7 +527,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-01T19:46:41.534227Z",
+ "generated_at": "2026-11-01T19:47:01.875481Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -980,10 +988,10 @@
   },
   {
    "id": "p23",
-   "name": null,
+   "name": "20%BrainPower",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 2448055582,
    "appearance": null,
    "movements": [],
    "presence": {
@@ -1057,7 +1065,16 @@
    "end": 48,
    "dm": "p4",
    "created_at": "2026-09-21T12:25:57.436523-05:00",
-   "signups": [],
+   "signups": [
+    {
+     "person": "p23",
+     "planned": [
+      0,
+      24
+     ],
+     "actual": null
+    }
+   ],
    "pad": 1
   },
   {
