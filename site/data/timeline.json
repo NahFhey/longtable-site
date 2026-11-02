@@ -527,7 +527,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-01T19:47:19.300584Z",
+ "generated_at": "2026-11-02T01:25:38.454624Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -999,6 +999,22 @@
      0,
      24
     ],
+    "actual": {
+     "here": null,
+     "leaving": null
+    }
+   }
+  },
+  {
+   "id": "p24",
+   "name": "Gryndor the Unicorn Wizard",
+   "dm": false,
+   "hidden": false,
+   "variant": 3991771774,
+   "appearance": null,
+   "movements": [],
+   "presence": {
+    "planned": null,
     "actual": {
      "here": null,
      "leaving": null
