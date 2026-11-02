@@ -560,6 +560,14 @@
    "actor": "p25",
    "table": null,
    "person": null
+  },
+  {
+   "id": "8ba1fa94f6e74813af9d244206d966ea",
+   "at": "2026-11-02T17:04:27.823287Z",
+   "action": "edit_table",
+   "actor": "p15",
+   "table": "t6",
+   "person": null
   }
  ],
  "visitors": {
@@ -577,7 +585,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-02T12:36:17.111589Z",
+ "generated_at": "2026-11-02T17:04:57.848711Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1250,8 +1258,8 @@
   {
    "id": "t6",
    "name": "\"Other\" Game Systems",
-   "system": "Delta Green, Alien, Power Rangers, Fallout, etc.",
-   "pitch": "This table will honor the often overlooked \"other\" game systems. Whether investigating the macabre as Agents or fighting against Zordon as Rangers - we will explore a variety of games.",
+   "system": "Power Rangers, Delta Green, and Cyberpunk",
+   "pitch": "This table will honor the often overlooked \"other\" game systems. Investigate the macabre as Agents, fight against the forces of Zordon as Rangers, and take on the corpos at Arasaka.",
    "seats": 5,
    "walk_ins": true,
    "start": 16,
