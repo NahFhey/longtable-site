@@ -560,7 +560,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-02T12:02:53.260257Z",
+ "generated_at": "2026-11-02T12:03:02.489680Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1064,10 +1064,10 @@
   },
   {
    "id": "p25",
-   "name": null,
+   "name": "Becky VG./ Mystilyn",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 3286553723,
    "appearance": null,
    "movements": [],
    "presence": {
