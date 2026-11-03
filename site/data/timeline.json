@@ -640,6 +640,14 @@
    "actor": "p10",
    "table": "t4",
    "person": null
+  },
+  {
+   "id": "d04a00e823704429b64d767c2ca6efbc",
+   "at": "2026-11-03T20:05:59.309062Z",
+   "action": "edit_table",
+   "actor": "p1",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -657,7 +665,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-03T20:04:08.882103Z",
+ "generated_at": "2026-11-03T20:06:29.189200Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1211,8 +1219,8 @@
    "pitch": "Hunt Deadly boss monsters and turn what you harvest into power for the next hunt!!",
    "seats": 7,
    "walk_ins": true,
-   "start": 2,
-   "end": 50,
+   "start": 0,
+   "end": 48,
    "dm": "p1",
    "created_at": "2026-09-21T09:54:34.261424-05:00",
    "signups": [
@@ -1228,7 +1236,7 @@
      "person": "p5",
      "planned": [
       2,
-      50
+      48
      ],
      "actual": null
     },
