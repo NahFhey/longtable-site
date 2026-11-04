@@ -681,7 +681,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-04T02:23:06.285515Z",
+ "generated_at": "2026-11-04T02:23:15.127442Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1228,10 +1228,10 @@
   },
   {
    "id": "p27",
-   "name": null,
+   "name": "Pxppunkpippin 👁🔮🧿",
    "dm": false,
-   "hidden": true,
-   "variant": null,
+   "hidden": false,
+   "variant": 3002484972,
    "appearance": null,
    "movements": [],
    "presence": {
