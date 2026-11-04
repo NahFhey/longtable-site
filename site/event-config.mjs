@@ -1,7 +1,7 @@
 export const INFO_SPEECHES = Object.freeze({
   before: Object.freeze([
     "Hey, welcome to Longtable! Glad you stopped by.",
-    "On November 7 we're playing D&D for 24 hours straight, in person, 11 AM to 11 AM.",
+    "On November 7 we're playing D&D for 24 hours straight, in person, 10 AM to 10 AM.",
     "See all these tables? Each one is a game we'll play during the event. A DM posted it, and players are grabbing seats.",
     "Come back to this page during the event and you'll see the action live: who's at which table and what's happening in the hall.",
     "We're doing it all for Extra Life. Donations go to Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
@@ -11,7 +11,7 @@ export const INFO_SPEECHES = Object.freeze({
   ]),
   during: Object.freeze([
     "Hey, welcome to Longtable! You picked a good time to drop in.",
-    "We're in the middle of 24 hours of D&D, live and in person, running until 11 AM on November 8.",
+    "We're in the middle of 24 hours of D&D, live and in person, running until 10 AM on November 8.",
     "Every table in this hall is a game on today's schedule, some playing right now and some starting later. Click one to see what it is.",
     "The hall updates live, so keep the page open or check back through the night to see what's going on.",
     "We're doing it all for Extra Life. Donations go to Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
@@ -21,7 +21,7 @@ export const INFO_SPEECHES = Object.freeze({
   ]),
   after: Object.freeze([
     "Hey, welcome to Longtable!",
-    "The marathon is over: 24 hours of D&D, 11 AM November 7 to 11 AM November 8. Thanks to everyone who played.",
+    "The marathon is over: 24 hours of D&D, 10 AM November 7 to 10 AM November 8. Thanks to everyone who played.",
     "Every table in this hall is a game we played. Press Play under the map to watch the day back.",
     "It was all for Extra Life, raising money for Corewell Health Helen DeVos Children's Hospital in Grand Rapids.",
     "The thermometer at the top of the page shows where our total stands. The Donate plaque on the wall still works.",
