@@ -744,6 +744,14 @@
    "actor": "p3",
    "table": null,
    "person": null
+  },
+  {
+   "id": "8b46af82c49641879226e7e100835f6c",
+   "at": "2026-11-06T00:44:16.292308Z",
+   "action": "join",
+   "actor": "p26",
+   "table": "t1",
+   "person": null
   }
  ],
  "visitors": {
@@ -761,7 +769,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-06T00:31:10.499180Z",
+ "generated_at": "2026-11-06T00:44:50.671533Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1289,7 +1297,7 @@
   },
   {
    "id": "p26",
-   "name": "SkullShards",
+   "name": "Ryan",
    "dm": false,
    "hidden": false,
    "variant": 2622941809,
@@ -1405,6 +1413,14 @@
     },
     {
      "person": "p3",
+     "planned": [
+      0,
+      48
+     ],
+     "actual": null
+    },
+    {
+     "person": "p26",
      "planned": [
       0,
       48
