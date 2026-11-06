@@ -792,6 +792,14 @@
    "actor": "p25",
    "table": "t8",
    "person": null
+  },
+  {
+   "id": "cbf76cd21c8b445a8cb3c103ec2a5ffe",
+   "at": "2026-11-06T15:38:57.196732Z",
+   "action": "edit_table",
+   "actor": "p10",
+   "table": "t4",
+   "person": null
   }
  ],
  "visitors": {
@@ -810,7 +818,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-06T15:36:22.476050Z",
+ "generated_at": "2026-11-06T15:39:32.099816Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1554,7 +1562,7 @@
    "name": "The Hidden Shrine of Tamaochan",
    "system": "AD&D",
    "pitch": "Experience the early years of D&D in this \"competitive\" dungeon-delve. See how for you can make before the dungeon kills you!",
-   "seats": 5,
+   "seats": 7,
    "walk_ins": true,
    "start": 0,
    "end": 28,
