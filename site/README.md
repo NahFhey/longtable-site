@@ -376,6 +376,14 @@ changed, reloads itself to the same URL plus `build=<stamps>` after the same 45
 seconds without input. The reload leaves fullscreen (tap once again on Android)
 and stops jukebox music.
 
+During a staff break the kiosk plays the raid trailer full screen, muted and
+looping, under a "BREAK — back to your games at <time>" caption, and returns to
+the hall when the break ends; jukebox music keeps playing under it. It follows
+the Preview arrow's rules: no trailer while the raid is live, during the curtain
+sequence, in archives or with `?sample=raid`. A trailer that cannot play leaves
+the hall up for the rest of that break. `?sample=1&kiosk=1&at=8.3` shows it on
+the sample's first break.
+
 `?sample=50&kiosk=1` is the dress rehearsal (the demo event in kiosk chrome);
 `?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
 combines with `?at=` and is kept when the clock rewrites the URL.

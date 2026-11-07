@@ -457,6 +457,18 @@ html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
 #raid-preview-status { position: absolute; bottom: 0; margin: 0; padding: 8px; background: var(--panel); color: var(--ink); }
 #raid-preview-status:empty { display: none; }
 @media (max-width: 650px) { .raid-preview { padding-inline: 0; } }
+/* Kiosk break: the trailer fills the projection, muted and looping, with nothing to press. */
+.raid-preview[data-kiosk] { padding: 0; background: #000; }
+.raid-preview[data-kiosk] .raid-preview-frame {
+  width: min(100%, calc(100vh * 16 / 9)); width: min(100%, calc(100dvh * 16 / 9));
+  border: 0; background: #000; box-shadow: none;
+}
+.raid-preview[data-kiosk] .raid-preview-controls { display: none; }
+#raid-preview-caption {
+  position: absolute; top: 12px; left: 12px; margin: 0; padding: 6px 12px;
+  background: #ffd27a; color: #1b1a22; font: 700 clamp(16px, 2.2vw, 30px)/1.2 ui-monospace, monospace;
+}
+#raid-preview-caption:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .raid-preview-arrow { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .raid-preview-board::before, .raid-preview-board::after { animation: none; } }
 .scene-toggle button { min-height: 2rem; padding: .15rem .6rem; }

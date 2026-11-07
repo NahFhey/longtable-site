@@ -6,6 +6,20 @@ export function previewVisible(status, { kiosk = false, curtainPlaying = false, 
   return (status == null || status === "upcoming" || status === "ended") && !kiosk && !curtainPlaying && !sample && !archive;
 }
 
+/** The projector loops the trailer through a staff break, under the same status rules as the arrow (Devin, 2026-11-07). */
+export function kioskTrailerPlaying(status, { kiosk = false, onBreak = false, curtainPlaying = false, sample = false,
+  archive = false } = {}) {
+  return kiosk && onBreak && previewVisible(status, { curtainPlaying, sample, archive });
+}
+
+/** Caption over the kiosk trailer, so the break notice it covers stays on screen. */
+export function kioskTrailerCaption(breakEvent, event, { locale } = {}) {
+  const end = Date.parse(event.start) + (breakEvent.at + breakEvent.duration) * event.slot_minutes * 60000;
+  if (!Number.isFinite(end)) return "BREAK";
+  const time = new Intl.DateTimeFormat(locale, { timeZone: event.tz, hour: "numeric", minute: "2-digit" }).format(new Date(end));
+  return `BREAK — back to your games at ${time}`;
+}
+
 /** Absolute opening time, using the hall's short day/date and separate time format.
  * `now` never infers raid status: the selected-time raid model owns that decision.
  */
@@ -86,11 +100,16 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
   const label = button?.querySelector(".raid-preview-label");
   const arrow = button?.querySelector(".raid-preview-arrow");
   const status = doc.getElementById("raid-preview-status");
+  const caption = doc.getElementById("raid-preview-caption");
   if (!button || !overlay || !video || !closeButton || !mute || !label) return null;
   const audio = music?.audio;
   let resumeMusic = false;
   let labelKey;
   let playAttempt = 0;
+  // A kiosk break trailer: `at` of the break it plays for, and of a break whose playback failed (the hall stays).
+  let kioskBreak = null;
+  let failedBreak = null;
+  let captionKey;
 
   function renderMute() {
     mute.textContent = video.muted ? "Unmute" : "Mute";
@@ -107,16 +126,25 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
       try { Promise.resolve(audio.play()).catch(() => {}); } catch { /* The jukebox remains available for retry. */ }
     }
     resumeMusic = false;
-    button.focus();
+    if (kioskBreak === null) { button.focus(); return; }
+    kioskBreak = null;
+    video.loop = false;
+    overlay.removeAttribute?.("data-kiosk");
+    if (caption) caption.textContent = "";
+    captionKey = undefined;
   }
+  // Nobody stands at the projector to close a break trailer; only the break's end does.
+  const dismiss = () => { if (kioskBreak === null) close(); };
+  const failKiosk = () => { failedBreak = kioskBreak; close(); };
 
-  button.addEventListener("click", () => {
-    if (button.hidden || !overlay.hidden) return;
-    resumeMusic = Boolean(audio && !audio.paused && !audio.ended);
+  function open({ kiosk = false } = {}) {
+    // The kiosk trailer is muted, so the projector's jukebox keeps playing under it.
+    resumeMusic = !kiosk && Boolean(audio && !audio.paused && !audio.ended);
     if (resumeMusic) audio.pause();
     overlay.hidden = false;
     button.setAttribute("aria-expanded", "true");
-    video.muted = false;
+    video.muted = kiosk;
+    video.loop = kiosk;
     renderMute();
     if (status) status.textContent = "";
     // No source exists before the first click, even if a browser ignores preload.
@@ -124,17 +152,25 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     video.currentTime = 0;
     const ticket = ++playAttempt;
     const failed = () => {
-      if (ticket === playAttempt && status) status.textContent = "Could not play the trailer. Close and try again.";
+      if (ticket !== playAttempt) return;
+      if (kioskBreak !== null) failKiosk();
+      else if (status) status.textContent = "Could not play the trailer. Close and try again.";
     };
     try { Promise.resolve(video.play()).catch(failed); } catch { failed(); }
-    closeButton.focus();
+    if (!kiosk) closeButton.focus();
+  }
+
+  button.addEventListener("click", () => {
+    if (button.hidden || !overlay.hidden) return;
+    open();
   });
-  closeButton.addEventListener("click", close);
-  video.addEventListener("ended", close);
-  overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+  closeButton.addEventListener("click", dismiss);
+  video.addEventListener("ended", dismiss);
+  video.addEventListener("error", () => { if (kioskBreak !== null) failKiosk(); });
+  overlay.addEventListener("click", event => { if (event.target === overlay) dismiss(); });
   mute.addEventListener("click", () => { video.muted = !video.muted; renderMute(); });
   doc.addEventListener("keydown", event => {
-    if (overlay.hidden) return;
+    if (overlay.hidden || kioskBreak !== null) return;
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
     if (event.key === "Tab") {
       event.preventDefault();
@@ -142,14 +178,36 @@ export function setupRaidPreview({ canvas, music, getState, sample = false }, do
     }
   });
   // Keep page-show or an already pending jukebox play from sounding over the trailer.
-  audio?.addEventListener("play", () => { if (!overlay.hidden) audio.pause(); });
+  audio?.addEventListener("play", () => { if (!overlay.hidden && kioskBreak === null) audio.pause(); });
 
-  function update() {
+  /** `active` is the frame's admin events; a kiosk break plays the trailer until the break ends. */
+  function updateKiosk(state, active) {
+    const onBreak = active?.break ?? null;
+    const playing = Boolean(state.data) && state.scene === "hall" && onBreak?.at !== failedBreak
+      && kioskTrailerPlaying(state.raid?.status, { kiosk: state.kiosk, onBreak: Boolean(onBreak),
+        curtainPlaying: Boolean(state.raidCurtain), sample, archive: state.archive });
+    if (!playing) { if (kioskBreak !== null) close(); return; }
+    if (kioskBreak !== onBreak.at) {
+      close();
+      kioskBreak = onBreak.at;
+      overlay.setAttribute("data-kiosk", "true");
+      open({ kiosk: true });
+    }
+    const { event } = state.data;
+    const key = `${onBreak.at}/${onBreak.duration}/${event.start}/${event.slot_minutes}/${event.tz}`;
+    if (caption && kioskBreak !== null && captionKey !== key) {
+      caption.textContent = kioskTrailerCaption(onBreak, event);
+      captionKey = key;
+    }
+  }
+
+  function update(active = null) {
     const state = getState();
+    updateKiosk(state, active);
     const visible = previewVisible(state.raid?.status, { kiosk: state.kiosk,
       curtainPlaying: Boolean(state.raidCurtain), sample, archive: state.archive }) && state.scene === "hall";
     button.hidden = !visible || !state.layout || !state.camera || !state.data;
-    if (button.hidden) { close(); return; }
+    if (button.hidden) { if (kioskBreak === null) close(); return; }
     // The arrow rests on the anchor; with no room above it, the sign flips below with the arrow up.
     const point = worldToScreen(state.camera, previewAnchor(state.layout));
     const tipAbove = point, tipBelow = point;

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { previewVisible, previewLabel, setupRaidPreview } from "../raid-preview.mjs";
+import { previewVisible, previewLabel, setupRaidPreview, kioskTrailerPlaying, kioskTrailerCaption } from "../raid-preview.mjs";
 import { setupHallMusic } from "../music.mjs";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
@@ -272,7 +272,7 @@ test("the per-frame update follows two camera transforms and canvas offsets: (54
   f.preview.update();
   assert.equal(button.hidden, false, "an off-screen curtain keeps the preview visible");
   assert.equal(button.getAttribute("data-pinned"), "true");
-  assert.match(app, /updateCamera\(announcer\);\s+raidPreview\?\.update\(\);\s+if \(!ctx\) return;/,
+  assert.match(app, /updateCamera\(announcer\);\s+raidPreview\?\.update\(active\);\s+if \(!ctx\) return;/,
     "the update uses the current camera before either scene can return");
   assert.match(app, /sample: new URLSearchParams\(location.search\)\.get\("sample"\) === "raid"/);
 });
@@ -459,4 +459,122 @@ test("update flips near the canvas top, removes the flip after panning back, and
   f.preview.update();
   assert.equal(button.getAttribute("data-flip"), null);
   assert.equal(button.getAttribute("data-pinned"), "true");
+});
+
+test("the kiosk trailer plays only on a kiosk break, under the arrow's status, curtain, sample and archive rules", () => {
+  for (const status of [null, undefined, "upcoming", "live", "ended"])
+    for (const kiosk of [false, true]) for (const onBreak of [false, true]) for (const curtainPlaying of [false, true])
+      for (const sample of [false, true]) for (const archive of [false, true])
+        assert.equal(kioskTrailerPlaying(status, { kiosk, onBreak, curtainPlaying, sample, archive }),
+          status !== "live" && kiosk && onBreak && !curtainPlaying && !sample && !archive,
+          JSON.stringify({ status, kiosk, onBreak, curtainPlaying, sample, archive }));
+});
+
+test("the kiosk caption gives the break's end in the event zone", () => {
+  const event = { start: "2026-11-07T14:00:00Z", tz: "America/New_York", slot_minutes: 15 };
+  // Slot 2 + 2 slots of 15 minutes is 15:00Z, 10:00 AM in New York.
+  assert.match(kioskTrailerCaption({ at: 2, duration: 2 }, event, { locale: "en-US" }), /^BREAK — back to your games at 10:00\sAM$/);
+  assert.equal(kioskTrailerCaption({ at: 2, duration: 2 }, { ...event, start: "not a date" }), "BREAK");
+});
+
+test("a kiosk break loops the trailer muted under a caption, ignores close routes and ends with the break", () => {
+  const f = fixture();
+  f.state.kiosk = true;
+  const overlay = f.$("raid-preview"), video = f.$("raid-preview-video"), caption = f.$("raid-preview-caption");
+  const onBreak = { kind: "break", at: 2, duration: 2 };
+  f.preview.update({ break: null });
+  assert.equal(overlay.hidden, true);
+  assert.deepEqual(video.requests, []);
+  f.preview.update({ break: onBreak });
+  assert.equal(overlay.hidden, false);
+  assert.equal(overlay.getAttribute("data-kiosk"), "true");
+  assert.equal(video.muted, true);
+  assert.equal(video.loop, true);
+  assert.equal(video.plays, 1);
+  assert.equal(video.currentTime, 0);
+  assert.match(video.src, /assets\/raid\/preview\.mp4$/);
+  assert.match(caption.textContent, /^BREAK — back to your games at 10:00/);
+  assert.equal(f.$("raid-preview-open").hidden, true, "the kiosk still shows no arrow");
+  // A polled timeline hands over a new but equal break object every few seconds.
+  f.preview.update({ break: { ...onBreak } });
+  assert.equal(video.plays, 1, "later frames of the same break never restart it");
+  assert.equal(f.key("Escape").prevented, false);
+  f.$("raid-preview").fire("click", { target: overlay });
+  video.fire("ended");
+  f.$("raid-preview-close").fire("click");
+  assert.equal(overlay.hidden, false, "nobody at the projector can close it");
+  f.preview.update({ break: { ...onBreak, duration: 4 } });
+  assert.match(caption.textContent, /at 10:30/, "a stretched break moves the caption");
+  f.preview.update({ break: null });
+  assert.equal(overlay.hidden, true);
+  assert.equal(video.paused, true);
+  assert.equal(video.loop, false);
+  assert.equal(overlay.getAttribute("data-kiosk"), null);
+  assert.equal(caption.textContent, "");
+  for (const change of [{ raid: { status: "live" } }, { raidCurtain: {} }, { scene: "raid" }, { archive: true }, { data: null }]) {
+    const before = { ...f.state };
+    Object.assign(f.state, change);
+    f.preview.update({ break: onBreak });
+    assert.equal(overlay.hidden, true, JSON.stringify(Object.keys(change)));
+    Object.assign(f.state, before);
+  }
+  f.preview.update({ break: onBreak });
+  assert.equal(overlay.hidden, false);
+  f.state.raid = { status: "live" };
+  f.preview.update({ break: onBreak });
+  assert.equal(overlay.hidden, true, "the raid opening mid-break takes the projector back");
+
+  const desk = fixture();
+  desk.preview.update({ break: onBreak });
+  assert.equal(desk.$("raid-preview").hidden, true, "a break never opens the trailer off the kiosk");
+  assert.equal(desk.$("raid-preview-video").plays, 0);
+  assert.equal(fixture({ sample: true }).preview.update({ break: onBreak }), undefined);
+});
+
+test("the muted kiosk trailer leaves the projector's jukebox playing", async () => {
+  const f = fixture({ enabled: true });
+  await settle();
+  f.state.kiosk = true;
+  const audio = f.music.audio;
+  audio.currentTime = 37;
+  const plays = audio.plays;
+  f.preview.update({ break: { kind: "break", at: 2, duration: 2 } });
+  assert.equal(f.$("raid-preview").hidden, false);
+  f.doc.defaultView.fire("pageshow");
+  await settle();
+  assert.equal(audio.paused, false);
+  f.preview.update({ break: null });
+  await settle();
+  assert.equal(audio.paused, false);
+  assert.equal(audio.currentTime, 37);
+  assert.equal(audio.plays, plays, "closing never restarts music it did not pause");
+});
+
+test("a kiosk trailer that cannot play gives the hall back for that break only", async () => {
+  const f = fixture();
+  f.state.kiosk = true;
+  const overlay = f.$("raid-preview"), video = f.$("raid-preview-video");
+  video.playResult = () => Promise.reject(Error("unavailable"));
+  f.preview.update({ break: { kind: "break", at: 2, duration: 2 } });
+  await settle();
+  assert.equal(overlay.hidden, true);
+  assert.equal(f.$("raid-preview-status").textContent, "", "no close-and-retry message on a projector");
+  f.preview.update({ break: { kind: "break", at: 2, duration: 2 } });
+  assert.equal(video.plays, 1, "the same break does not retry every frame");
+  video.playResult = null;
+  f.preview.update({ break: { kind: "break", at: 6, duration: 1 } });
+  assert.equal(overlay.hidden, false);
+  assert.equal(video.plays, 2);
+  video.fire("error");
+  assert.equal(overlay.hidden, true, "a media error mid-loop also returns to the hall");
+  f.preview.update({ break: { kind: "break", at: 6, duration: 1 } });
+  assert.equal(overlay.hidden, true);
+});
+
+test("the hall passes each frame's admin events, and kiosk CSS fills the screen with no controls", () => {
+  assert.match(app, /raidPreview\?\.update\(active\);/);
+  assert.match(html, /<p id="raid-preview-caption"><\/p>/);
+  assert.match(css, /\.raid-preview\[data-kiosk\] \.raid-preview-controls \{ display: none; \}/);
+  assert.match(css, /\.raid-preview\[data-kiosk\] \.raid-preview-frame \{\s*width: min\(100%, calc\(100vh \* 16 \/ 9\)\); width: min\(100%, calc\(100dvh \* 16 \/ 9\)\);/);
+  assert.match(css, /#raid-preview-caption:empty \{ display: none; \}/);
 });
