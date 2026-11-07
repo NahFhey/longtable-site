@@ -888,6 +888,14 @@
    "actor": "p11",
    "table": null,
    "person": null
+  },
+  {
+   "id": "36df239449f143f18f24cff0a0c24641",
+   "at": "2026-11-07T19:41:12.015747Z",
+   "action": "end_table",
+   "actor": "p16",
+   "table": "t8",
+   "person": null
   }
  ],
  "visitors": {
@@ -906,7 +914,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-07T19:21:29.762381Z",
+ "generated_at": "2026-11-07T19:41:46.776866Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1749,7 +1757,7 @@
    "seats": 5,
    "walk_ins": true,
    "start": 4,
-   "end": 28,
+   "end": 10,
    "dm": "p16",
    "created_at": "2026-10-04T13:39:34.750963-05:00",
    "signups": [],
