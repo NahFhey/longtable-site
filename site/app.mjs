@@ -2402,6 +2402,13 @@ function toggleFullscreen() {
   } catch { /* No fullscreen API: F11 still works. */ }
 }
 
+function enterFullscreen() {
+  if (document.fullscreenElement) return;
+  try {
+    Promise.resolve(document.documentElement?.requestFullscreen?.()).catch(() => {});
+  } catch { /* No fullscreen API. */ }
+}
+
 function inputFocused() {
   const active = document.activeElement;
   return !!active && (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(active.tagName) || active.isContentEditable === true);
@@ -2426,6 +2433,8 @@ if (state.kiosk) {
   const noteInput = () => { state.lastInputAt = performance.now(); };
   document.addEventListener?.("pointermove", () => { state.lastPointerAt = state.lastInputAt = performance.now(); }, { passive: true });
   document.addEventListener?.("pointerdown", noteInput, { passive: true });
+  // Android Chrome has no F11 or fullscreen menu item, so a tap (or click) on the kiosk enters fullscreen.
+  document.addEventListener?.("pointerup", enterFullscreen, { passive: true });
   document.addEventListener?.("wheel", noteInput, { passive: true });
   document.addEventListener?.("keydown", (event) => {
     noteInput();

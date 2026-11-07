@@ -358,7 +358,9 @@ art license or bot event is needed.
 ## Kiosk mode (projector)
 
 Open `https://longtable.party/?kiosk=1` in Chrome or Firefox on the projector
-laptop and press `f` (or F11) for fullscreen. The hall alone fills the whole
+laptop and press `f` (or F11) for fullscreen. On Android Chrome, which has no
+F11, tap the screen once: any tap or click on a kiosk enters fullscreen (the
+back gesture leaves it). The hall alone fills the whole
 viewport at every aspect ratio: no header bar, fundraising strip, status line or
 side columns. The Discord and Donate QR codes are the wall plaques in the hall,
 which grow with it. It needs no other setup: the same timeline,

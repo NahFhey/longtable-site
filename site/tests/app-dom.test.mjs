@@ -2208,6 +2208,31 @@ test("kiosk toggles fullscreen on f only outside inputs and ignores a missing or
   assert.deepEqual(app.errors, []);
 });
 
+test("a kiosk tap enters fullscreen, never exits it, and ignores a missing or refusing API", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "kiosk-tap-fullscreen", { search: "?sample=1&kiosk=1" });
+  const calls = [];
+  document.documentElement.requestFullscreen = async () => { calls.push("enter"); throw new Error("Not allowed"); };
+  document.exitFullscreen = async () => { calls.push("exit"); };
+  const pointerup = app.documentListeners.get("pointerup");
+  pointerup({});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(calls, ["enter"]);
+  document.fullscreenElement = document.documentElement;
+  pointerup({});
+  assert.deepEqual(calls, ["enter"], "a tap in fullscreen stays in fullscreen");
+  delete document.documentElement.requestFullscreen;
+  delete document.fullscreenElement;
+  pointerup({});
+  assert.deepEqual(app.errors, []);
+});
+
+test("ordinary pages do not enter fullscreen on a tap", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], "page-tap-fullscreen", { search: "?sample=1" });
+  assert.equal(app.documentListeners.has("pointerup"), false);
+});
+
 test("the plaques join the automatic frame before doors and on the projector; ordinary live views frame tables", async () => {
   const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
   const layout = createRoomLayout(sample.tables, sample.room_layout);

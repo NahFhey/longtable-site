@@ -374,8 +374,9 @@ html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip)
 html[data-kiosk] main { max-width: none; padding: 0; }
 html[data-kiosk] .hall-explorer { margin: 0; border: 0; border-radius: 0; background: none; }
 html[data-kiosk] .hall-layout { gap: 0; padding: 0; }
-/* Sized from the viewport, not 100%: a percentage cannot resolve through the <details> content slot. */
-html[data-kiosk] #hall { height: 100vh; border: 0; border-radius: 0; }
+/* Sized from the viewport, not 100%: a percentage cannot resolve through the <details> content slot.
+   dvh tracks Android Chrome's address bar; 100vh alone runs under it and cuts off the hall's bottom. */
+html[data-kiosk] #hall { height: 100vh; height: 100dvh; border: 0; border-radius: 0; }
 
 /* Live fundraising stays in one row and never animates. */
 html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
@@ -537,8 +538,8 @@ html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
   .raid-board thead th { font-size: 12px; line-height: 16px; }
   .raid-board th:first-child { width: 28%; }
 }
-html[data-kiosk]:has(#hall[data-scene="raid"]) #hall-content { width: 100vw; height: 100vh; margin: 0; padding: 0; }
-html[data-kiosk]:has(#hall[data-scene="raid"]) #hall { width: 100%; height: 100vh; }
+html[data-kiosk]:has(#hall[data-scene="raid"]) #hall-content { width: 100vw; height: 100vh; height: 100dvh; margin: 0; padding: 0; }
+html[data-kiosk]:has(#hall[data-scene="raid"]) #hall { width: 100%; height: 100vh; height: 100dvh; }
 
 /* Raid-only overrides leave the hall kiosk's sizing intact. */
 @media (min-width: 900px) {
