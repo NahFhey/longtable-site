@@ -864,6 +864,14 @@
    "actor": "p20",
    "table": null,
    "person": null
+  },
+  {
+   "id": "1d10e79855934709b9cb0818870a0474",
+   "at": "2026-11-07T16:35:24.284425Z",
+   "action": "here",
+   "actor": "p13",
+   "table": null,
+   "person": null
   }
  ],
  "visitors": {
@@ -882,7 +890,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-07T16:21:42.565152Z",
+ "generated_at": "2026-11-07T16:35:27.002123Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1165,7 +1173,7 @@
      25
     ],
     "actual": {
-     "here": null,
+     "here": 3.18,
      "leaving": null
     }
    }
@@ -1695,7 +1703,10 @@
       1,
       25
      ],
-     "actual": null
+     "actual": [
+      3.18,
+      null
+     ]
     }
    ],
    "pad": 4
