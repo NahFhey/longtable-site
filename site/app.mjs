@@ -110,6 +110,7 @@ const INFO_CONTINUE_HINT = "▸ click to continue";
 const INFO_FINISH_HINT = "▸ click to finish";
 const KIOSK_CAMERA_RESET_MS = 45_000;   // a bumped mouse never leaves the projection zoomed into a corner
 const KIOSK_CURSOR_HIDE_MS = 3_000;
+const KIOSK_UPDATE_CHECK_MS = 180_000;  // a published fix reaches the projector past Cloudflare's 4 h page cache
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("hall");
@@ -233,6 +234,7 @@ const state = {
   wakeLock: null,
   lastInputAt: 0,
   lastPointerAt: 0,
+  kioskUpdateUrl: null,
 };
 function setCameraMenu(open, { focusToggle = false } = {}) {
   const controls = $("camera-controls");
@@ -2394,6 +2396,36 @@ function requestWakeLock() {
   } catch { /* Same rule for a synchronous throw. */ }
 }
 
+// Kiosk only: Cloudflare keeps index.html for 4 h, so the projector asks for its own page past every
+// cache and, when the ?v= stamps differ, reloads at the next idle moment with a `build` query.
+function buildStamp(text, file) {
+  return new RegExp(`${file.replace(".", "\\.")}\\?v=([0-9a-f]+)`).exec(text ?? "")?.[1] ?? null;
+}
+
+async function checkKioskUpdate() {
+  if (document.hidden) return;
+  try {
+    const url = new URL(location.pathname, location.href);
+    url.searchParams.set("update-check", String(Date.now()));
+    const response = await fetch(url.href, { cache: "no-store", signal: AbortSignal.timeout?.(8000) });
+    if (!response.ok) return;
+    const html = await response.text();
+    const liveApp = buildStamp(html, "app.mjs");
+    const liveCss = buildStamp(html, "styles.css");
+    const loadedApp = buildStamp(import.meta.url, "app.mjs");
+    const loadedCss = buildStamp(document.querySelector?.('link[href*="styles.css"]')?.getAttribute("href"), "styles.css");
+    const changed = (liveApp && loadedApp && liveApp !== loadedApp) || (liveCss && loadedCss && liveCss !== loadedCss);
+    if (!changed) return;
+    const build = [liveApp, liveCss].filter(Boolean).join(".");
+    const next = new URL(location.href);
+    // Loop guard: this page already came from that build's URL.
+    if (next.searchParams.get("build") === build) return;
+    next.searchParams.set("build", build);
+    state.kioskUpdateUrl = next.href;
+  } catch { /* Venue Wi-Fi drops are not an error; the next check tries again. */ }
+}
+if (state.kiosk && !state.archive) setInterval(checkKioskUpdate, KIOSK_UPDATE_CHECK_MS);
+
 function toggleFullscreen() {
   try {
     const root = document.documentElement;
@@ -2415,13 +2447,20 @@ function inputFocused() {
 }
 
 // Kiosk idle rules run on the animation clock: a manual camera returns to automatic framing after
-// 45 s without input, and the cursor hides after 3 s without pointer movement.
+// 45 s without input, a waiting new build reloads after the same 45 s, and the cursor hides after
+// 3 s without pointer movement.
 function applyKioskIdle(now) {
   if (!state.kiosk) return;
   if (state.manualCamera && now - state.lastInputAt >= KIOSK_CAMERA_RESET_MS) {
     state.manualCamera = false;
     state.manualSelection = false;
     state.frameKey = null;
+  }
+  // A new build waits for the same idle span, so it never reloads under someone at the jukebox.
+  if (state.kioskUpdateUrl && now - state.lastInputAt >= KIOSK_CAMERA_RESET_MS) {
+    const url = state.kioskUpdateUrl;
+    state.kioskUpdateUrl = null;
+    try { location.replace(url); } catch { /* A failed reload leaves the old build running. */ }
   }
   const dataset = document.documentElement?.dataset;
   if (!dataset) return;

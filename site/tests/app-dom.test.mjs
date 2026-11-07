@@ -196,6 +196,10 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
       return nodes.get(id) ?? find(body);
     },
     createElement(tag) { return new FakeNode(tag); },
+    // Only the kiosk update check reads the stylesheet link; other callers tolerate a missing node.
+    querySelector(selector) {
+      return selector.includes("styles.css") && options.stylesheetHref ? { getAttribute: () => options.stylesheetHref } : undefined;
+    },
   };
   for (const node of nodes.values()) node.ownerDocument = globalThis.document;
   const wakeLockRequests = [];
@@ -203,8 +207,10 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     async request(kind) { wakeLockRequests.push(kind); if (options.wakeLock === "rejects") throw new Error("NotAllowedError"); return { release() {} }; },
   } } : {} });
   const urlWrites = [];
-  globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
-  globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
+  const navigations = [];
+  const locationAt = (href) => Object.assign(new URL(href), { replace(next) { navigations.push(next); } });
+  globalThis.location = locationAt(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
+  globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = locationAt(url); } };
   const phoneMedia = { matches: !!options.mobile, addEventListener(kind, listener) { this.change = listener; } };
   globalThis.matchMedia = (query) => query.includes("650") ? phoneMedia : { matches: !!options.reducedMotion, addEventListener() {} };
   const storage = options.storage ?? new Map();
@@ -235,6 +241,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   let fetchIndex = 0;
   const fetchUrls = [];
   const teamFetches = [];
+  const updateChecks = [];
   globalThis.fetch = async (url, init) => {
     const href = new URL(url, location.href).href;
     // The Extra Life team total has its own stub so it never consumes a timeline from the sequence.
@@ -243,12 +250,18 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
       if (options.team instanceof Error) throw options.team;
       return { ok: true, async json() { return structuredClone(options.team ?? { teamID: 74917, sumDonations: 20, fundraisingGoal: 2500 }); } };
     }
+    // The kiosk's own-page update check reads index.html text, never a timeline.
+    if (href.includes("update-check=")) {
+      updateChecks.push({ href, init });
+      if (options.indexHtml instanceof Error) throw options.indexHtml;
+      return { ok: true, async text() { return options.indexHtml ?? ""; } };
+    }
     fetchUrls.push(href);
     const item = dataSequence[Math.min(fetchIndex++, dataSequence.length - 1)];
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, originalParents, frames, intervals, phoneMedia, storage, storageCalls, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, originalParents, frames, intervals, phoneMedia, storage, storageCalls, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests, updateChecks, navigations };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -2181,6 +2194,73 @@ test("kiosk returns a manual camera to automatic framing after 45 s idle, hides 
   plain.transforms.length = 0; plain.frames.shift()?.(performance.now() + 60_000);
   assert.deepEqual(plain.transforms[1], plainZoomed, "outside kiosk a manual camera never resets");
   assert.equal(document.documentElement.dataset.idle, undefined);
+});
+
+const OLD_CSS = "./styles.css?v=aaaaaaaaaaaa";
+const newIndex = (css = "bbbbbbbbbbbb") => `<link rel="stylesheet" href="./styles.css?v=${css}">\n<script type="module" src="./app.mjs?v=cccccccccccc"></script>`;
+async function kioskUpdateFixture(label, options = {}) {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const app = await runApp([sample], label, { search: "?sample=1&kiosk=1", stylesheetHref: OLD_CSS, indexHtml: newIndex(), ...options });
+  const check = app.intervals.find(fn => fn.name === "checkKioskUpdate");
+  return { app, check, idleFrame: (offset = 50_000) => app.frames.shift()?.(performance.now() + offset) };
+}
+
+test("kiosk update check: a changed stylesheet stamp reloads once at idle with a build query", async () => {
+  const { app, check, idleFrame } = await kioskUpdateFixture("kiosk-update-changed");
+  assert.equal(typeof check, "function");
+  await check();
+  assert.equal(app.updateChecks.length, 1);
+  const checked = new URL(app.updateChecks[0].href);
+  assert.equal(checked.pathname, "/");
+  assert.match(checked.searchParams.get("update-check"), /^\d+$/);
+  assert.equal(checked.searchParams.get("kiosk"), null, "the check fetches the bare page path");
+  assert.equal(app.updateChecks[0].init.cache, "no-store");
+  assert.ok(app.updateChecks[0].init.signal, "the check has a timeout signal");
+  idleFrame();
+  assert.equal(app.navigations.length, 1);
+  const next = new URL(app.navigations[0]);
+  assert.equal(next.searchParams.get("build"), "cccccccccccc.bbbbbbbbbbbb");
+  assert.equal(next.searchParams.get("kiosk"), "1");
+  assert.equal(next.searchParams.get("sample"), "1");
+  idleFrame();
+  assert.equal(app.navigations.length, 1, "the stored reload is used once");
+  assert.deepEqual(app.errors, []);
+});
+
+test("kiosk update check: the same stamp, a URL already on that build, or a failed fetch never reloads", async () => {
+  const same = await kioskUpdateFixture("kiosk-update-same", { indexHtml: newIndex("aaaaaaaaaaaa") });
+  await same.check();
+  same.idleFrame();
+  assert.equal(same.app.updateChecks.length, 1);
+  assert.deepEqual(same.app.navigations, []);
+  const guarded = await kioskUpdateFixture("kiosk-update-guard", { search: "?sample=1&kiosk=1&build=cccccccccccc.bbbbbbbbbbbb" });
+  await guarded.check();
+  guarded.idleFrame();
+  assert.deepEqual(guarded.app.navigations, [], "a page loaded from that build's URL does not loop");
+  const failed = await kioskUpdateFixture("kiosk-update-error", { indexHtml: new Error("offline") });
+  await failed.check();
+  failed.idleFrame();
+  assert.equal(failed.app.updateChecks.length, 1);
+  assert.deepEqual(failed.app.navigations, []);
+  assert.deepEqual(failed.app.errors, []);
+});
+
+test("kiosk update check: a pending reload waits for 45 s without input", async () => {
+  const { app, check } = await kioskUpdateFixture("kiosk-update-input");
+  await check();
+  app.documentListeners.get("pointerdown")();
+  app.frames.shift()?.(performance.now() + 10_000);
+  assert.deepEqual(app.navigations, [], "recent input holds the reload");
+  app.frames.shift()?.(performance.now() + 50_000);
+  assert.equal(app.navigations.length, 1);
+});
+
+test("kiosk update check runs only on a live kiosk", async () => {
+  const sample = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
+  const plain = await runApp([sample], "kiosk-update-plain", { search: "?sample=1" });
+  assert.equal(plain.intervals.find(fn => fn.name === "checkKioskUpdate"), undefined);
+  const archive = await runApp([sample], "kiosk-update-archive", { search: "?kiosk=1", archive: true });
+  assert.equal(archive.intervals.find(fn => fn.name === "checkKioskUpdate"), undefined);
 });
 
 test("kiosk toggles fullscreen on f only outside inputs and ignores a missing or refusing API", async () => {

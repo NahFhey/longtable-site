@@ -370,6 +370,11 @@ total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
 the page also asks for a screen wake lock where the browser allows one. After
 45 seconds without input a moved camera returns to the kiosk's automatic frame,
 which always contains the whole hall including the lounge, and the cursor hides after 3 seconds.
+Every 3 minutes a kiosk fetches its own page past every cache (Cloudflare keeps
+index.html for up to 4 hours) and, when the `app.mjs` or `styles.css` stamp has
+changed, reloads itself to the same URL plus `build=<stamps>` after the same 45
+seconds without input. The reload leaves fullscreen (tap once again on Android)
+and stops jukebox music.
 
 `?sample=50&kiosk=1` is the dress rehearsal (the demo event in kiosk chrome);
 `?kiosk=1&now=<ISO>` previews the gathering scene before doors. `?kiosk=1`
