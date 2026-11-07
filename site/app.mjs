@@ -261,58 +261,11 @@ function updateView() {
 updateView();
 arrangeHall();
 mobile.addEventListener?.("change", () => { updateView(); arrangeHall(); });
-// Kiosk hides the scrubber panel, so its clock lives in the bar.
-if (state.kiosk) $("mode-badge").after($("clock"));
 if ($("info-open")) $("info-open").hidden = state.kiosk;
 if (state.kiosk) {
   if (document.documentElement?.dataset) document.documentElement.dataset.kiosk = "1";
   $("hall-explorer").open = true;
 }
-// Move the existing live regions with their containers; keep their original insertion points.
-function setupKioskColumns() {
-  const media = matchMedia("(min-aspect-ratio: 3/2)");
-  const info = document.createElement("aside");
-  info.id = "kiosk-info";
-  info.setAttribute("aria-label", "Event information");
-  const codes = document.createElement("aside");
-  codes.id = "kiosk-codes";
-  codes.setAttribute("aria-label", "Event QR codes");
-  const moved = [$("event-name").parentElement, $("mode-badge").parentElement, $("fundraising-strip"), $("status")]
-    .map(node => ({ node, parent: node.parentElement, next: node.nextSibling }));
-  if (!state.archive) {
-    for (const plaque of WALL_PLAQUES) {
-      if (!plaque.url) continue;
-      const card = document.createElement("div");
-      card.className = "kiosk-code";
-      const mat = document.createElement("div");
-      mat.className = "kiosk-code-mat";
-      const image = document.createElement("img");
-      image.src = new URL(plaque.qr, import.meta.url).href;
-      image.alt = plaque.label;
-      mat.append(image);
-      const label = document.createElement("p");
-      label.className = "kiosk-code-label";
-      label.textContent = plaque.label;
-      const url = document.createElement("p");
-      url.className = "kiosk-code-url";
-      url.textContent = shortUrl(plaque.url);
-      card.append(mat, label, url);
-      codes.append(card);
-    }
-  }
-  document.body.append(info, codes);
-  function arrangeKiosk() {
-    info.hidden = !media.matches;
-    codes.hidden = !media.matches || !codes.children.length;
-    for (const { node, parent, next } of moved) {
-      if (media.matches) info.append(node);
-      else parent.insertBefore(node, next);
-    }
-  }
-  arrangeKiosk();
-  media.addEventListener("change", arrangeKiosk);
-}
-if (state.kiosk) setupKioskColumns();
 // The footer's kiosk link keeps the page's other query flags (sample, now, at) so it opens the same view as a kiosk.
 {
   const link = $("kiosk-link");
@@ -2347,9 +2300,8 @@ function installTimeline(data, initial = false) {
   state.layout = buildLayout();
   restoreCameraMemory();
   state.loungeGeometry = null;
-  // Desktop aspect and kiosk column width both include the back wall.
+  // The desktop aspect includes the back wall.
   canvas.style.setProperty("--hall-aspect", `${state.layout.width} / ${state.layout.height - state.layout.backWall.y}`);
-  document.documentElement.style.setProperty("--hall-ratio", state.layout.width / (state.layout.height - state.layout.backWall.y));
   state.frameKey = null;
   renderActions();
   state.adminEvents = indexAdminEvents(data);

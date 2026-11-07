@@ -358,15 +358,10 @@ art license or bot event is needed.
 ## Kiosk mode (projector)
 
 Open `https://longtable.party/?kiosk=1` in Chrome or Firefox on the projector
-laptop and press `f` (or F11) for fullscreen. At aspect ratios of 3:2 or wider,
-event identity, badge, clock, scene, live Extra Life total and thermometer, and
-status occupy the left column. Large Discord and Donate QR cards occupy the
-right column. The hall fills the viewport height between the page gutters, with
-its width derived from the room including the back wall. At 1920×1080 the
-42×40 demo hall is about 1110×1057px and the QR images are about 300px square.
-Below 3:2 (including 1400×1050), the existing fundraising strip, header bar and
-status row return. Resizing moves the same live-region nodes between layouts.
-The in-world plaques remain scenery in both layouts; archives have no QR cards. It needs no other setup: the same timeline,
+laptop and press `f` (or F11) for fullscreen. The hall alone fills the whole
+viewport at every aspect ratio: no header bar, fundraising strip, status line or
+side columns. The Discord and Donate QR codes are the wall plaques in the hall,
+which grow with it. It needs no other setup: the same timeline,
 polling and consent rules as the public page apply, and nothing new about any
 attendee appears. Keep the tab in the foreground (polling and the Extra Life
 total pause while the tab is hidden), plug the laptop in, and disable OS sleep;
@@ -719,10 +714,8 @@ goal is met. A zero goal hides the thermometer and omits the goal from the text.
 A failed first fetch shows “Support our Extra Life team” with the thermometer
 hidden; the header's Donate stays available. Later failures retain the last fill and thermometer
 state and label the text “last available total”. Totals never animate. Phones
-omit the Extra Life brand text; kiosks enlarge the total and hide the header
-actions. Wide kiosks stack the total above the thermometer in the left column
-and provide large QR cards in the right column; narrow kiosks retain the strip. Samples and archived replays do not fetch or
-show the strip.
+omit the Extra Life brand text. Kiosks hide the strip so the hall fills the
+screen. Samples and archived replays do not fetch or show the strip.
 
 ## Raid room
 
@@ -771,4 +764,4 @@ right sidebar for legs, checklist and leaderboard. A compact 96px header occupie
 the empty top band; replay controls occupy the empty bottom band. Geometry tests
 keep both clear of the boss, rings, plates and party sprites. At 720px height the
 sidebar panels may scroll. The phone keeps its canvas aspect and stacked panels;
-the kiosk keeps its hall-only info and QR columns hidden during the raid.
+the kiosk raid fills the screen, as the kiosk hall does.

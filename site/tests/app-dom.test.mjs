@@ -206,8 +206,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
   globalThis.location = new URL(`https://longtable.test/${options.archive ? "project/events/0123456789abcdef0123456789abcdef/" : ""}${search}`);
   globalThis.history = { replaceState(_state, _title, url) { urlWrites.push(url); globalThis.location = new URL(url); } };
   const phoneMedia = { matches: !!options.mobile, addEventListener(kind, listener) { this.change = listener; } };
-  const kioskMedia = { matches: !!options.wideKiosk, addEventListener(kind, listener) { this.change = listener; } };
-  globalThis.matchMedia = (query) => query === "(min-aspect-ratio: 3/2)" ? kioskMedia : query.includes("650") ? phoneMedia : { matches: !!options.reducedMotion, addEventListener() {} };
+  globalThis.matchMedia = (query) => query.includes("650") ? phoneMedia : { matches: !!options.reducedMotion, addEventListener() {} };
   const storage = options.storage ?? new Map();
   const storageCalls = [];
   Object.defineProperty(globalThis, "localStorage", { configurable: true, get() {
@@ -249,7 +248,7 @@ function installDom(dataSequence, search = "?sample=1", options = {}) {
     if (item instanceof Error) throw item;
     return { ok: true, async json() { return structuredClone(item); } };
   };
-  return { nodes, originalParents, frames, intervals, phoneMedia, kioskMedia, storage, storageCalls, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
+  return { nodes, originalParents, frames, intervals, phoneMedia, storage, storageCalls, documentListeners, contextCalls, textCalls, imageCalls, imageRequests, rectCalls, canvasCalls, transforms, urlWrites, fetchUrls, teamFetches, wakeLockRequests };
 }
 
 async function runApp(dataSequence, label, options = {}) {
@@ -3142,13 +3141,13 @@ for (const mobile of [false, true]) {
   });
 }
 
-test("kiosk moves only the clock into the bar after the badge", async () => {
+test("kiosk leaves the header, fundraising and status nodes in place and the clock in the timeline", async () => {
   const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  const app = await runApp([data], "kiosk-clock-placement", { search: "?kiosk=1" });
-  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
-  assert.equal(app.nodes.get("clock").nextElementSibling, app.nodes.get("scene-event"));
-  assert.equal(app.nodes.get("timeline-controls").contains(app.nodes.get("clock")), false);
-  for (const id of ["play", "return-now", "speed"]) assert.ok(app.nodes.get("timeline-controls").contains(app.nodes.get(id)));
+  const app = await runApp([data], "kiosk-hall-only", { search: "?kiosk=1" });
+  for (const [id, parent] of app.originalParents) assert.equal(app.nodes.get(id).parentElement, parent, `${id} keeps its parent`);
+  for (const id of ["clock", "play", "return-now", "speed"]) assert.ok(app.nodes.get("timeline-controls").contains(app.nodes.get(id)), `${id} stays in the timeline`);
+  assert.equal(document.getElementById("kiosk-info"), undefined, "no info column");
+  assert.equal(document.getElementById("kiosk-codes"), undefined, "no QR column");
   assert.deepEqual(app.errors, []);
 });
 
@@ -3332,80 +3331,6 @@ test("mobile explicit selection and Fit active tables keep the selected target",
   assert.deepEqual(cameraFrame(app), selected, "manual selection wins even after its game ends");
   app.nodes.get("fit-active").listeners.get("click")();
   assert.deepEqual(cameraFrame(app), selected);
-});
-
-test("wide kiosk columns preserve live nodes and restore the narrow layout on every change", async () => {
-  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  const app = await runApp([data], "kiosk-column-moves", { search: "?kiosk=1", wideKiosk: true });
-  const info = document.getElementById("kiosk-info");
-  assert.ok(info, "wide kiosks build the info column");
-  const identity = app.nodes.get("event-name").parentElement;
-  const readout = app.nodes.get("current-event").parentElement;
-  const strip = app.nodes.get("fundraising-strip");
-  const status = app.nodes.get("status");
-  assert.deepEqual(info.children, [identity, readout, strip, status]);
-  assert.equal(strip.hidden, false, "live fundraising remains visible");
-  for (const id of ["status", "current-event", "fundraising-total"]) {
-    assert.equal(document.getElementById(id), app.nodes.get(id), `${id} retains its pre-boot node`);
-    assert.ok(info.contains(app.nodes.get(id)), `${id} moves into the info column`);
-  }
-  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
-  for (let i = 0; i < 2; i += 1) {
-    app.kioskMedia.matches = false;
-    app.kioskMedia.change({ matches: false });
-    assert.equal(info.hidden, true);
-    assert.equal(document.getElementById("kiosk-codes").hidden, true);
-    for (const [id, parent] of app.originalParents) assert.equal(app.nodes.get(id).parentElement, parent, `${id} returns to its original parent`);
-    assert.equal(info.contains(status), false);
-    app.kioskMedia.matches = true;
-    app.kioskMedia.change({ matches: true });
-    assert.equal(info.hidden, false);
-    assert.deepEqual(info.children, [identity, readout, strip, status]);
-  }
-  const layout = createRoomLayout(data.tables, data.room_layout);
-  assert.equal(document.documentElement.style["--hall-ratio"], String(layout.width / (layout.height - layout.backWall.y)));
-  assert.deepEqual(app.errors, []);
-});
-
-test("kiosk QR cards follow plaque order, images, labels and URLs", async () => {
-  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  const app = await runApp([data], "kiosk-column-codes", { search: "?sample=1&kiosk=1", wideKiosk: true });
-  const codes = document.getElementById("kiosk-codes");
-  assert.ok(codes, "kiosks build the codes column");
-  assert.equal(codes.hidden, false);
-  assert.equal(codes.children.length, WALL_PLAQUES.length);
-  codes.children.forEach((card, index) => {
-    const plaque = WALL_PLAQUES[index];
-    const [mat, label, url] = card.children;
-    assert.equal(mat.children[0].tagName, "IMG");
-    assert.equal(mat.children[0].alt, plaque.label);
-    assert.equal(mat.children[0].src, new URL(plaque.qr, new URL("../app.mjs", import.meta.url)).href);
-    assert.equal(label.textContent, plaque.label);
-    assert.equal(url.textContent, shortUrl(plaque.url));
-  });
-  assert.equal(app.nodes.get("fundraising-strip").hidden, true, "samples still hide fundraising");
-});
-
-test("archive kiosk columns keep the codes column empty and hidden", async () => {
-  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  const app = await runApp([data], "kiosk-column-archive", { search: "?kiosk=1", archive: true, wideKiosk: true });
-  const codes = document.getElementById("kiosk-codes");
-  assert.ok(codes, "archive kiosks build an empty codes column");
-  assert.deepEqual(codes.children, []);
-  assert.equal(codes.hidden, true);
-  assert.equal(app.nodes.get("fundraising-strip").hidden, true);
-});
-
-test("narrow kiosk builds hidden columns without moving the bar nodes", async () => {
-  const data = JSON.parse(await readFile(new URL("../data/timeline.sample.json", import.meta.url), "utf8"));
-  const app = await runApp([data], "kiosk-column-narrow", { search: "?kiosk=1" });
-  const info = document.getElementById("kiosk-info");
-  assert.ok(info, "narrow kiosks prepare the info column at boot");
-  assert.equal(info.hidden, true);
-  assert.deepEqual(info.children, []);
-  for (const [id, parent] of app.originalParents) assert.equal(app.nodes.get(id).parentElement, parent);
-  assert.equal(app.nodes.get("mode-badge").nextElementSibling, app.nodes.get("clock"));
-  assert.deepEqual(app.errors, []);
 });
 
 const clickControl = (app, id) => app.nodes.get(id).listeners.get("click")?.();
@@ -3965,7 +3890,7 @@ test("hidden raid members draw only silhouettes while visible members stay armed
 const curtainBeat = app => app.nodes.get("hall").getAttribute("data-raid-curtain");
 async function startRaidCurtain(label, speed = 30, kiosk = false) {
   const data = await raidSample();
-  const app = await runApp([data], label, { search: `?sample=raid&at=39.999999${kiosk ? "&kiosk=1" : ""}`, wideKiosk: kiosk });
+  const app = await runApp([data], label, { search: `?sample=raid&at=39.999999${kiosk ? "&kiosk=1" : ""}` });
   app.nodes.get("speed").listeners.get("change")({ target: { value: String(speed) } });
   app.nodes.get("play").listeners.get("click")();
   // Integer frame times: a fractional start made (start + 5500) - start land an ulp off 5500, so
@@ -4080,7 +4005,7 @@ test("raid sample loader and selected-time scene toggle persist only inside the 
 });
 
 test("kiosk follows default raid scene, hides toggle and ignores its Hall button", async () => {
-  const app = await runApp([await raidSample()], "raid-kiosk", { search: "?sample=raid&kiosk=1&at=40", wideKiosk: true, reducedMotion: true });
+  const app = await runApp([await raidSample()], "raid-kiosk", { search: "?sample=raid&kiosk=1&at=40", reducedMotion: true });
   assert.deepEqual(app.errors, []);
   assert.equal(raidScene(app), "raid"); assert.equal(app.nodes.get("scene-toggle").hidden, true);
   app.nodes.get("scene-hall").listeners.get("click")(); raidSeek(app, 41);
