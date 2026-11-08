@@ -922,7 +922,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-07T23:00:05.874354Z",
+ "generated_at": "2026-11-08T02:49:56.976475Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -1796,6 +1796,15 @@
    "kind": "break",
    "at": 12.0,
    "duration": 2.0,
+   "text": null,
+   "person": null,
+   "by": "p1"
+  },
+  {
+   "id": "e4",
+   "kind": "break",
+   "at": 26.0,
+   "duration": 0.5,
    "text": null,
    "person": null,
    "by": "p1"
