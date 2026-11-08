@@ -936,6 +936,14 @@
    "actor": null,
    "table": "t1",
    "person": null
+  },
+  {
+   "id": "676ea2a7e0f1477892af8117f3b186a3",
+   "at": "2026-11-08T16:00:00Z",
+   "action": "end_table",
+   "actor": null,
+   "table": "t2",
+   "person": null
   }
  ],
  "visitors": {
@@ -954,7 +962,7 @@
   "overflow_capacity": 120
  },
  "phase": "live",
- "generated_at": "2026-11-08T15:00:13.200305Z",
+ "generated_at": "2026-11-08T16:00:04.183640Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
