@@ -2,6 +2,13 @@
  "format": 1,
  "events": [
   {
+   "event_id": "e346c3f074a246c7a4f48a92cb512dd6",
+   "name": "24 Hour D&D",
+   "start": "2026-11-07T10:00:00-05:00",
+   "tz": "America/New_York",
+   "tables": 7
+  },
+  {
    "event_id": "9611039761ab4ce3b086f4fedae83dc2",
    "name": "Lanternlight Marathon — 50-person demo",
    "start": "2026-11-07T10:00:00-05:00",

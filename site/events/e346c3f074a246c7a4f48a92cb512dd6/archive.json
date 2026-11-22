@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "fidelity": "final-schedule",
+ "event_id": "e346c3f074a246c7a4f48a92cb512dd6",
+ "preserved_at": "2026-11-22T16:00:00.002886Z",
+ "presentation_version": 1,
+ "renderer": "318ef6829757db80418da7ba20134ee852d71d69ebf4d8fda52df2ead62d448d",
+ "schema": 7,
+ "room_layout": {
+  "version": 1,
+  "pad_capacity": 20,
+  "overflow_capacity": 120
+ }
+}

@@ -1,0 +1,456 @@
+:root {
+  color-scheme: dark;
+  --ink: #f1eadb;
+  --muted: #b1b5a8;
+  --panel: #1c2925;
+  --panel-2: #273731;
+  --line: #3b4b40;
+  --bar: #55685b;
+  --gold: #dfba76;
+  --raised: #d9604c;
+  --fund-strip: 2.75rem;
+  --focus: #9cdbcd;
+  --error: #ffb2a7;
+  --live: #285b43;
+  --page-width: 1480px;
+  --gutter: clamp(1rem, 3vw, 3rem);
+  font: 15px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+body { margin: 0; background: #121d19; color: var(--ink); }
+a { color: var(--gold); text-underline-offset: .25em; }
+a:hover { color: #f5dba7; }
+button, select, input { font: inherit; }
+button, select {
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: .35rem;
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: .45rem .85rem;
+}
+button, summary, select { cursor: pointer; }
+button { transition: background .15s, border-color .15s; }
+button:hover:not(:disabled), select:hover:not(:disabled) { border-color: var(--gold); background: #34483b; }
+button:disabled, select:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+h1, h2, h3 { text-wrap: balance; }
+h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+h1 { margin: .4rem 0 .65rem; font-size: clamp(2.4rem, 4vw, 3.4rem); line-height: 1.06; letter-spacing: -.045em; overflow-wrap: anywhere; }
+h2 { font-size: clamp(1.65rem, 2.5vw, 2.1rem); line-height: 1.2; }
+.eyebrow { margin: 0; color: var(--gold); font-size: .7rem; font-weight: 750; letter-spacing: .19em; text-transform: uppercase; }
+.eyebrow span { margin-right: .65rem; }
+.muted { color: var(--muted); }
+
+.skip-link { position: absolute; left: 1rem; top: -5rem; z-index: 20; padding: .7rem 1rem; background: var(--ink); color: #121d19; }
+.skip-link:focus { top: 1rem; }
+.site-bar { max-width: var(--page-width); margin: auto; min-height: 78px; padding: 1rem var(--gutter); display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
+.wordmark { display: inline-flex; align-items: center; gap: .65rem; color: var(--ink); text-decoration: none; font-size: 1.45rem; font-weight: 750; letter-spacing: -.06em; }
+.wordmark img { border-radius: .3rem; }
+.wordmark-dot { color: var(--gold); margin-left: -.65rem; }
+.site-nav { display: flex; align-items: center; gap: clamp(1rem, 3vw, 2.5rem); font-size: .85rem; }
+.site-nav a { color: var(--muted); text-decoration: none; padding: .5rem 0; }
+.site-nav a:hover { color: var(--gold); }
+.site-nav span { margin-left: .4rem; color: var(--gold); }
+
+.masthead { max-width: var(--page-width); margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 25rem); gap: 2rem 4rem; align-items: center; padding: 1.25rem var(--gutter); }
+.identity { min-width: 0; }
+.event-title a { color: inherit; text-decoration: none; }
+.title-dot { color: var(--gold); }
+.identity .site-nav { flex-wrap: wrap; margin-top: .75rem; }
+.orientation { max-width: 43rem; margin: 0 0 .65rem; color: var(--muted); font-size: .98rem; line-height: 1.7; }
+.event-console { padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--panel); box-shadow: 0 12px 35px #00000015; }
+.readout { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+.readout time { font-size: clamp(1.1rem, 1.8vw, 1.4rem); font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+#scene-event { color: var(--gold); font-size: .8rem; font-weight: 750; }
+.badge { border: 1px solid var(--line); border-radius: 999px; padding: .2rem .65rem; font-size: .65rem; font-weight: 750; letter-spacing: .12em; }
+.badge.live { background: var(--live); border-color: #578867; }
+.badge.live::before { content: ""; display: inline-block; width: .4rem; height: .4rem; border-radius: 50%; background: #b5e6be; margin-right: .45rem; vertical-align: .06rem; }
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; font-size: .8rem; }
+.controls label { color: var(--muted); margin-left: auto; }
+#play { min-width: 5rem; color: #17251d; background: var(--gold); border-color: var(--gold); font-weight: 750; }
+#play:hover:not(:disabled) { background: #f1d299; }
+.record-note { margin: .75rem 0 0; color: var(--gold); }
+.event-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.event-actions:not(:empty) { margin: 1rem 0; }
+.event-actions a { display: inline-block; border-radius: .3rem; padding: .6rem 1rem; background: var(--gold); color: #17251d; font-weight: 700; text-decoration: none; }
+
+main { max-width: var(--page-width); margin: 0 auto; padding: 0 var(--gutter); overflow-x: clip; } /* the closed hall drawer waits off the scene's right edge */
+#hall-content { display: flex; flex-direction: column; }
+.status { margin: 0; padding: 1rem 0 .3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; min-height: 1.5rem; }
+.status.error { color: var(--error); font-weight: 700; }
+.status.stale, .sync-controls.delayed { color: #ffd58f; }
+.status a { color: var(--gold); font-weight: 700; }
+.sync-controls { margin: 1rem 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem 1rem; color: var(--muted); font-size: .72rem; }
+.sync-controls button { min-height: 2rem; padding: .2rem .6rem; background: transparent; font-size: .72rem; }
+/* The hall is always open: app.mjs opens the <details> and nothing on the page can close it, since its summary never shows. */
+.hall-explorer { margin-top: 1rem; border: 1px solid var(--line); border-radius: .6rem; background: #18241f; }
+.hall-explorer > summary { display: none; }
+.hall-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding: 1.25rem; align-items: start; }
+.scene-wrap { position: relative; min-width: 0; }
+.camera-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.camera-controls button { min-height: 2.5rem; font-size: .75rem; background: #21332a; }
+#zoom-in, #zoom-out { min-width: 2.5rem; font-size: 1.1rem; line-height: 1; }
+.camera-help { color: var(--muted); font-size: .7rem; margin: .5rem 0 .8rem; }
+canvas { display: block; width: 100%; height: clamp(320px, 39vw, 540px); touch-action: none; cursor: grab; border: 1px solid #766749; border-radius: .3rem; background: #100f15; image-rendering: pixelated; image-rendering: crisp-edges; }
+canvas:active { cursor: grabbing; }
+/* Off phones and the kiosk the view takes the hall's shape (app.mjs sets --hall-aspect from the room), so each row
+   of tables the hall gains makes the view taller. The cap keeps the whole view on one screen; past it, the camera pans. */
+html:not([data-kiosk]) #hall { height: auto; aspect-ratio: var(--hall-aspect, 2 / 1); min-height: 320px; max-height: max(320px, calc(100vh - var(--fund-strip) - var(--desk-bar, 3.5rem) - 2.5rem)); }
+.tooltip { position: absolute; z-index: 5; pointer-events: none; max-width: min(24rem, 80vw); padding: .4rem .65rem; border: 1px solid #ffffff52; border-radius: .3rem; background: #070d0beb; color: white; font-size: .82rem; }
+.timeline-controls { margin-top: 1rem; padding: .85rem 1rem; background: #111d17; border: 1px solid var(--line); border-radius: .35rem; }
+.timeline-head > label { color: var(--gold); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
+.timeline-head { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; }
+.timeline-head time { font-size: .95rem; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; }
+.timeline-head .controls { margin-left: auto; flex-wrap: nowrap; }
+.timeline-head .controls label { margin-left: .25rem; }
+.timeline-head .controls button, .timeline-head .controls select { min-height: 2rem; padding: .15rem .7rem; }
+@media (pointer: coarse) { .timeline-head .controls button, .timeline-head .controls select { min-height: 44px; } }
+.timeline-track { position: relative; min-width: 0; margin: .7rem 0; }
+.scrubber-bars { position: absolute; inset-inline: 5px; top: 50%; height: 18px; transform: translateY(-50%); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; pointer-events: none; }
+.scrubber-bars::after { content: ""; position: absolute; top: 100%; width: 100%; height: 1.5px; background: var(--line); }
+.scrubber-bars > span { margin-right: 1px; background: var(--bar); }
+.scrubber-bars > span:last-child { margin-right: 0; }
+.scrubber-bars > .previewed { background: var(--focus); }
+.scrubber-bars > .selected { background: var(--gold); }
+.now-tick { position: absolute; top: 50%; width: 1px; height: 18px; transform: translate(-50%, -50%); background: var(--muted); pointer-events: none; }
+#scrubber { position: relative; display: block; appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; background: transparent; cursor: pointer; }
+#scrubber:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#scrubber::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+#scrubber::-moz-range-track, #scrubber::-moz-range-progress { height: 24px; background: transparent; }
+/* The transparent 10px thumb aligns native travel with the 5px bar insets. */
+#scrubber::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 10px; height: 24px; border: 0; border-radius: 0; background: linear-gradient(var(--ink), var(--ink)) center top / 6px 2px no-repeat, linear-gradient(to right, transparent 3px, #111d17 3px, #111d17 4px, var(--ink) 4px, var(--ink) 6px, #111d17 6px, #111d17 7px, transparent 7px); }
+#scrubber::-moz-range-thumb { width: 10px; height: 24px; border: 0; border-radius: 0; background: linear-gradient(var(--ink), var(--ink)) center top / 6px 2px no-repeat, linear-gradient(to right, transparent 3px, #111d17 3px, #111d17 4px, var(--ink) 4px, var(--ink) 6px, #111d17 6px, #111d17 7px, transparent 7px); }
+#scrubber:disabled::-webkit-slider-thumb, #timeline-track[data-empty="true"] #scrubber::-webkit-slider-thumb { background: none; }
+#scrubber:disabled::-moz-range-thumb, #timeline-track[data-empty="true"] #scrubber::-moz-range-thumb { background: none; }
+@media (pointer: coarse) { #scrubber { height: 44px; } }
+.timeline-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem 1rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+#now-marker { color: var(--gold); }
+/* The jukebox player floats over the scene beside the drawn jukebox; app.mjs anchors it each frame while open. */
+/* Keyboard route to the jukebox: hidden until focused, then a normal button above the canvas. */
+.jukebox-key { display: block; margin: 0 0 .5rem; min-height: 44px; padding: .3rem .8rem; }
+.jukebox-key:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.music-panel { position: absolute; z-index: 6; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .5rem; align-items: center; width: 15rem; max-width: calc(100% - 1rem); padding: .7rem .85rem .6rem; border: 1px solid var(--gold); border-radius: .4rem; background: #0b1310f0; color: var(--ink); font-size: .8rem; box-shadow: 0 10px 30px #00000066; }
+.music-track, .music-buttons, .music-panel label, #music-status { grid-column: 1 / -1; }
+.music-track { margin: 0 0 .5rem; color: var(--gold); font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; }
+.music-buttons { display: flex; gap: .4rem; }
+.music-buttons button { min-height: 44px; padding: .3rem .55rem; background: transparent; font-size: .75rem; white-space: nowrap; }
+#music-toggle { flex: 1; }
+#music-close { min-width: 44px; font-size: 1.15rem; line-height: 1; }
+.music-panel label { margin-top: .6rem; color: var(--muted); font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; }
+#music-volume { width: 100%; min-width: 0; min-height: 44px; margin: 0; accent-color: var(--gold); }
+#music-volume-value { min-width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+#music-status { margin-top: .2rem; color: var(--muted); font-size: .7rem; }
+
+.hall-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 4; width: min(22rem, calc(100% - 3rem));
+  display: flex; flex-direction: column; overflow-y: auto;
+  background: var(--panel); border: 1px solid #655e45; border-top: 3px solid var(--gold); border-radius: .3rem 0 0 .3rem; box-shadow: -.5rem 0 1.5rem #00000066;
+  transform: translateX(calc(100% + 1.5rem)); visibility: hidden;
+  transition: transform .22s ease-out, visibility 0s linear .22s;
+}
+.hall-drawer[data-view] { transform: none; visibility: visible; transition: transform .22s ease-out; }
+.hall-drawer[data-view="detail"] .activity-panel, .hall-drawer[data-view="activity"] #detail { display: none; }
+.drawer-close { position: sticky; top: 0; align-self: flex-end; min-width: 2.5rem; min-height: 2.5rem; margin: .35rem .35rem -2.85rem 0; font-size: 1.15rem; line-height: 1; z-index: 1; }
+@media (pointer: coarse) { .drawer-close { width: 44px; height: 44px; } }
+.detail { min-width: 0; padding: 1.1rem; }
+.detail h2 { padding-right: 2.75rem; margin: 0 0 .6rem; font-size: 1.65rem; overflow-wrap: anywhere; }
+.detail h3 { margin: 1.3rem 0 .4rem; padding-top: .85rem; border-top: 1px solid var(--line); font-size: .7rem; color: var(--gold); text-transform: uppercase; letter-spacing: .12em; }
+.detail p { margin: .6rem 0; overflow-wrap: anywhere; font-size: .87rem; }
+.detail ul { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .83rem; color: var(--muted); }
+.system { color: var(--gold); font-weight: 700; }
+.table-phase { color: #c4d5bd; font-size: .78rem; }
+.dice-result { color: var(--gold); overflow-wrap: anywhere; }
+.dice-result:empty { margin: 0; }
+.dice-result:not(:empty) { padding: .6rem .75rem; border-left: 2px solid var(--gold); background: #dfba7609; font-size: .8rem; }
+.join-instructions { color: var(--muted); font-size: .8rem; }
+
+.table-list { padding: 2rem 0 1rem; }
+.table-list > h2 { margin: 0 0 1.3rem; }
+.table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)); gap: 1rem; }
+.table-card { min-width: 0; border: 1px solid var(--line); border-radius: .4rem; padding: 1.3rem; background: var(--panel); }
+.table-card:focus-within { border-color: var(--gold); }
+.table-card h3 { margin: 0; font-size: 1rem; }
+.table-card h3 button { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; min-height: 2.75rem; padding: .1rem 0 .65rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; text-align: left; font: 400 1.5rem/1.25 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
+.table-card h3 button::after { content: "↗"; flex-shrink: 0; color: var(--gold); font: 1.1rem system-ui, sans-serif; }
+.table-card h3 button:hover { color: var(--gold); background: transparent; }
+.table-card p { margin: .7rem 0; overflow-wrap: anywhere; font-size: .85rem; }
+.table-card dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .6rem 1rem; margin: 1rem 0; padding: .9rem 0; border-block: 1px solid var(--line); font-size: .8rem; }
+.table-card dt { color: var(--muted); }
+.table-card dd { margin: 0; overflow-wrap: anywhere; }
+.roster { margin: .4rem 0 0; padding-left: 1.25rem; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.attendees-card { margin-bottom: 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); }
+.attendees-card summary { padding: .8rem 1.1rem; color: var(--gold); font-weight: 650; }
+.attendee-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: .45rem 1.5rem; margin: 0; padding: .2rem 1.1rem 1rem; max-height: 16rem; overflow-y: auto; }
+.attendee-column { min-width: 0; }
+.attendee-column ul { list-style: none; padding: 0; margin: .45rem 0 0; }
+.attendee-list li { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
+.attendee-role { margin: 0; font-weight: 650; color: var(--muted); font-size: .72rem; }
+.activity-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 1.1rem; }
+.activity-panel h2 { margin: 0 0 .4rem; font: 650 .9rem system-ui, sans-serif; }
+#activity-note, #activity-empty { margin: .4rem 0; color: var(--muted); font-size: .7rem; }
+.activity-log { list-style: none; padding: 0; margin: .6rem 0 0; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scrollbar-color: var(--line) transparent; }
+.activity-log li { display: grid; grid-template-columns: 1fr; gap: .2rem; padding: .6rem .4rem; border-bottom: 1px solid var(--line); font-size: .78rem; }
+.activity-log li:nth-child(odd) { background: #111d1750; }
+.activity-log time { color: var(--muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
+#activity-more { margin-top: .75rem; min-height: 2rem; padding: .3rem .6rem; font-size: .75rem; }
+
+footer { max-width: var(--page-width); margin: auto; border-top: 1px solid var(--line); padding: 1.6rem var(--gutter) 2.5rem; color: var(--muted); font-size: .72rem; }
+footer p { margin: .3rem 0; }
+.kiosk-link { display: inline-block; margin-top: .5rem; padding: .15rem .5rem; border: 1px solid var(--line); border-radius: .3rem; color: var(--muted); font-size: .68rem; text-decoration: none; }
+.kiosk-link:hover, .kiosk-link:focus-visible { color: var(--ink); border-color: var(--muted); }
+.event-navigation { margin-top: 1rem; }
+.archive-page { max-width: 65rem; padding-top: 1rem; padding-bottom: 4rem; }
+.archive-page > p { color: var(--muted); }
+.archive-list { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.archive-list li { padding: 1.5rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); }
+.archive-list a { font: 1.6rem Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
+.archive-list p { margin-bottom: 0; color: var(--muted); }
+/* Dismissed camera help stays available to the canvas's aria-describedby. */
+.visually-hidden, #camera-help[data-dismissed] { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+@media (max-width: 1050px) {
+  .masthead { gap: 2rem; grid-template-columns: minmax(0, 1fr) 19rem; }
+
+}
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  .site-bar { min-height: 68px; flex-wrap: wrap; gap: .5rem 1rem; }
+  .wordmark { font-size: 1.25rem; }
+  .wordmark img { width: 27px; height: 27px; }
+  .site-nav { gap: 1rem; font-size: .75rem; flex-wrap: wrap; }
+  .site-nav a { min-height: 44px; display: inline-flex; align-items: center; }
+  .site-nav a:first-child:not(:last-child) { display: none; }
+  .masthead { grid-template-columns: 1fr; padding-block: 1.8rem; gap: 1.4rem; }
+  h1 { font-size: clamp(2.6rem, 10vw, 3.6rem); }
+  .orientation { font-size: .9rem; }
+  .event-console { padding: 1rem; }
+  .readout time { flex-basis: auto; font-size: 1.05rem; }
+  .event-actions details { display: none; }
+  .table-list { padding-top: 1.75rem; }
+  .hall-explorer { margin-top: 1rem; }
+  .hall-layout { padding: .75rem; }
+  .camera-controls button { min-width: 44px; min-height: 44px; }
+  .drawer-close { width: 44px; height: 44px; }
+  .timeline-controls { padding: .75rem; }
+  .timeline-meta { font-size: .65rem; }
+  .table-card { padding: 1.1rem; }
+}
+/* Event page on phones (not kiosk): two bar lines, then the hall and status strip.
+   Line 1: title and Discord. Line 2: event name, badge and scene text.
+   Height: .4rem padding + 44px Discord row + 1.5rem second row + .4rem padding.
+   Without actions the title row is 2.4rem, giving 4.7rem total. The status strip is 3rem;
+   the canvas has a 10rem floor. Time controls sit below the map on their own row. */
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 3.25rem; --phone-bar: calc(2.3rem + 44px); --phone-strip: 3rem; }
+  html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-bar: 4.7rem; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav, html:not([data-kiosk]):has(#hall-content) #record-note { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { height: var(--phone-bar); display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 0 .75rem; padding: .4rem var(--gutter); overflow: hidden; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { content: ""; flex-basis: 100%; height: 0; }
+  html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 2.4rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 5; flex: none; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 4; flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 2; flex: none; flex-wrap: nowrap; margin: 0 0 0 auto; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; min-height: 44px; padding: 0 1rem; line-height: 44px; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 6; flex: 0 1 auto; min-width: 0; font-size: .8rem; line-height: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls { flex: 1 0 100%; margin-left: 0; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls label { margin-left: auto; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-head .controls button, html:not([data-kiosk]):has(#hall-content) .timeline-head .controls select { min-height: 44px; }
+  html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { padding: 0; }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { right: calc(-1 * var(--gutter)); } /* flush with the full-bleed canvas */
+  html:not([data-kiosk]):has(#hall-content) #hall { width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); border-inline: 0; border-radius: 0; min-height: 0; max-height: none;
+    height: max(10rem, calc(100vh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip)));
+    height: max(10rem, calc(100svh - var(--fund-strip) - var(--phone-bar) - var(--phone-strip))); }
+  html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--phone-strip); }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { position: absolute; z-index: 1; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
+}
+/* Landscape phones: one row of title, event name, badge, scene text and Discord (44px + .8rem padding). */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  html:not([data-kiosk]):has(#hall-content), html:not([data-kiosk]):has(#hall-content):has(#event-actions:empty) { --phone-bar: calc(44px + .8rem); }
+  html:not([data-kiosk]):has(#hall-content) .masthead { flex-wrap: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .masthead::before { display: none; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 3; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 2; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 4; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 5; flex: none; gap: .5rem; margin-left: auto; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { flex: none; padding: 0 1rem; }
+}
+/* Event page off phones (not kiosk): a fixed 3.5rem bar, hall, then status strip.
+   Bar order: title, event name, badge, scene text, nav and Discord.
+   Under 1100px the bar stays on one line. The camera buttons and help float over the canvas's bottom corners
+   (the scene is a grid: canvas and both overlays share row 1, the timeline takes row 2). */
+@media not ((max-width: 650px) or ((orientation: landscape) and (max-height: 500px) and (max-width: 950px))) {
+  html:not([data-kiosk]):has(#hall-content) { --fund-strip: 2.75rem; --desk-bar: 3.5rem; --desk-strip: 2.5rem; --desk-gap: .75rem; }
+  html:not([data-kiosk]):has(#hall-content) #record-note { display: none; }
+  html:not([data-kiosk]):has(#hall-content) .masthead { max-width: none; height: var(--desk-bar); display: flex; flex-wrap: nowrap; align-content: center; align-items: center; gap: .4rem 1rem; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+  html:not([data-kiosk]):has(#hall-content) .identity, html:not([data-kiosk]):has(#hall-content) .event-console, html:not([data-kiosk]):has(#hall-content) .readout { display: contents; }
+  html:not([data-kiosk]):has(#hall-content) h1 { order: 1; flex: none; margin: 0; font-size: 1.6rem; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .badge { order: 3; flex: none; line-height: 1; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) .orientation, html:not([data-kiosk]):has(#hall-content) #scene-event {
+    flex: 0 1 auto; min-width: 0; margin: 0; font-size: .85rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-kiosk]):has(#hall-content) .orientation { order: 2; }
+  html:not([data-kiosk]):has(#hall-content) #scene-event { order: 4; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) .site-nav { order: 5; flex: none; flex-wrap: nowrap; gap: 1.25rem; margin: 0 0 0 auto; font-size: .8rem; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions { order: 6; flex: none; flex-wrap: nowrap; margin: 0; }
+  html:not([data-kiosk]):has(#hall-content) #event-actions a { padding: .4rem .85rem; font-size: .8rem; white-space: nowrap; }
+  html:not([data-kiosk]):has(#hall-content) main { max-width: none; }
+  html:not([data-kiosk]):has(#hall-content) #hall-explorer { order: -1; margin: 0; border: 0; border-radius: 0; background: none; }
+  html:not([data-kiosk]):has(#hall-content) .hall-layout { gap: var(--desk-gap); padding: var(--desk-gap) 0 0; align-items: stretch; }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap {
+    height: max(20rem, calc(100vh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap)));
+    height: max(20rem, calc(100svh - var(--fund-strip) - var(--desk-bar) - var(--desk-strip) - var(--desk-gap))); }
+  html:not([data-kiosk]):has(#hall-content) .scene-wrap { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); }
+  html:not([data-kiosk]):has(#hall-content) .hall-drawer { grid-area: 1 / 1 / 2 / 2; } /* explicit end lines: an absolute grid item reads "auto" as the container edge */
+  html:not([data-kiosk]):has(#hall-content) #hall { grid-area: 1 / 1; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls { grid-area: 1 / 1; align-self: end; justify-self: start; z-index: 1; margin: .5rem; pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) #camera-controls button { pointer-events: auto; background: rgb(33 51 42 / .6); backdrop-filter: blur(3px); }
+  html:not([data-kiosk]):has(#hall-content) #camera-help { grid-area: 1 / 1; align-self: end; justify-self: end; z-index: 1; margin: .5rem; padding: .2rem .55rem; border-radius: .3rem; background: rgb(7 13 11 / .6); pointer-events: none; }
+  html:not([data-kiosk]):has(#hall-content) .jukebox-key:focus { grid-area: 1 / 1; align-self: start; justify-self: start; z-index: 1; margin: .5rem; }
+  html:not([data-kiosk]):has(#hall-content) .timeline-controls { grid-row: 2; margin-top: .6rem; padding: .45rem .85rem; }
+  html[data-view="desktop"] #hall-content #timeline-track { margin: .35rem 0; }
+  html:not([data-kiosk]):has(#hall-content) .status { min-height: var(--desk-strip); padding: .5rem 0 0; }
+}
+/* View controls follow the camera mode, including phones held sideways. */
+#camera-toggle { display: none; }
+html[data-view="mobile"] #camera-toggle { display: block; }
+html[data-view="mobile"] #camera-controls { left: .5rem; bottom: .5rem; flex-direction: column-reverse; align-items: flex-start; flex-wrap: nowrap; }
+html[data-view="mobile"] #camera-controls:not([data-open]) button:not(#camera-toggle) { display: none; }
+html[data-view="mobile"] #camera-controls button { min-width: 44px; min-height: 44px; border-radius: .3rem; }
+@media (orientation: landscape) {
+  html[data-view="mobile"] #camera-controls { flex-direction: row; flex-wrap: nowrap; }
+}
+
+/* Desktop keeps the same actions in a compact joined group. */
+html[data-view="desktop"] #camera-controls { gap: 0; }
+html[data-view="desktop"] #camera-controls button { min-height: 1.9rem; padding: .2rem .6rem; font-size: .75rem; border-radius: 0; }
+html[data-view="desktop"] #camera-controls #zoom-in,
+html[data-view="desktop"] #camera-controls #zoom-out { font-size: 1.1rem; min-width: 1.9rem; }
+html[data-view="desktop"] #camera-controls #zoom-in { border-radius: .3rem 0 0 .3rem; }
+html[data-view="desktop"] #camera-controls #activity-toggle { border-radius: 0 .3rem .3rem 0; }
+html[data-view="desktop"] #camera-controls button:not(#camera-toggle):not(#zoom-in) { margin-left: -1px; }
+@media (pointer: coarse) {
+  html[data-view="desktop"] #camera-controls button { min-height: 44px; }
+}
+
+/* Wide desktops put all timeline items in one row; hidden items take no space. */
+@media (min-width: 1100px) {
+  html[data-view="desktop"] .timeline-controls { display: flex; align-items: center; gap: .4rem .9rem; flex-wrap: nowrap; }
+  html[data-view="desktop"] .timeline-head, html[data-view="desktop"] .timeline-meta { display: contents; }
+  html[data-view="desktop"] .timeline-head > label { order: 1; white-space: nowrap; }
+  html[data-view="desktop"] #clock { order: 2; }
+  html[data-view="desktop"] #start-label { order: 3; white-space: nowrap; }
+  html[data-view="desktop"] #hall-content #timeline-track { order: 4; flex: 1 1 auto; min-width: 8rem; margin: 0; }
+  html[data-view="desktop"] #end-label { order: 5; white-space: nowrap; }
+  html[data-view="desktop"] #now-marker { order: 6; white-space: nowrap; }
+  html[data-view="desktop"] .timeline-head .controls { order: 7; margin-left: 0; }
+}
+@media (min-width: 1100px) and (pointer: fine) {
+  /* Allow for the panel's 2px border within the 3rem height target. */
+  html[data-view="desktop"] .timeline-head .controls button,
+  html[data-view="desktop"] .timeline-head .controls select { min-height: calc(2rem - 1px); }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+}
+
+/* Kiosk mode (`?kiosk=1`): a slim bar and the scene filling the viewport; the wall plaques carry the QR codes. */
+html[data-kiosk] { --fund-strip: 3.5rem; --kiosk-bar: 4.5rem; --kiosk-status: 2.4rem; --kiosk-gap: .75rem; scroll-behavior: auto; }
+html[data-kiosk] body { overflow: hidden; }
+html[data-kiosk][data-idle] body { cursor: none; }
+html[data-kiosk] .skip-link, html[data-kiosk] .site-nav, html[data-kiosk] #event-actions, html[data-kiosk] #record-note,
+html[data-kiosk] #table-list, html[data-kiosk] #table-list details,
+html[data-kiosk] #hall-sidebar, html[data-kiosk] .camera-controls, html[data-kiosk] #camera-help,
+html[data-kiosk] .timeline-controls, html[data-kiosk] #tooltip:not(.jukebox-tip), html[data-kiosk] footer { display: none; }
+html[data-kiosk] .masthead { max-width: none; height: var(--kiosk-bar); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 1.5rem; align-items: center; padding: 0 var(--gutter); border-bottom: 1px solid var(--line); overflow: hidden; }
+html[data-kiosk] .identity { display: contents; }
+html[data-kiosk] h1 { margin: 0; font-size: 2rem; white-space: nowrap; }
+html[data-kiosk] .orientation { margin: 0; max-width: none; font-size: 1.2rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-kiosk] .event-console { grid-column: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+html[data-kiosk] .readout { flex-wrap: nowrap; gap: 1rem; font-size: 1.4rem; white-space: nowrap; }
+html[data-kiosk] .readout time { font-size: 1.4rem; }
+html[data-kiosk] #scene-event { font-size: 1.1rem; }
+html[data-kiosk] .badge { font-size: .85rem; padding: .25rem .8rem; }
+html[data-kiosk] main { max-width: none; padding: 0 var(--gutter); }
+html[data-kiosk] .status { height: var(--kiosk-status); padding: .35rem 0 0; border-top: 0; font-size: 1.3rem; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-kiosk] .hall-explorer { margin: 0; border: 0; border-radius: 0; background: none; }
+html[data-kiosk] .hall-layout { grid-template-columns: minmax(0, 1fr); gap: var(--kiosk-gap); padding: 0; align-items: stretch; }
+html[data-kiosk] canvas { height: calc(100vh - var(--fund-strip) - var(--kiosk-bar) - var(--kiosk-status) - var(--kiosk-gap)); border-radius: 0; }
+
+/* Live fundraising stays in one row and never animates. */
+html:has(#hall-content):has(#fundraising-strip[hidden]) { --fund-strip: 0px; }
+.fundraising-strip { width: 100%; height: var(--fund-strip); overflow: hidden; display: flex; align-items: center; gap: .75rem; padding: 0 max(16px, var(--gutter)); background: var(--panel); border-bottom: 1px solid var(--line); }
+.thermometer { flex: 1 1 12rem; min-width: 4rem; display: flex; align-items: center; }
+.thermometer-bulb { flex: none; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--raised); }
+.thermometer-tube { flex: 1; min-width: 0; height: .6rem; border-radius: .3rem; background: var(--panel-2); border: 1px solid var(--line); margin-left: -.2rem; overflow: hidden; }
+.thermometer-fill { display: block; width: 0; height: 100%; border-radius: .3rem; background: var(--raised); }
+.fundraising-total { margin: 0; font-size: .9rem; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fundraising-total .raised { color: var(--gold); font-weight: 700; }
+.fundraising-total .reached { color: var(--gold); }
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  .fundraising-total .brand { display: none; }
+  /* The total is the point of the strip: it keeps its width and the tube gives way. */
+  .thermometer { flex-basis: 3rem; min-width: 3rem; }
+  .fundraising-total { flex-shrink: 0; }
+}
+html[data-kiosk] .fundraising-total { font-size: 1.6rem; color: var(--gold); }
+html[data-kiosk] .thermometer-tube { height: .9rem; }
+html[data-kiosk] .thermometer-bulb { width: 1.5rem; height: 1.5rem; }
+
+/* Wide projectors give the hall its full height; narrower kiosks retain the bar layout above. */
+@media (min-aspect-ratio: 3/2) {
+  html[data-kiosk] { --kiosk-canvas-h: calc(100vh - 2 * var(--kiosk-gap)); }
+  html[data-kiosk] body {
+    display: grid;
+    grid-template-columns: minmax(16rem, 1fr) auto minmax(16rem, 1fr);
+    grid-template-rows: var(--kiosk-canvas-h);
+    gap: var(--kiosk-gap);
+    padding: var(--kiosk-gap) var(--gutter);
+  }
+  html[data-kiosk] .masthead { display: none; }
+  html[data-kiosk] #hall-content {
+    grid-area: 1 / 2;
+    width: min(calc(var(--kiosk-canvas-h) * var(--hall-ratio)), calc(100vw - 2 * var(--gutter) - 2 * 16rem - 2 * var(--kiosk-gap)));
+    min-width: 0;
+    height: var(--kiosk-canvas-h);
+    margin: 0;
+    padding: 0;
+  }
+  /* Sized from the variable, not 100%: a percentage cannot resolve through the <details> content slot. */
+  html[data-kiosk] #hall { height: var(--kiosk-canvas-h); border: 0; }
+  html[data-kiosk] #kiosk-info,
+  html[data-kiosk] #kiosk-codes { min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+  html[data-kiosk] #kiosk-info { grid-area: 1 / 1; }
+  html[data-kiosk] #kiosk-info .identity { display: block; }
+  html[data-kiosk] #kiosk-info #event-name {
+    margin-top: .75rem; font-size: 1.5rem; white-space: normal; text-overflow: clip;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  }
+  html[data-kiosk] #kiosk-info .readout { flex-direction: column; align-items: flex-start; gap: .5rem; white-space: normal; }
+  html[data-kiosk] #kiosk-info #clock { font-size: 2.2rem; font-variant-numeric: tabular-nums; }
+  html[data-kiosk] #kiosk-info #scene-event { font-size: 1.2rem; overflow-wrap: anywhere; }
+  html[data-kiosk] #kiosk-info #fundraising-strip {
+    height: auto; padding: 0; flex-direction: column; align-items: stretch; background: none; border: 0;
+  }
+  html[data-kiosk] #kiosk-info .fundraising-total { order: -1; white-space: normal; overflow-wrap: anywhere; }
+  html[data-kiosk] #kiosk-info .thermometer { flex: none; width: 100%; }
+  html[data-kiosk] #kiosk-info #status {
+    margin-top: auto; height: auto; font-size: 1.1rem; white-space: normal; text-overflow: clip;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4;
+  }
+  html[data-kiosk] #kiosk-codes { grid-area: 1 / 3; justify-content: center; align-items: center; }
+  html[data-kiosk] .kiosk-code { width: 100%; max-width: 22rem; padding: .5rem; background: #4a3524; border: 2px solid #b89b5c; }
+  html[data-kiosk] .kiosk-code-mat { padding: .5rem; background: white; }
+  html[data-kiosk] .kiosk-code img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+  html[data-kiosk] .kiosk-code p { margin: .5rem 0 0; overflow-wrap: anywhere; }
+  html[data-kiosk] .kiosk-code-label { color: #e9d9ae; font-size: 1.2rem; }
+  html[data-kiosk] .kiosk-code-url { color: var(--muted); font-size: .95rem; }
+}
