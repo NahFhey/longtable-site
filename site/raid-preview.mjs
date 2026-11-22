@@ -20,7 +20,7 @@ export function kioskTrailerCaption(breakEvent, event, { locale } = {}) {
   return `BREAK — back to your games at ${time}`;
 }
 
-export const KIOSK_TRAILER_SECONDS = 60;   // assets/raid/preview.mp4 (DISPATCH-raid-trailer-v2 builds it at 60 ± 0.1 s)
+export const KIOSK_TRAILER_SECONDS = 93;   // assets/raid/preview.mp4 (DISPATCH-raid-trailer-v3 builds it at 93 ± 0.1 s)
 
 /** Slots in which the break's one play starts: its middle on the break's middle, or at once in a break shorter
  * than the trailer (Devin, 2026-11-07). */

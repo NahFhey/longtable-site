@@ -479,15 +479,16 @@ test("the kiosk caption gives the break's end in the event zone", () => {
 });
 
 test("the break's one play is centred on its middle, or starts at once in a break shorter than the trailer", () => {
-  // 30-minute slots: the 60 s trailer is 1/30 of a slot.
+  // 30-minute slots: the 93 s trailer is 93/1800 of a slot.
   const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} vs ${expected}`);
+  const length = 93 / 1800;
   const { start, end } = kioskTrailerWindow({ at: 8, duration: 1 }, 30);
-  close(start, 8 + (1 - 1 / 30) / 2);
-  close(end, start + 1 / 30);
+  close(start, 8 + (1 - length) / 2);
+  close(end, start + length);
   close((start + end) / 2, 8.5);
   const short = kioskTrailerWindow({ at: 8, duration: 1 / 60 }, 30);
   close(short.start, 8);
-  close(short.end, 8 + 1 / 30);
+  close(short.end, 8 + length);
 });
 
 test("a kiosk break plays the trailer once, muted, in its middle under a caption, and nothing on screen closes it", () => {
