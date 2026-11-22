@@ -961,8 +961,8 @@
   "pad_capacity": 20,
   "overflow_capacity": 120
  },
- "phase": "live",
- "generated_at": "2026-11-21T17:19:08.131670Z",
+ "phase": "final",
+ "generated_at": "2026-11-22T16:00:02.985387Z",
  "event": {
   "name": "24 Hour D&D",
   "start": "2026-11-07T10:00:00-05:00",
@@ -975,7 +975,7 @@
  "people": [
   {
    "id": "p1",
-   "name": "Nah Fhey",
+   "name": "Nah F.",
    "dm": true,
    "hidden": false,
    "variant": 4082956081,
@@ -1447,7 +1447,7 @@
   },
   {
    "id": "p24",
-   "name": "Gryndor the Unicorn Wizard",
+   "name": "Gryndor W.",
    "dm": false,
    "hidden": false,
    "variant": 3991771774,
@@ -1471,7 +1471,7 @@
   },
   {
    "id": "p25",
-   "name": "Becky VG./ Mystilyn",
+   "name": "Becky M.",
    "dm": false,
    "hidden": false,
    "variant": 3286553723,
@@ -1514,7 +1514,7 @@
   },
   {
    "id": "p27",
-   "name": "Pxppunkpippin 👁🔮🧿",
+   "name": "Pxppunkpippin",
    "dm": false,
    "hidden": false,
    "variant": 3002484972,
